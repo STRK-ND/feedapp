@@ -43,6 +43,7 @@ dependencies:
   xml: ^6.3.0
   google_fonts: ^6.2.0
   connectivity_plus: ^6.1.0
+  package_info_plus: ^8.1.2
 
 dev_dependencies:
   flutter_test:

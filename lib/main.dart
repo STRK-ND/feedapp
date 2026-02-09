@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'services/update_service.dart';
+import 'widgets/update_dialog.dart';
 
 void main() {
   runApp(const RssReaderApp());
@@ -332,7 +334,7 @@ class RssFeedService {
         final enclosureElement = item.findElements('enclosure').firstOrNull;
         if (enclosureElement != null) {
           final url = enclosureElement.getAttribute('url');
-          if (url != null && _isValidImageUrl(url)) {
+          if (url != null) {
             imageUrl = url;
           }
         }
@@ -342,7 +344,18 @@ class RssFeedService {
           final mediaElement = item.findElements('media:content').firstOrNull;
           if (mediaElement != null) {
             final url = mediaElement.getAttribute('url');
-            if (url != null && _isValidImageUrl(url)) {
+            if (url != null) {
+              imageUrl = url;
+            }
+          }
+        }
+
+        // Method 2.5: media:thumbnail element
+        if (imageUrl == null) {
+          final thumbnailElement = item.findElements('media:thumbnail').firstOrNull;
+          if (thumbnailElement != null) {
+            final url = thumbnailElement.getAttribute('url');
+            if (url != null) {
               imageUrl = url;
             }
           }
@@ -355,8 +368,7 @@ class RssFeedService {
             final imgMatches = RegExp(r'''<img[^>]+src=["']([^"']+)["']''', multiLine: true)
                 .allMatches(descriptionText)
                 .map((m) => m.group(1))
-                .whereType<String>()
-                .where((url) => _isValidImageUrl(url));
+                .whereType<String>();
             if (imgMatches.isNotEmpty) {
               imageUrl = imgMatches.first;
             }
@@ -372,10 +384,51 @@ class RssFeedService {
               final imgMatches = RegExp(r'''<img[^>]+src=["']([^"']+)["']''', multiLine: true)
                   .allMatches(contentText)
                   .map((m) => m.group(1))
-                  .whereType<String>()
-                  .where((url) => _isValidImageUrl(url));
+                  .whereType<String>();
               if (imgMatches.isNotEmpty) {
                 imageUrl = imgMatches.first;
+              }
+            }
+          }
+        }
+
+        // Method 5: Try to extract ANY URL from description as fallback (be lenient)
+        if (imageUrl == null && descriptionElement != null) {
+          final descriptionText = descriptionElement.innerText;
+          if (descriptionText.isNotEmpty && descriptionText.contains('http')) {
+            // Find all URLs in the content
+            final urlMatches = RegExp(r'https?://\S+', multiLine: true)
+                .allMatches(descriptionText)
+                .map((m) => m.group(0)!);
+
+            // Pick the first URL that doesn't look like the main article link
+            for (final url in urlMatches) {
+              // Skip if it's the main article link (we already have that)
+              if (linkElement != null && url == linkElement.innerText) continue;
+
+              // Just accept it - be very lenient to catch any images
+              imageUrl = url;
+              break;
+            }
+          }
+        }
+
+        // If still no image, try extracting from the full content/encoded
+        if (imageUrl == null) {
+          final contentElement = item.findElements('content:encoded').firstOrNull;
+          if (contentElement != null) {
+            final contentText = contentElement.innerText;
+            if (contentText.isNotEmpty && contentText.contains('http')) {
+              final urlMatches = RegExp(r'https?://\S+', multiLine: true)
+                  .allMatches(contentText)
+                  .map((m) => m.group(0)!);
+              if (urlMatches.isNotEmpty) {
+                // Pick a URL that doesn't look like the article link
+                for (final url in urlMatches) {
+                  if (linkElement != null && url == linkElement.innerText) continue;
+                  imageUrl = url;
+                  break;
+                }
               }
             }
           }
@@ -428,12 +481,62 @@ class RssFeedService {
   static bool _isValidImageUrl(String url) {
     if (url.isEmpty) return false;
 
-    // Check for valid image extensions
-    final validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
     final lowerUrl = url.toLowerCase();
 
+    // Check for common image file extensions
+    final validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.avif', '.heic', '.ico', '.tif', '.tiff'];
     for (final ext in validExtensions) {
       if (lowerUrl.contains(ext)) return true;
+    }
+
+    // Check for common image CDN patterns (these often don't have explicit extensions)
+    final imagePatterns = [
+      // Cloudinary
+      'clouddn.com',
+      'cloudinary.com',
+      'res.cloudinary',
+      // Image services
+      'images.unsplash.com',
+      'cdn.pixabay.com',
+      'imgur.com',
+      'i.imgur.com',
+      'cdn-images-1.medium.com',
+      'miro.medium.com',
+      'static.wixstatic.com',
+      'images.unsplash.com',
+      'pbs.twimg.com', // Twitter images
+      'abs-0.twimg.com', // Twitter images
+      // Image CDNs commonly used
+      'cdn.',
+      'images.',
+      'static.',
+      'assets.',
+      'img.',
+      'media.',
+      'thumbs.',
+      'thumbnail.',
+      'preview.',
+    ];
+
+    for (final pattern in imagePatterns) {
+      if (lowerUrl.contains(pattern)) return true;
+    }
+
+    // Accept URLs that look like they might be images based on parameters
+    if (lowerUrl.contains('image') || lowerUrl.contains('photo') || lowerUrl.contains('picture')) {
+      return true;
+    }
+
+    // Accept URLs that have dimensions (often image thumbnails)
+    if (lowerUrl.contains('&width=') || lowerUrl.contains('&height=') ||
+        lowerUrl.contains('?width=') || lowerUrl.contains('?height=') ||
+        lowerUrl.contains('w=') || lowerUrl.contains('h=')) {
+      return true;
+    }
+
+    // Accept URLs that look like content delivery
+    if (lowerUrl.contains('content') && (lowerUrl.contains('cdn') || lowerUrl.contains('media'))) {
+      return true;
     }
 
     return false;
@@ -1395,6 +1498,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _loadData();
     _loadViewMode();
     _checkConnectivity();
+    _checkForUpdates();
     _fabController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -1476,6 +1580,19 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   Future<void> _saveViewMode() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('viewMode', _viewMode == ViewMode.list ? 'list' : 'cards');
+  }
+
+  Future<void> _checkForUpdates() async {
+    // Delay check to avoid showing on first launch
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+
+    if (mounted && updateInfo != null) {
+      showUpdateDialog(context: context, updateInfo: updateInfo);
+    }
   }
 
   Future<void> _saveArticles() async {
@@ -2075,6 +2192,57 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
                   color: Colors.white,
                 ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                color: _AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (value) async {
+                  if (value == 'check_updates') {
+                    final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+                    if (context.mounted) {
+                      if (updateInfo != null) {
+                        showUpdateDialog(context: context, updateInfo: updateInfo);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('You\'re using the latest version!')),
+                        );
+                      }
+                    }
+                  } else if (value == 'toggle_view') {
+                    setState(() {
+                      _viewMode = _viewMode == ViewMode.cards ? ViewMode.list : ViewMode.cards;
+                    });
+                    _saveViewMode();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'check_updates',
+                    child: Row(
+                      children: [
+                        Icon(Icons.system_update),
+                        SizedBox(width: 12),
+                        Text('Check for updates'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle_view',
+                    child: Row(
+                      children: [
+                        Icon(_viewMode == ViewMode.cards ? Icons.view_list : Icons.grid_view),
+                        const SizedBox(width: 12),
+                        Text(_viewMode == ViewMode.cards ? 'Switch to List View' : 'Switch to Card View'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
