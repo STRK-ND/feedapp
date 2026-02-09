@@ -5,7 +5,7 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2025-02-XX
+## [1.1.0] - 2025-02-10
 
 ### Added
 - Auto-update feature using GitHub Actions and GitHub Releases
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved update checking with hourly rate limiting
 
-## [1.0.0] - 2025-XX-XX
+## [1.0.0] - 2025-02-10
 
 ### Added
 - Initial release
