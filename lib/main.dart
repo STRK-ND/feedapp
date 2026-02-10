@@ -2118,7 +2118,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: Text(
-            _selectedTab == 0 ? 'Curated Feeds' : 'Saved',
+            _selectedTab == 0
+                ? 'Curated Feeds'
+                : _selectedTab == 1
+                    ? 'Saved'
+                    : 'Settings',
             style: GoogleFonts.playfairDisplay(
               fontSize: 28,
               fontWeight: FontWeight.w700,
@@ -2440,7 +2444,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             ? (_viewMode == ViewMode.cards
                                 ? _buildCardView()
                                 : _buildListView())
-                            : _buildSavedArticlesView(),
+                            : _selectedTab == 1
+                                ? _buildSavedArticlesView()
+                                : _buildSettingsView(),
                       ),
               ),
             ],
@@ -2541,9 +2547,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             _selectedTab = index;
             if (index == 1) {
               _displayedArticles = List.from(_savedArticles);
-            } else {
+            } else if (index == 0) {
               _displayedArticles = _getFilteredArticles();
             }
+            // Settings tab (index 2) doesn't need displayed articles
           });
         },
         borderRadius: BorderRadius.circular(24),
@@ -2766,6 +2773,163 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSettingsView() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+      children: [
+        _buildSettingsSection('About', [
+          _buildSettingsItem(
+            icon: Icons.info_outline_rounded,
+            title: 'Version',
+            subtitle: '1.1.1',
+            trailing: null,
+            onTap: null,
+          ),
+        ]),
+        const SizedBox(height: 20),
+        _buildSettingsSection('Appearance', [
+          _buildSettingsItem(
+            icon: Icons.view_column_outlined,
+            title: 'View Mode',
+            subtitle: _viewMode == ViewMode.cards ? 'Card View' : 'List View',
+            trailing: Icon(
+              _viewMode == ViewMode.cards ? Icons.style_outlined : Icons.list_outlined,
+              color: _AppColors.textTertiary,
+            ),
+            onTap: () {
+              setState(() {
+                _viewMode = _viewMode == ViewMode.cards
+                    ? ViewMode.list
+                    : ViewMode.cards;
+              });
+              _saveViewMode();
+            },
+          ),
+        ]),
+        const SizedBox(height: 20),
+        _buildSettingsSection('Data', [
+          _buildSettingsItem(
+            icon: Icons.bookmark_outline_rounded,
+            title: 'Saved Articles',
+            subtitle: '${_savedArticles.length} articles saved',
+            trailing: null,
+            onTap: null,
+          ),
+        ]),
+        const SizedBox(height: 20),
+        _buildSettingsSection('Support', [
+          _buildSettingsItem(
+            icon: Icons.refresh_rounded,
+            title: 'Refresh Feeds',
+            subtitle: 'Pull down to refresh or tap here',
+            trailing: null,
+            onTap: _isLoading ? null : _refreshFeeds,
+          ),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildSettingsSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            title,
+            style: GoogleFonts.dmSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _AppColors.primary,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: _AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _AppColors.divider.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: _AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        color: _AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing,
+              if (onTap != null) ...[
+                if (trailing == null) const Icon(
+                  Icons.chevron_right_rounded,
+                  color: _AppColors.textTertiary,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
