@@ -2784,7 +2784,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _buildSettingsItem(
             icon: Icons.info_outline_rounded,
             title: 'Version',
-            subtitle: '1.1.1',
+            subtitle: '1.1.3',
             trailing: null,
             onTap: null,
           ),
