@@ -86,6 +86,16 @@ class UpdateService {
 
   /// Compare versions to determine if update is needed
   static bool _shouldUpdate(String current, String latest) {
+    // Remove build number from current version (e.g., "1.1.3+5" -> "1.1.3")
+    if (current.contains('+')) {
+      current = current.split('+')[0];
+    }
+
+    // Remove build number from latest version too (for consistency)
+    if (latest.contains('+')) {
+      latest = latest.split('+')[0];
+    }
+
     final currentParts = current.split('.')..removeWhere((e) => e.isEmpty);
     final latestParts = latest.split('.')..removeWhere((e) => e.isEmpty);
 
