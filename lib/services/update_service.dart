@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'version_provider.dart';
 
 class UpdateService {
   // GitHub repository URL for auto-updates
@@ -41,14 +41,14 @@ class UpdateService {
             ? latestVersion.substring(1)
             : latestVersion;
 
-        // Get current app version
-        final packageInfo = await _getCurrentVersion();
+        // Get current app version via VersionProvider for caching
+        final currentVersion = await VersionProvider.getVersionWithoutBuild();
 
         // Update last checked time
         await prefs.setInt(_lastCheckedKey, now);
 
         // Check if update is needed (simple version comparison)
-        if (_shouldUpdate(packageInfo, cleanVersion)) {
+        if (_shouldUpdate(currentVersion, cleanVersion)) {
           final ignoredVersion = prefs.getString(_ignoredVersionKey);
           // Don't show if user ignored this version
           if (ignoredVersion != cleanVersion) {
@@ -75,13 +75,15 @@ class UpdateService {
     if (assets != null && assets.isNotEmpty) {
       // Find the APK file
       for (final asset in assets) {
-        if ((asset['name'] as String).endsWith('.apk')) {
-          return asset['browser_download_url'] as String;
+        final name = asset['name'] as String?;
+        if (name != null && name.endsWith('.apk')) {
+          final url = asset['browser_download_url'] as String?;
+          if (url != null) return url;
         }
       }
     }
     // Fallback to release page
-    return releaseData['html_url'] as String;
+    return releaseData['html_url'] as String? ?? '';
   }
 
   /// Compare versions to determine if update is needed
@@ -112,17 +114,6 @@ class UpdateService {
     }
 
     return false;
-  }
-
-  /// Get current app version
-  static Future<String> _getCurrentVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      return packageInfo.version;
-    } catch (e) {
-      debugPrint('Error getting package info: $e');
-      return '1.0.0'; // Fallback
-    }
   }
 
   /// Mark a version as ignored (won't show update for this version)

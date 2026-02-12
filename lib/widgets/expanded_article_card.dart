@@ -1,0 +1,327 @@
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import '../models/article.dart';
+import '../services/cache_manager.dart';
+import '../services/rss_feed_service.dart';
+import '../utils/constants.dart';
+import '../utils/helpers.dart';
+
+/// Expanded article card bottom sheet/modal widget
+class ExpandedArticleCard extends StatelessWidget {
+  final Article article;
+  final VoidCallback onClose;
+  final VoidCallback onToggleSave;
+
+  const ExpandedArticleCard({
+    required this.article,
+    required this.onClose,
+    required this.onToggleSave,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final source = RssFeedService.getSourceById(article.sourceId) ??
+        RssFeedService.predefinedSources.first;
+    final sourceColor = source.color;
+
+    return Dismissible(
+      direction: DismissDirection.down,
+      key: const Key('article_modal'),
+      onDismissed: (_) => onClose(),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.92,
+        minChildSize: 0.5,
+        maxChildSize: 0.97,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, -20),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: sourceColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(source.icon, size: 14, color: sourceColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              source.name,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: sourceColor,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          _buildHeaderButton(
+                            icon: Icons.open_in_new_rounded,
+                            onPressed: () async {
+                              final uri = Uri.parse(article.link);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            color: sourceColor,
+                            label: 'Open in browser',
+                          ),
+                          _buildHeaderButton(
+                            icon: Icons.share_rounded,
+                            onPressed: () {
+                              Share.share('${article.title}\n\n${article.link}');
+                            },
+                            color: sourceColor,
+                            label: 'Share article',
+                          ),
+                          _buildHeaderButton(
+                            icon: article.isSaved
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            onPressed: onToggleSave,
+                            color: article.isSaved
+                                ? AppColors.error
+                                : sourceColor,
+                            label: article.isSaved ? 'Saved' : 'Save',
+                          ),
+                          _buildHeaderButton(
+                            icon: Icons.close_rounded,
+                            onPressed: onClose,
+                            color: AppColors.textSecondary,
+                            label: 'Close',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image if available
+                        if (article.imageUrl != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: CachedNetworkImage(
+                              imageUrl: article.imageUrl!,
+                              height: 220,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              cacheManager: AppCacheManager(),
+                              placeholder: (context, url) => Container(
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                      Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(height: 20),
+                                    Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 32,
+                                      color: AppColors.textTertiary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Image unavailable',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // Author and date
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            children: [
+                              if (article.author != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: sourceColor.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.person_outline_rounded,
+                                          size: 13, color: sourceColor),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        article.author!,
+                                        style: GoogleFonts.dmSans(
+                                          fontSize: 12,
+                                          color: sourceColor,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              Icon(Icons.access_time_rounded,
+                                  size: 14, color: AppColors.textTertiary),
+                              const SizedBox(width: 6),
+                              Text(
+                                Helpers.formatDate(article.pubDate),
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Title
+                        Text(
+                          article.title,
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            height: 1.35,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Description
+                        Text(
+                          article.description,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 16,
+                            color: AppColors.textPrimary,
+                            height: 1.7,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Full content with HTML stripped
+                        Text(
+                          Helpers.stripHtmlTags(article.fullContent),
+                          style: GoogleFonts.dmSans(
+                            fontSize: 15,
+                            color: AppColors.textSecondary,
+                            height: 1.8,
+                            letterSpacing: 0.05,
+                          ),
+                        ),
+                        const SizedBox(height: 120),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeaderButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required Color color,
+    required String label,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(left: 4),
+      child: Semantics(
+        button: true,
+        label: label,
+        child: IconButton(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          color: color,
+          padding: const EdgeInsets.all(8),
+          style: IconButton.styleFrom(
+            backgroundColor: color.withValues(alpha: 0.08),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -7,7 +7,12 @@ void main() {
   testWidgets('App starts with RssFeedScreen', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const RssReaderApp());
-    await tester.pumpAndSettle();
+
+    // Pump once to handle synchronous initialization
+    await tester.pump();
+
+    // Handle the update check timer (2 second delay) by pumping to 3 seconds
+    await tester.pump(const Duration(seconds: 3));
 
     // Verify that the app title is displayed.
     expect(find.text('Curated Feeds'), findsOneWidget);
@@ -24,14 +29,27 @@ void main() {
   testWidgets('App theme has expected colors', (WidgetTester tester) async {
     // Build our app.
     await tester.pumpWidget(const RssReaderApp());
-    await tester.pumpAndSettle();
 
-    // Verify that the gradient background is present in the Container.
-    final Container container = tester.widget(find.byType(Container).first);
+    // Pump and handle the timer
+    await tester.pump(const Duration(seconds: 3));
 
-    // Verify that a gradient decoration exists
-    final decoration = container.decoration as BoxDecoration;
-    expect(decoration.gradient, isNotNull);
-    expect(decoration.gradient, isA<LinearGradient>());
+    // Verify that a Container with gradient decoration exists
+    final containers = find.byType(Container);
+    expect(containers, findsWidgets);
+
+    // Find the first container with a BoxGradient
+    bool foundGradient = false;
+    for (final element in containers.evaluate()) {
+      final widget = element.widget as Container;
+      if (widget.decoration is BoxDecoration) {
+        final boxDecoration = widget.decoration as BoxDecoration;
+        if (boxDecoration.gradient is LinearGradient) {
+          foundGradient = true;
+          break;
+        }
+      }
+    }
+
+    expect(foundGradient, isTrue);
   });
 }

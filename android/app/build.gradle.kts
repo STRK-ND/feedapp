@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android") version "2.2.20"
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -9,7 +9,6 @@ android {
     namespace = "com.curatedfeeds"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
-    buildToolsVersion = "34.0.0"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -18,6 +17,8 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // Suppress deprecation warning - kotlinOptions will be replaced with compilerOptions
+        // in future Kotlin Gradle Plugin versions
     }
 
     defaultConfig {
