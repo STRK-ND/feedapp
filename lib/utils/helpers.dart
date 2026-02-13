@@ -159,14 +159,14 @@ class Helpers {
   }
 
   static int _hashCode(String string) {
-    var hash = 0xcbf29ce484222325;
+    var hash = 0xcbf29ce484222325.toUnsigned(64);
 
     for (var i = 0; i < string.length; i++) {
       final codeUnit = string.codeUnitAt(i);
-      hash ^= codeUnit >> 8;
-      hash *= 0x100000001b3;
-      hash ^= codeUnit & 0xFF;
-      hash *= 0x100000001b3;
+      hash = (hash ^ (codeUnit >> 8)).toUnsigned(64);
+      hash = (hash * 0x100000001b3).toUnsigned(64);
+      hash = (hash ^ (codeUnit & 0xFF)).toUnsigned(64);
+      hash = (hash * 0x100000001b3).toUnsigned(64);
     }
 
     return hash;

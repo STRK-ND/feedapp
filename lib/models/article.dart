@@ -12,6 +12,7 @@ class Article {
   final String? imageUrl;
   bool isRead;
   bool isSaved;
+  String? fetchedFullContent;
 
   Article({
     required this.id,
@@ -26,6 +27,7 @@ class Article {
     this.imageUrl,
     this.isRead = false,
     this.isSaved = false,
+    this.fetchedFullContent,
   });
 
   Map<String, dynamic> toJson() {
@@ -42,6 +44,7 @@ class Article {
       'imageUrl': imageUrl,
       'isRead': isRead,
       'isSaved': isSaved,
+      'fetchedFullContent': fetchedFullContent,
     };
   }
 
@@ -61,6 +64,7 @@ class Article {
       imageUrl: json['imageUrl'] as String?,
       isRead: json['isRead'] as bool? ?? false,
       isSaved: json['isSaved'] as bool? ?? false,
+      fetchedFullContent: json['fetchedFullContent'] as String?,
     );
   }
 
@@ -77,6 +81,7 @@ class Article {
     String? imageUrl,
     bool? isRead,
     bool? isSaved,
+    String? fetchedFullContent,
   }) {
     return Article(
       id: id ?? this.id,
@@ -91,6 +96,7 @@ class Article {
       imageUrl: imageUrl ?? this.imageUrl,
       isRead: isRead ?? this.isRead,
       isSaved: isSaved ?? this.isSaved,
+      fetchedFullContent: fetchedFullContent ?? this.fetchedFullContent,
     );
   }
 }

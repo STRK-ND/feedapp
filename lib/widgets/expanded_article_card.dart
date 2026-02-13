@@ -6,11 +6,12 @@ import 'package:share_plus/share_plus.dart';
 import '../models/article.dart';
 import '../services/cache_manager.dart';
 import '../services/rss_feed_service.dart';
+import '../services/article_content_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 
 /// Expanded article card bottom sheet/modal widget
-class ExpandedArticleCard extends StatelessWidget {
+class ExpandedArticleCard extends StatefulWidget {
   final Article article;
   final VoidCallback onClose;
   final VoidCallback onToggleSave;
@@ -23,15 +24,70 @@ class ExpandedArticleCard extends StatelessWidget {
   });
 
   @override
+  State<ExpandedArticleCard> createState() => _ExpandedArticleCardState();
+}
+
+class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
+  bool _isLoadingContent = false;
+  String? _fullContent;
+
+  @override
+  void initState() {
+    super.initState();
+    _initContent();
+  }
+
+  Future<void> _initContent() async {
+    // Check if we already have cached full content
+    if (widget.article.fetchedFullContent != null) {
+      setState(() {
+        _fullContent = widget.article.fetchedFullContent;
+      });
+      return;
+    }
+
+    // Try to fetch full content only if RSS content is short
+    if (widget.article.fullContent.length < 200) {
+      _fetchFullContent();
+    } else {
+      setState(() {
+        _fullContent = widget.article.fullContent;
+      });
+    }
+  }
+
+  Future<void> _fetchFullContent() async {
+    setState(() {
+      _isLoadingContent = true;
+    });
+
+    try {
+      final content = await ArticleContentService.fetchArticleContent(widget.article.link);
+      setState(() {
+        _fullContent = content;
+        _isLoadingContent = false;
+      });
+
+      // Cache the fetched content in the article
+      widget.article.fetchedFullContent = content;
+    } catch (e) {
+      setState(() {
+        _fullContent = widget.article.fullContent;
+        _isLoadingContent = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final source = RssFeedService.getSourceById(article.sourceId) ??
+    final source = RssFeedService.getSourceById(widget.article.sourceId) ??
         RssFeedService.predefinedSources.first;
     final sourceColor = source.color;
 
     return Dismissible(
       direction: DismissDirection.down,
       key: const Key('article_modal'),
-      onDismissed: (_) => onClose(),
+      onDismissed: (_) => widget.onClose(),
       child: DraggableScrollableSheet(
         initialChildSize: 0.92,
         minChildSize: 0.5,
@@ -99,7 +155,7 @@ class ExpandedArticleCard extends StatelessWidget {
                           _buildHeaderButton(
                             icon: Icons.open_in_new_rounded,
                             onPressed: () async {
-                              final uri = Uri.parse(article.link);
+                              final uri = Uri.parse(widget.article.link);
                               if (await canLaunchUrl(uri)) {
                                 await launchUrl(uri,
                                     mode: LaunchMode.externalApplication);
@@ -111,24 +167,24 @@ class ExpandedArticleCard extends StatelessWidget {
                           _buildHeaderButton(
                             icon: Icons.share_rounded,
                             onPressed: () {
-                              Share.share('${article.title}\n\n${article.link}');
+                              Share.share('${widget.article.title}\n\n${widget.article.link}');
                             },
                             color: sourceColor,
                             label: 'Share article',
                           ),
                           _buildHeaderButton(
-                            icon: article.isSaved
+                            icon: widget.article.isSaved
                                 ? Icons.favorite_rounded
                                 : Icons.favorite_border_rounded,
-                            onPressed: onToggleSave,
-                            color: article.isSaved
+                            onPressed: widget.onToggleSave,
+                            color: widget.article.isSaved
                                 ? AppColors.error
                                 : sourceColor,
-                            label: article.isSaved ? 'Saved' : 'Save',
+                            label: widget.article.isSaved ? 'Saved' : 'Save',
                           ),
                           _buildHeaderButton(
                             icon: Icons.close_rounded,
-                            onPressed: onClose,
+                            onPressed: widget.onClose,
                             color: AppColors.textSecondary,
                             label: 'Close',
                           ),
@@ -148,11 +204,11 @@ class ExpandedArticleCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Image if available
-                        if (article.imageUrl != null)
+                        if (widget.article.imageUrl != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: CachedNetworkImage(
-                              imageUrl: article.imageUrl!,
+                              imageUrl: widget.article.imageUrl!,
                               height: 220,
                               width: double.infinity,
                               fit: BoxFit.cover,
@@ -208,7 +264,7 @@ class ExpandedArticleCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Row(
                             children: [
-                              if (article.author != null) ...[
+                              if (widget.article.author != null) ...[
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -225,7 +281,7 @@ class ExpandedArticleCard extends StatelessWidget {
                                           size: 13, color: sourceColor),
                                       const SizedBox(width: 6),
                                       Text(
-                                        article.author!,
+                                        widget.article.author!,
                                         style: GoogleFonts.dmSans(
                                           fontSize: 12,
                                           color: sourceColor,
@@ -242,7 +298,7 @@ class ExpandedArticleCard extends StatelessWidget {
                                   size: 14, color: AppColors.textTertiary),
                               const SizedBox(width: 6),
                               Text(
-                                Helpers.formatDate(article.pubDate),
+                                Helpers.formatDate(widget.article.pubDate),
                                 style: GoogleFonts.dmSans(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
@@ -255,7 +311,7 @@ class ExpandedArticleCard extends StatelessWidget {
 
                         // Title
                         Text(
-                          article.title,
+                          widget.article.title,
                           style: GoogleFonts.playfairDisplay(
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
@@ -268,7 +324,7 @@ class ExpandedArticleCard extends StatelessWidget {
 
                         // Description
                         Text(
-                          article.description,
+                          widget.article.description,
                           style: GoogleFonts.dmSans(
                             fontSize: 16,
                             color: AppColors.textPrimary,
@@ -278,16 +334,41 @@ class ExpandedArticleCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // Full content with HTML stripped
-                        Text(
-                          Helpers.stripHtmlTags(article.fullContent),
-                          style: GoogleFonts.dmSans(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
-                            height: 1.8,
-                            letterSpacing: 0.05,
+                        // Full content
+                        if (_isLoadingContent)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      sourceColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Loading full article...',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else if (_fullContent != null && _fullContent!.isNotEmpty)
+                          Text(
+                            _fullContent!,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 15,
+                              color: AppColors.textSecondary,
+                              height: 1.8,
+                              letterSpacing: 0.05,
+                            ),
                           ),
-                        ),
                         const SizedBox(height: 120),
                       ],
                     ),
