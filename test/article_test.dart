@@ -1,4 +1,4 @@
-import 'package:myapp/models/article.dart';
+import 'package:curatedfeeds/models/article.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
