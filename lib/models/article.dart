@@ -58,7 +58,7 @@ class Article {
       sourceId: json['sourceId'] as String? ?? '',
       sourceName: json['sourceName'] as String? ?? 'Unknown Source',
       pubDate: json['pubDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['pubDate'] as int)
+          ? DateTime.fromMillisecondsSinceEpoch(json['pubDate'] as int, isUtc: true)
           : DateTime.now(),
       author: json['author'] as String?,
       imageUrl: json['imageUrl'] as String?,
