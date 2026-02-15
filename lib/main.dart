@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'di/service_locator.dart';
 import 'utils/constants.dart';
 import 'screens/feed_screen.dart';
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize dependency injection
+  await setupServiceLocator();
+
   runApp(const RssReaderApp());
 }
 
