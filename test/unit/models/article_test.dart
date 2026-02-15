@@ -14,7 +14,7 @@ void main() {
         link: 'https://example.com/article/1',
         sourceId: 'test-source',
         sourceName: 'Test Source',
-        pubDate: DateTime.utc(2024, 1, 15, 10, 30),
+        pubDate: DateTime.fromMillisecondsSinceEpoch(1705314600000),
         author: 'Test Author',
         imageUrl: 'https://example.com/image.jpg',
         isRead: false,
@@ -30,7 +30,7 @@ void main() {
       expect(testArticle.link, 'https://example.com/article/1');
       expect(testArticle.sourceId, 'test-source');
       expect(testArticle.sourceName, 'Test Source');
-      expect(testArticle.pubDate, DateTime.utc(2024, 1, 15, 10, 30));
+      expect(testArticle.pubDate.millisecondsSinceEpoch, 1705314600000);
       expect(testArticle.author, 'Test Author');
       expect(testArticle.imageUrl, 'https://example.com/image.jpg');
       expect(testArticle.isRead, false);
@@ -56,7 +56,6 @@ void main() {
     });
 
     test('Should create Article from JSON correctly', () {
-      // Use the timestamp that matches DateTime.utc(2024, 1, 15, 10, 30)
       final timestamp = 1705314600000;
 
       final json = {
@@ -84,7 +83,7 @@ void main() {
       expect(article.link, 'https://example.com/article/2');
       expect(article.sourceId, 'another-source');
       expect(article.sourceName, 'Another Source');
-      expect(article.pubDate, DateTime.utc(2024, 1, 15, 10, 30));
+      expect(article.pubDate.millisecondsSinceEpoch, timestamp);
       expect(article.author, 'Another Author');
       expect(article.imageUrl, 'https://example.com/image2.jpg');
       expect(article.isRead, true);
