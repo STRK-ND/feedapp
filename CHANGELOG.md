@@ -1,4 +1,4 @@
-# Changelog
+## [1.2.1] - 2025-02-21\n\n### Added\n- In-app APK download and installation system\n  - Users can now download updates directly within the app\n  - Progress bar shows real-time download progress\n  - Install button launches system installer automatically\n  - No manual APK downloads needed from GitHub\n\n### Changed\n- Updated version to 1.2.1\n\n# Changelog
 
 All notable changes to Curated Feeds will be documented in this file.
 
