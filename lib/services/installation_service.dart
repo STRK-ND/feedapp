@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../utils/error_handler.dart';
 
 /// Service for handling APK installation with permission management
@@ -32,20 +33,14 @@ class InstallationService {
           );
           return success;
         } else {
-          // Fallback: try to open settings if permission not granted
-          final settingsUrl = 'package:${Platform.packageName}';
-          if (await canLaunchUrl(Uri.parse('app-settings:$settingsUrl'))) {
-            await launchUrl(
-              Uri.parse('app-settings:$settingsUrl'),
-              mode: LaunchMode.externalApplication,
-            );
-          }
-
+          // Fallback: show error and direct user to settings manually
           ErrorHandler.logError(
-            'Failed to open APK installer',
-            error: 'Intent URL launching failed',
+            'Failed to open APK installer. APK installation may be disabled on this device.',
+            error: 'Install from unknown sources permission may be required',
           );
-          throw Exception('Unable to launch APK installer');
+          throw Exception(
+            'Unable to launch APK installer. Please ensure "Install from unknown sources" permission is enabled in Settings.',
+          );
         }
       }
 
