@@ -1,9 +1,5 @@
 version: 2.1
 
-# Orb definitions
-orbs:
-  flutter: circleci/flutter@3.4.0
-
 # Execute jobs on Ubuntu 24.04
 executors:
   android-executor:
