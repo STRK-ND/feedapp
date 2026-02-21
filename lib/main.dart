@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'di/service_locator.dart';
-import 'themes/tinder_theme.dart';
+import 'utils/constants.dart';
 import 'screens/feed_screen.dart';
 
 Future<void> main() async {
@@ -21,28 +20,15 @@ class RssReaderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Curated',
+      title: 'Curated Feeds',
       debugShowCheckedModeBanner: false,
-      theme: TinderTheme.theme.copyWith(
-        textTheme: GoogleFonts.poppinsTextTheme(TinderTheme.theme.textTheme).copyWith(
-          bodyLarge: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: TinderTheme.textSecondary,
-            height: 1.5,
-          ),
-          bodyMedium: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: TinderTheme.textSecondary,
-            height: 1.4,
-          ),
-          bodySmall: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: TinderTheme.textTertiary,
-          ),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          brightness: Brightness.light,
         ),
+        useMaterial3: true,
+        textTheme: appTextTheme,
       ),
       home: const RssFeedScreen(),
     );

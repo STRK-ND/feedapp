@@ -27,7 +27,7 @@ class RssFeedService {
       name: 'The Verge',
       url: 'https://www.theverge.com/rss/index.xml',
       category: 'Tech',
-      color: const Color(0xFF818CF8),
+      color: AppColors.techSecondary,
       icon: Icons.devices,
     ),
     RssSource(
@@ -53,7 +53,7 @@ class RssFeedService {
       name: 'CNN Top Stories',
       url: 'https://rss.cnn.com/rss/cnn_topstories.rss',
       category: 'News',
-      color: const Color(0xFFF87171),
+      color: AppColors.newsSecondary,
       icon: Icons.article_rounded,
     ),
 

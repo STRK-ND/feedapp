@@ -8,271 +8,6 @@ import '../services/cache_manager.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import 'swipeable_card.dart';
-import '../themes/tinder_theme.dart';
-
-/// Tinder Card - Fun, vibrant design with photo-first layout
-class _CardContent extends StatelessWidget {
-  final Article article;
-  final Color sourceColor;
-  final String sourceName;
-  final IconData sourceIcon;
-  final bool hasImage;
-  final bool isFront;
-
-  const _CardContent({
-    required this.article,
-    required this.sourceColor,
-    required this.sourceName,
-    required this.sourceIcon,
-    required this.hasImage,
-    required this.isFront,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75,
-        child: Stack(
-          children: [
-            // Hero image - taller section for visual impact
-            if (hasImage)
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.55,
-                child: _buildTinderHeroImage(),
-              )
-            else
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.55,
-                child: _buildTinderImagePlaceholder(),
-              ),
-
-            // Gradient overlay - only in bottom section where text appears
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: MediaQuery.of(context).size.height * 0.35,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      TinderTheme.bgDark.withValues(alpha: 0.7),
-                      TinderTheme.bgDark.withValues(alpha: 0.95),
-                    ],
-                    stops: const [0.0, 0.3, 1.0],
-                  ),
-                ),
-              ),
-            ),
-
-            // Content - positioned in bottom section
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Source badge with gradient
-                    _buildTinderSourceBadge(),
-
-                    const SizedBox(height: 12),
-
-                    // Title - bold, large, white
-                    Text(
-                      article.title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: TinderTheme.textPrimary,
-                        height: 1.2,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Description - smaller, grey
-                    if (article.description.isNotEmpty)
-                      Text(
-                        article.description,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: TinderTheme.textSecondary,
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                    const SizedBox(height: 14),
-
-                    // Metadata - time and author at bottom
-                    _buildTinderMetadata(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Hero image scaled to fit card
-  Widget _buildTinderHeroImage() {
-    return CachedNetworkImage(
-      imageUrl: article.imageUrl!,
-      width: double.infinity,
-      height: double.infinity,
-      fit: BoxFit.cover,
-      cacheManager: AppCacheManager(),
-      placeholder: (context, url) => _buildTinderImagePlaceholder(),
-      errorWidget: (context, url, error) => _buildTinderImagePlaceholder(),
-    );
-  }
-
-  /// Gradient-styled placeholder when image fails to load
-  Widget _buildTinderImagePlaceholder() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: BoxDecoration(
-        gradient: TinderTheme.backgroundGradient,
-      ),
-      child: Center(
-        child: Icon(
-          Icons.photo_size_select_large_outlined,
-          size: 64,
-          color: TinderTheme.textTertiary.withValues(alpha: 0.5),
-        ),
-      ),
-    );
-  }
-
-  /// Gradient source badge with playful styling
-  Widget _buildTinderSourceBadge() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            sourceColor.withValues(alpha: 0.7),
-            sourceColor.withValues(alpha: 0.9),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: sourceColor.withValues(alpha: 0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 8,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            sourceIcon,
-            size: 16,
-            color: TinderTheme.textPrimary,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            sourceName,
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: TinderTheme.textPrimary,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Bottom metadata row with time and author
-  Widget _buildTinderMetadata() {
-    return Row(
-      children: [
-        // Time icon
-        Icon(
-          Icons.access_time_rounded,
-          size: 14,
-          color: TinderTheme.textTertiary,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          Helpers.formatTimeAgo(article.pubDate),
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: TinderTheme.textSecondary,
-          ),
-        ),
-
-        const SizedBox(width: 16),
-
-        // Author if available
-        if (article.author != null) ...[
-          Icon(
-            Icons.person_rounded,
-            size: 14,
-            color: TinderTheme.textTertiary,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              article.author!,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: TinderTheme.textSecondary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-
-        // Unread indicator dot
-        const Spacer(),
-        if (!article.isRead)
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: sourceColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: sourceColor.withValues(alpha: 0.6),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 /// Card stack widget for displaying articles in a swipeable stack
 class CardStack extends StatefulWidget {
@@ -304,14 +39,9 @@ class _CardStackState extends State<CardStack>
   @override
   void initState() {
     super.initState();
-    // Use reduced duration if user prefers reduced motion
-    final duration = Helpers.getAnimationDuration(
-      const Duration(milliseconds: 500),
-      reducedDuration: const Duration(milliseconds: 150),
-    );
     _cardEntranceController = AnimationController(
       vsync: this,
-      duration: duration,
+      duration: const Duration(milliseconds: 500),
     );
     _cardEntranceController.forward();
   }
@@ -336,7 +66,6 @@ class _CardStackState extends State<CardStack>
     final source = RssFeedService.getSourceById(article.sourceId) ??
         RssFeedService.predefinedSources.first;
     final sourceColor = source.color;
-    final hasImage = article.imageUrl != null;
 
     return AnimatedBuilder(
       animation: _cardEntranceController,
@@ -366,13 +95,207 @@ class _CardStackState extends State<CardStack>
           ),
         );
       },
-      child: _CardContent(
-        article: article,
-        sourceColor: sourceColor,
-        sourceName: source.name,
-        sourceIcon: source.icon,
-        hasImage: hasImage,
-        isFront: isFront,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: sourceColor.withValues(alpha: 0.12),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
+              spreadRadius: -8,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Semantics(
+          label: '${article.title}. ${article.description}. From ${source.name}. Published ${Helpers.formatTimeAgo(article.pubDate)}.',
+          image: article.imageUrl != null,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.divider.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Source badge
+                  Semantics(
+                    label: 'Source: ${source.name}',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: sourceColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            source.icon,
+                            size: 14,
+                            color: sourceColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            source.name,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: sourceColor,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Hero image if available
+                  if (article.imageUrl != null)
+                    Semantics(
+                      image: true,
+                      label: 'Article image',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: CachedNetworkImage(
+                          imageUrl: article.imageUrl!,
+                          height: 180,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          cacheManager: AppCacheManager(),
+                          placeholder: (context, url) => Container(
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_outlined,
+                                size: 32,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                size: 32,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (article.imageUrl != null)
+                    const SizedBox(height: 24),
+
+                  // Article title
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        article.title,
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          height: 1.35,
+                          letterSpacing: -0.3,
+                        ),
+                        textAlign: TextAlign.left,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Description snippet
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      article.description,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 15,
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                        letterSpacing: 0.1,
+                      ),
+                      textAlign: TextAlign.left,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Publication time
+                  Semantics(
+                    label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.divider.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            Helpers.formatTimeAgo(article.pubDate),
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -385,48 +308,46 @@ class _CardStackState extends State<CardStack>
 
     final visibleArticles = widget.articles.take(3).toList();
 
-    return RepaintBoundary(
-      child: Stack(
-        children: [
-          for (int i = visibleArticles.length - 1; i >= 0; i--)
-            if (i == 0)
-              SwipeableCard(
-                key: ValueKey('card_${widget.articles[i].id}'),
+    return Stack(
+      children: [
+        for (int i = visibleArticles.length - 1; i >= 0; i--)
+          if (i == 0)
+            SwipeableCard(
+              key: ValueKey('card_${widget.articles[i].id}'),
+              child: _buildArticleCard(
+                widget.articles[i],
+                i,
+                true,
+              ),
+              onSwipeRight: () {
+                widget.onSwipeRight(
+                  widget.articles.indexOf(widget.articles[i]),
+                );
+              },
+              onSwipeLeft: () {
+                widget.onSwipeLeft(
+                  widget.articles.indexOf(widget.articles[i]),
+                );
+              },
+              onTap: () {
+                widget.onTap(widget.articles.indexOf(widget.articles[i]));
+              },
+            )
+          else
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
                 child: _buildArticleCard(
                   widget.articles[i],
                   i,
-                  true,
-                ),
-                onSwipeRight: () {
-                  widget.onSwipeRight(
-                    widget.articles.indexOf(widget.articles[i]),
-                  );
-                },
-                onSwipeLeft: () {
-                  widget.onSwipeLeft(
-                    widget.articles.indexOf(widget.articles[i]),
-                  );
-                },
-                onTap: () {
-                  widget.onTap(widget.articles.indexOf(widget.articles[i]));
-                },
-              )
-            else
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: IgnorePointer(
-                  child: _buildArticleCard(
-                    widget.articles[i],
-                    i,
-                    false,
-                  ),
+                  false,
                 ),
               ),
-        ],
-      ),
+            ),
+      ],
     );
   }
 }
