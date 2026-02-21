@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import '../utils/constants.dart';
+import '../utils/helpers.dart';
 
 /// Swipeable card widget for article cards
 class SwipeableCard extends StatefulWidget {
@@ -26,6 +27,11 @@ class SwipeableCard extends StatefulWidget {
 class _SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
   static const double _rotationFactor = 0.015;
+
+  // Use ValueNotifier for position to reduce rebuilds
+  final ValueNotifier<Offset> _positionNotifier = ValueNotifier(Offset.zero);
+  final ValueNotifier<double> _rotationNotifier = ValueNotifier(0.0);
+
   late final AnimationController _controller;
   VoidCallback? _animationListener;
 
@@ -38,9 +44,14 @@ class _SwipeableCardState extends State<SwipeableCard>
   @override
   void initState() {
     super.initState();
+    // Use reduced duration if user prefers reduced motion
+    final duration = Helpers.getAnimationDuration(
+      const Duration(milliseconds: 350),
+      reducedDuration: const Duration(milliseconds: 150),
+    );
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: duration,
     );
     _controller.addStatusListener(_onAnimationStatusChanged);
   }
@@ -79,10 +90,12 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   void _handlePanUpdate(DragUpdateDetails details) {
     if (_isAnimatingOut) return;
-    setState(() {
-      _position += details.delta;
-      _rotation = _position.dx * _rotationFactor;
-    });
+    _position += details.delta;
+    _rotation = _position.dx * _rotationFactor;
+
+    // Update ValueNotifiers instead of setState for better performance
+    _positionNotifier.value = _position;
+    _rotationNotifier.value = _rotation;
   }
 
   void _handlePanEnd(DragEndDetails details) {
@@ -144,10 +157,11 @@ class _SwipeableCardState extends State<SwipeableCard>
 
     _animationListener = () {
       if (mounted) {
-        setState(() {
-          _position = _animation!.value;
-          _rotation = _rotationAnimation!.value;
-        });
+        _position = _animation!.value;
+        _rotation = _rotationAnimation!.value;
+        // Update ValueNotifiers to trigger rebuilds
+        _positionNotifier.value = _position;
+        _rotationNotifier.value = _rotation;
       }
     };
 
@@ -157,91 +171,162 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Article card. Swipe right to save, swipe left to dismiss, or tap to view details.',
-      onTap: widget.onTap,
-      child: GestureDetector(
-        onPanUpdate: _handlePanUpdate,
-        onPanEnd: _handlePanEnd,
+    return RepaintBoundary(
+      child: Semantics(
+        button: true,
+        label: 'Article card. Swipe right to save, swipe left to dismiss, or tap to view details.',
         onTap: widget.onTap,
-        child: Stack(
-          children: [
-            // Left swipe background (dismiss)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Container(
-                  width: constraints.maxWidth,
-                  height: constraints.maxHeight,
-                  color: AppColors.textSecondary
-                      .withValues(alpha: _position.dx < 0
-                          ? _position.dx.abs() / 600
-                          : 0),
-                  child: _position.dx < -50
-                      ? Center(
-                          child: Semantics(
-                            label: 'Swipe left to dismiss article',
-                            child: Transform.rotate(
-                              angle: -0.2,
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 80,
-                                color: AppColors.textSecondary.withValues(
-                                  alpha: _position.dx.abs().clamp(50.0, 500.0) / 500.0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                );
-              },
-            ),
-
-            // Right swipe background (save)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Container(
-                  width: constraints.maxWidth,
-                  height: constraints.maxHeight,
-                  color: AppColors.success
-                      .withValues(alpha: _position.dx > 0
-                          ? (_position.dx / 600) * 0.15
-                          : 0),
-                  child: _position.dx > 50
-                      ? Center(
-                          child: Semantics(
-                            label: 'Swipe right to save article',
-                            child: Transform.rotate(
-                              angle: 0.2,
-                              child: Icon(
-                                Icons.favorite_rounded,
-                                size: 80,
-                                color: AppColors.accent.withValues(
-                                  alpha: _position.dx.clamp(50.0, 500.0) / 500.0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                );
-              },
-            ),
-
-            Positioned.fill(
-              child: Transform.translate(
-                offset: _position,
-                child: Transform.rotate(
-                  angle: _rotation,
-                  child: Semantics(
-                    container: true,
-                    child: widget.child,
-                  ),
+        child: GestureDetector(
+          onPanUpdate: _handlePanUpdate,
+          onPanEnd: _handlePanEnd,
+          onTap: widget.onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              color: TinderTheme.bgMedium.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: Offset(0, 8),
                 ),
-              ),
+              ],
             ),
-          ],
+            child: Stack(
+              children: [
+                // Left swipe background (dismiss) - refined styling
+                ValueListenableBuilder<Offset>(
+                valueListenable: _positionNotifier,
+                builder: (context, position, child) {
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final swipeAlpha = position.dx < 0
+                          ? (position.dx.abs() / 200).clamp(0.0, 0.12)
+                          : 0.0;
+
+                      return Container(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        decoration: BoxDecoration(
+                          color: AppColors.swipeDismiss.withValues(alpha: swipeAlpha),
+                          borderRadius: BorderRadius.circular(AppDimens.cardCornerRadius),
+                        ),
+                        child: position.dx < -50
+                            ? Center(
+                                child: Semantics(
+                                  label: 'Swipe left to dismiss article',
+                                  child: Transform.rotate(
+                                    angle: -0.15,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(20),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface.withValues(alpha: 0.9),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.swipeDismiss.withValues(alpha: 0.3),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        size: 40,
+                                        color: AppColors.swipeDismiss.withValues(
+                                          alpha: (position.dx.abs() / 150).clamp(0.3, 1.0),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
+
+              // Right swipe background (save) - refined styling
+              ValueListenableBuilder<Offset>(
+                valueListenable: _positionNotifier,
+                builder: (context, position, child) {
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final swipeAlpha = position.dx > 0
+                          ? (position.dx / 200).clamp(0.0, 0.12)
+                          : 0.0;
+
+                      return Container(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        decoration: BoxDecoration(
+                          color: AppColors.swipeSave.withValues(alpha: swipeAlpha),
+                          borderRadius: BorderRadius.circular(AppDimens.cardCornerRadius),
+                        ),
+                        child: position.dx > 50
+                            ? Center(
+                                child: Semantics(
+                                  label: 'Swipe right to save article',
+                                  child: Transform.rotate(
+                                    angle: 0.15,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(20),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface.withValues(alpha: 0.9),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.swipeSave.withValues(alpha: 0.3),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        Icons.bookmark_added_rounded,
+                                        size: 40,
+                                        color: AppColors.swipeSave.withValues(
+                                          alpha: (position.dx / 150).clamp(0.3, 1.0),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
+
+              // Card content with swipe transformation
+              ValueListenableBuilder<Offset>(
+                valueListenable: _positionNotifier,
+                builder: (context, position, child) {
+                  return ValueListenableBuilder<double>(
+                    valueListenable: _rotationNotifier,
+                    builder: (context, rotation, child) {
+                      return Positioned.fill(
+                        child: Transform.translate(
+                          offset: position,
+                          child: Transform.rotate(
+                            angle: rotation,
+                            child: Semantics(
+                              container: true,
+                              child: widget.child,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

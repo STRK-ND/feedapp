@@ -1,6 +1,51 @@
+import 'dart:math';
+import 'dart:ui';
+import 'package:flutter/material.dart';
+
 /// Utility functions for common operations
 class Helpers {
   Helpers._();
+
+  /// Check if the user prefers reduced motion based on system settings.
+  ///
+  /// This respects both accessibility settings for accessible navigation
+  /// and explicit reduced motion preferences.
+  ///
+  /// Use this to conditionally disable or reduce animations:
+  /// ```dart
+  /// if (Helpers.prefersReducedMotion) {
+  ///   // Use shorter duration or no animation
+  /// } else {
+  ///   // Normal animation
+  /// }
+  /// ```
+  static bool get prefersReducedMotion {
+    final platformDispatcher = PlatformDispatcher.instance;
+    return platformDispatcher.accessibilityFeatures.accessibleNavigation ||
+        platformDispatcher.accessibilityFeatures.reduceMotion;
+  }
+
+  /// Get an appropriate animation duration based on reduced motion preference.
+  ///
+  /// [normalDuration] - The full animation duration
+  /// [reducedDuration] - The shortened duration for reduced motion (default: 100ms)
+  static Duration getAnimationDuration(
+    Duration normalDuration, {
+    Duration reducedDuration = const Duration(milliseconds: 100),
+  }) {
+    return prefersReducedMotion ? reducedDuration : normalDuration;
+  }
+
+  /// Get an appropriate animation curve based on reduced motion preference.
+  ///
+  /// [normalCurve] - The standard animation curve
+  /// [reducedCurve] - The curve for reduced motion (default: Curves.linear)
+  static Curve getAnimationCurve({
+    Curve normalCurve = Curves.easeOut,
+    Curve reducedCurve = Curves.linear,
+  }) {
+    return prefersReducedMotion ? reducedCurve : normalCurve;
+  }
 
   /// Format a date/datetime as "time ago" (e.g., "2h ago", "5d ago")
   static String formatTimeAgo(DateTime dateTime) {

@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/article.dart';
+import '../models/rss_source.dart';
 import '../services/rss_feed_service.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
@@ -14,6 +15,47 @@ import '../widgets/update_dialog.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../utils/error_handler.dart';
+
+/// Horizontal scrollable row with consistent spacing
+class SingleChildScrollableRow extends StatelessWidget {
+  final List<Widget> children;
+  final Axis scrollDirection;
+  final double spacing;
+  final EdgeInsets? padding;
+  final ScrollController? controller;
+
+  const SingleChildScrollableRow({
+    super.key,
+    required this.children,
+    this.scrollDirection = Axis.horizontal,
+    this.spacing = 0,
+    this.padding,
+    this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: scrollDirection,
+      controller: controller,
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 20),
+      child: scrollDirection == Axis.horizontal
+          ? Row(children: _buildChildrenWithSpacing())
+          : Column(children: _buildChildrenWithSpacing()),
+    );
+  }
+
+  List<Widget> _buildChildrenWithSpacing() {
+    final result = <Widget>[];
+    for (int i = 0; i < children.length; i++) {
+      result.add(children[i]);
+      if (i < children.length - 1) {
+        result.add(SizedBox(width: spacing));
+      }
+    }
+    return result;
+  }
+}
 
 /// Main RSS Feed Screen
 class RssFeedScreen extends StatefulWidget {
@@ -201,6 +243,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       });
 
       debugPrint('[Feed] Refresh complete. Total articles: ${_articles.length}');
+
       await _saveArticles();
     } catch (e) {
       debugPrint('[Feed] ERROR during refresh: $e');
@@ -238,8 +281,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     });
 
     _saveArticles();
-
-    _showSnackBar('Article saved', AppColors.success);
   }
 
   void _onSwipeLeft(int index) {
@@ -316,7 +357,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.surface,
       builder: (context) => ExpandedArticleCard(
         article: _articles[articleIndex],
         onClose: () => Navigator.pop(context),
@@ -356,7 +397,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.lexend(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.1,
@@ -365,13 +406,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         backgroundColor: AppColors.surface,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-            color: color.withValues(alpha: 0.2),
+            color: AppColors.border,
             width: 1,
           ),
         ),
-        elevation: 8,
         duration: const Duration(milliseconds: 2000),
       ),
     );
@@ -379,101 +419,178 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Widget _buildEmptyState() {
     final icon = _selectedTab == 0
-        ? (_viewMode == ViewMode.cards ? Icons.style_outlined : Icons.inbox_outlined)
-        : Icons.bookmark_outline_rounded;
+        ? (_viewMode == ViewMode.cards ? Icons.auto_awesome_motion_outlined : Icons.inbox_outlined)
+        : Icons.bookmark_border_outlined;
 
     final title = _selectedTab == 0
-        ? (_viewMode == ViewMode.cards ? 'No articles' : 'No articles yet')
+        ? (_viewMode == ViewMode.cards ? 'No articles to show' : 'No articles yet')
         : 'No saved articles';
 
+    final subtitle = _selectedTab == 0 && _selectedTab == 0 && _articles.isEmpty && !_isLoading
+        ? 'Pull down to refresh or tap the button below'
+        : _selectedTab == 1
+            ? 'Swipe right on articles to save them for later'
+            : 'Your saved articles will appear here';
+
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.divider.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Semantics(
-              label: title,
-              child: Icon(
-                icon,
-                size: 72,
-                color: AppColors.textTertiary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _errorMessage ?? title,
-            style: GoogleFonts.dmSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.2,
-            ),
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 16),
+      child: GlassContainer(
+        borderRadius: 20,
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated icon container
             Container(
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.primarySurface,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _refreshFeeds,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          button: true,
-                          label: 'Retry loading feeds',
-                          child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Retry',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              child: Semantics(
+                label: title,
+                child: Icon(
+                  icon,
+                  size: 48,
+                  color: AppColors.primary,
                 ),
               ),
             ),
-          ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
+            const SizedBox(height: 28),
+            Text(
+              _errorMessage ?? title,
+              style: GoogleFonts.lexend(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Tap the refresh button to load articles',
+                _errorMessage != null ? _errorMessage! : subtitle,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
+                style: GoogleFonts.lexend(
+                  fontSize: 14,
                   color: AppColors.textSecondary,
                   height: 1.6,
                   letterSpacing: 0.1,
                 ),
               ),
             ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 24),
+              _buildStyledButton(
+                label: 'Try Again',
+                onPressed: _refreshFeeds,
+                icon: Icons.refresh_rounded,
+              ),
+            ],
+            if (_errorMessage == null && _selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
+              const SizedBox(height: 24),
+              _buildStyledButton(
+                label: 'Load Articles',
+                onPressed: _refreshFeeds,
+                icon: Icons.download_rounded,
+              ),
+            ],
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStyledButton({
+    required String label,
+    required VoidCallback onPressed,
+    required IconData icon,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: AppColors.textOnPrimary),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: GoogleFonts.lexend(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textOnPrimary,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip({
+    required String category,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: 'Filter by $category',
+      selected: isSelected,
+      child: AnimatedContainer(
+        duration: Helpers.getAnimationDuration(
+          const Duration(milliseconds: 200),
+          reducedDuration: const Duration(milliseconds: 100),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color.withValues(alpha: 0.8) : AppColors.border,
+            width: 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          category,
+          style: GoogleFonts.lexend(
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+            letterSpacing: 0.1,
+          ),
+        ),
       ),
     );
   }
@@ -486,15 +603,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           Semantics(
             label: 'Loading feeds',
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               strokeWidth: 3,
             ),
           ),
           const SizedBox(height: 24),
           Text(
             'Loading feeds...',
-            style: GoogleFonts.dmSans(
-              fontSize: 18,
+            style: GoogleFonts.lexend(
+              fontSize: 16,
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
               letterSpacing: 0.1,
@@ -521,13 +638,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       return _buildEmptyState();
     }
 
+    // Cache source data for performance - avoid repeated lookups
+    final sources = RssFeedService.predefinedSources;
+    final sourceMap = {for (var s in sources) s.id: s};
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
       itemCount: _displayedArticles.length,
       itemBuilder: (context, index) {
         final article = _displayedArticles[index];
-        final source = RssFeedService.getSourceById(article.sourceId) ??
+        // Use cached map for O(1) lookup instead of O(n)
+        final source = sourceMap[article.sourceId] ??
             RssFeedService.predefinedSources.first;
         final sourceColor = source.color;
 
@@ -555,185 +677,174 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               ),
             );
           },
-          child: Semantics(
-            button: true,
-            label: '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
-            child: GestureDetector(
-              onTap: () => _onTapCard(index),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: sourceColor.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.divider.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: sourceColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Semantics(
-                                label: source.name,
-                                child: Icon(source.icon, size: 14, color: sourceColor),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                source.name,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: sourceColor,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                article.title,
-                                style: GoogleFonts.playfairDisplay(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                  height: 1.3,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                article.description,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
-                                  height: 1.5,
-                                  letterSpacing: 0.05,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Semantics(
-                                    label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                                    child: Icon(Icons.schedule_outlined,
-                                        size: 12, color: AppColors.textTertiary),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    Helpers.formatTimeAgo(article.pubDate),
-                                    style: GoogleFonts.dmSans(
-                                      fontSize: 12,
-                                      color: AppColors.textTertiary,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: _buildListItem(article, sourceColor, source),
         );
       },
+    );
+  }
+
+  Widget _buildListItem(Article article, Color sourceColor, RssSource source) {
+    return Semantics(
+      button: true,
+      label: '${article.title}, from ${source.name}, published ${Helpers.formatTimeAgo(article.pubDate)}',
+      child: GestureDetector(
+        key: ValueKey('article_${article.id}'),
+        onTap: () => _onTapCard(_displayedArticles.indexOf(article)),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppDimens.radiusLarge),
+            border: Border.all(color: AppColors.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowSmall,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Source badge
+                Container(
+                  decoration: BoxDecoration(
+                    color: sourceColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+                    border: Border.all(
+                      color: sourceColor.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(source.icon, size: 14, color: sourceColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        source.name,
+                        style: GoogleFonts.lexend(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: sourceColor,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        article.title,
+                        style: GoogleFonts.lexend(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                          letterSpacing: -0.1,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        article.description,
+                        style: GoogleFonts.lexend(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                          letterSpacing: 0.05,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time_rounded, size: 12, color: AppColors.textTertiary),
+                          const SizedBox(width: 6),
+                          Text(
+                            Helpers.formatTimeAgo(article.pubDate),
+                            style: GoogleFonts.lexend(
+                              fontSize: 12,
+                              color: AppColors.textTertiary,
+                              letterSpacing: 0.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildSavedArticlesView() {
     if (_savedArticles.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.divider.withValues(alpha: 0.3),
-                  width: 1,
+        child: GlassContainer(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: AppColors.secondarySurface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.secondary.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Semantics(
+                  label: 'No saved articles',
+                  child: Icon(
+                    Icons.bookmark_border_outlined,
+                    size: 48,
+                    color: AppColors.secondary,
+                  ),
                 ),
               ),
-              child: Semantics(
-                label: 'No saved articles',
-                child: const Icon(
-                  Icons.bookmark_outline_rounded,
-                  size: 72,
-                  color: AppColors.textTertiary,
+              const SizedBox(height: 28),
+              Text(
+                'No saved articles yet',
+                style: GoogleFonts.lexend(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No saved articles yet',
-              style: GoogleFonts.dmSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Swipe right on articles to save them for later',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                  letterSpacing: 0.1,
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Swipe right on articles to save them for later reading',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.lexend(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    height: 1.6,
+                    letterSpacing: 0.1,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -755,56 +866,55 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             _onToggleSave(article);
           },
           background: Container(
-            margin: const EdgeInsets.only(bottom: 14),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: AppColors.textSecondary,
-              borderRadius: BorderRadius.circular(20),
+              color: AppColors.error,
+              borderRadius: BorderRadius.circular(AppDimens.radiusLarge),
             ),
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 24),
-            child: Icon(Icons.delete_rounded, color: Colors.white, size: 24),
+            child: const Icon(Icons.delete_rounded, color: Colors.white, size: 24),
           ),
           child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppDimens.radiusLarge),
+              border: Border.all(color: AppColors.borderSubtle),
               boxShadow: [
                 BoxShadow(
-                  color: sourceColor.withValues(alpha: 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: AppColors.shadowSmall,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     decoration: BoxDecoration(
                       color: sourceColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+                      border: Border.all(
+                        color: sourceColor.withValues(alpha: 0.12),
+                      ),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(source.icon, size: 14, color: sourceColor),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         Text(
                           source.name,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.lexend(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: sourceColor,
-                            letterSpacing: 0.2,
+                            letterSpacing: 0.1,
                           ),
                         ),
                       ],
@@ -817,12 +927,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       children: [
                         Text(
                           article.title,
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 17,
+                          style: GoogleFonts.lexend(
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
-                            height: 1.3,
-                            letterSpacing: -0.2,
+                            height: 1.4,
+                            letterSpacing: -0.1,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -830,8 +940,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         const SizedBox(height: 8),
                         Text(
                           article.description,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 14,
+                          style: GoogleFonts.lexend(
+                            fontSize: 13,
                             color: AppColors.textSecondary,
                             height: 1.5,
                             letterSpacing: 0.05,
@@ -847,8 +957,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     label: article.isSaved ? 'Remove from saved' : 'Save article',
                     child: IconButton(
                       icon: Icon(
-                        article.isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: article.isSaved ? AppColors.error : AppColors.textTertiary,
+                        article.isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                        color: article.isSaved ? AppColors.secondary : AppColors.textTertiary,
                       ),
                       onPressed: () => _onToggleSave(article),
                     ),
@@ -924,11 +1034,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Text(
             title,
-            style: GoogleFonts.dmSans(
-              fontSize: 13,
+            style: GoogleFonts.lexend(
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.primary,
               letterSpacing: 0.5,
@@ -938,14 +1048,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(children: children),
         ),
@@ -964,7 +1068,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -972,8 +1076,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.divider.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
@@ -988,16 +1092,16 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.lexend(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
                     if (subtitle != null) ...[
+                      const SizedBox(height: 2),
                       DefaultTextStyle(
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.lexend(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -1036,544 +1140,410 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: [0.0, 0.6, 1.0],
-          colors: [
-            Color(0xFF1A1B4D),
-            Color(0xFF2D2F73),
-            Color(0xFF4A3B5C),
-          ],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: Text(
-            _selectedTab == 0
-                ? 'Curated Feeds'
-                : _selectedTab == 1
-                    ? 'Saved'
-                    : 'Settings',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: -0.5,
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Row(
+          children: [
+            Text(
+              _selectedTab == 0
+                  ? 'Curated Feeds'
+                  : _selectedTab == 1
+                      ? 'Saved'
+                      : 'Settings',
+              style: GoogleFonts.lexend(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
-          actions: [
-            if (_selectedTab == 0 && _articles.isNotEmpty)
+            if (_selectedTab == 0 && _articles.isNotEmpty) ...[
+              const SizedBox(width: 12),
               Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: AppColors.primarySurface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    width: 1,
+                    color: AppColors.primary.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Semantics(
-                      label: '$_unreadCount unread articles',
-                      child: Icon(
-                        Icons.article_outlined,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
+                    Icon(
+                      Icons.auto_awesome_motion_outlined,
+                      size: 14,
+                      color: AppColors.primary,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
                       '$_unreadCount',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
+                      style: GoogleFonts.lexend(
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
+                        color: AppColors.primary,
                       ),
                     ),
                   ],
                 ),
               ),
-            if (_selectedTab == 0)
-              Semantics(
-                button: true,
-                label: _isLoading ? 'Loading' : 'Refresh feeds',
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: IconButton(
-                    onPressed: _isLoading ? null : _refreshFeeds,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Icon(Icons.refresh_rounded, color: Colors.white),
-                  ),
-                ),
-              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (_selectedTab == 0)
             Semantics(
               button: true,
-              label: _isSearchActive ? 'Close search' : 'Search articles',
+              label: _isLoading ? 'Loading' : 'Refresh feeds',
               child: Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 4),
                 child: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _isSearchActive = !_isSearchActive;
-                      if (!_isSearchActive) {
-                        _searchQuery = '';
-                        _displayedArticles = _getFilteredArticles();
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
-                    color: Colors.white,
-                  ),
+                  onPressed: _isLoading ? null : _refreshFeeds,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded, color: AppColors.primary),
                 ),
               ),
             ),
-            Semantics(
-              button: true,
-              label: 'More options',
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  color: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  onSelected: (value) async {
-                    if (value == 'check_updates') {
-                      final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
-                      if (context.mounted) {
-                        if (updateInfo != null) {
-                          showUpdateDialog(context: context, updateInfo: updateInfo);
-                        } else {
+          Semantics(
+            button: true,
+            label: _isSearchActive ? 'Close search' : 'Search articles',
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                onPressed: () {
+                  setState(() {
+                    _isSearchActive = !_isSearchActive;
+                    if (!_isSearchActive) {
+                      _searchQuery = '';
+                      _displayedArticles = _getFilteredArticles();
+                    }
+                  });
+                },
+                icon: Icon(
+                  _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: 'More options',
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                surfaceTintColor: AppColors.surface,
+                onSelected: (value) async {
+                  if (value == 'check_updates') {
+                    final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+                    if (context.mounted) {
+                      if (updateInfo != null) {
+                        showUpdateDialog(context: context, updateInfo: updateInfo);
+                      } else {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('You\'re using the latest version!')),
+                            const SnackBar(
+                              content: Text("You're using the latest version!"),
+                              backgroundColor: AppColors.surface,
+                            ),
                           );
                         }
                       }
-                    } else if (value == 'toggle_view') {
-                      setState(() {
-                        _viewMode = _viewMode == ViewMode.cards ? ViewMode.list : ViewMode.cards;
-                      });
-                      _saveViewMode();
                     }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'check_updates',
-                      child: Row(
-                        children: [
-                          Icon(Icons.system_update),
-                          SizedBox(width: 12),
-                          Text('Check for updates'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'toggle_view',
-                      child: Row(
-                        children: [
-                          Icon(_viewMode == ViewMode.cards ? Icons.view_list : Icons.grid_view),
-                          const SizedBox(width: 12),
-                          Text(_viewMode == ViewMode.cards ? 'Switch to List View' : 'Switch to Card View'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Search bar
-              if (_isSearchActive)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: TextField(
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'Search articles, sources, or content...',
-                      hintStyle: GoogleFonts.dmSans(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 15,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: AppColors.accent,
-                          width: 2,
-                        ),
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? Semantics(
-                              button: true,
-                              label: 'Clear search',
-                              child: IconButton(
-                                icon: const Icon(Icons.clear_rounded, color: Colors.white),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                    _displayedArticles = _getFilteredArticles();
-                                  });
-                                },
-                              ),
-                            )
-                          : null,
-                    ),
-                    style: GoogleFonts.dmSans(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                        _displayedArticles = _getFilteredArticles();
-                      });
-                    },
-                  ),
-                ),
-
-              // Category filter for feeds tab (hide when search is active)
-              if (_selectedTab == 0 && !_isSearchActive && (_articles.isNotEmpty || _isLoading == false)) ...[
-                Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final category = _categories[index];
-                      final isSelected = _selectedFilter == category;
-                      final color = category == 'All'
-                          ? Colors.white
-                          : getCategoryColor(category);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Semantics(
-                          button: true,
-                          label: 'Filter by $category',
-                          selected: isSelected,
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                _selectedFilter = category;
-                                _displayedArticles = _getFilteredArticles();
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            splashColor: Colors.white.withValues(alpha: 0.1),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected ? color : Colors.white.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? color
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                category,
-                                style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                  fontSize: 14,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Search results indicator
-              if (_isSearchActive && _searchQuery.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.search_rounded, size: 16, color: Colors.white.withValues(alpha: 0.7)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
-                        style: GoogleFonts.dmSans(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Offline indicator
-              if (!_isOnline && _selectedTab == 0)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.cloud_off_rounded, size: 16, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Offline - Showing cached content',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              if (!_isOnline) const SizedBox(height: 8),
-
-              // Content
-              Expanded(
-                child: _isLoading
-                    ? _buildLoadingState()
-                    : RefreshIndicator(
-                        color: AppColors.accent,
-                        backgroundColor: AppColors.surface,
-                        strokeWidth: 2.5,
-                        onRefresh: _isLoading ? () async {} : () async {
-                          await _refreshFeeds();
-                        },
-                        child: _selectedTab == 0
-                            ? (_viewMode == ViewMode.cards
-                                ? _buildCardView()
-                                : _buildListView())
-                            : _selectedTab == 1
-                                ? _buildSavedArticlesView()
-                                : _buildSettingsView(),
-                      ),
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: _selectedTab == 0 && !_isSearchActive
-            ? Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Semantics(
-                  button: true,
-                  label: _viewMode == ViewMode.cards ? 'Switch to list view' : 'Switch to card view',
-                  child: FloatingActionButton.small(
-                    heroTag: 'view_mode',
-                    onPressed: () {
-                      setState(() {
-                        _viewMode = _viewMode == ViewMode.cards
-                            ? ViewMode.list
-                            : ViewMode.cards;
-                      });
-                      _saveViewMode();
-                    },
-                    backgroundColor: AppColors.surface,
-                    elevation: 0,
-                    child: Icon(
-                      _viewMode == ViewMode.cards
-                          ? Icons.view_list_rounded
-                          : Icons.grid_view_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              )
-            : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        bottomNavigationBar: _buildBottomAppBar(),
-      ),
-    );
-  }
-
-  Widget _buildBottomAppBar() {
-    return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.rss_feed_rounded,
-                  label: 'Feeds',
-                  index: 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.bookmark_rounded,
-                  label: 'Saved',
-                  index: 1,
-                ),
-                _buildNavItem(
-                  icon: Icons.settings_rounded,
-                  label: 'Settings',
-                  index: 2,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isSelected = _selectedTab == index;
-    return Expanded(
-      child: Semantics(
-        button: true,
-        label: label,
-        selected: isSelected,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _selectedTab = index;
-              if (index == 1) {
-                _displayedArticles = List.from(_savedArticles);
-              } else if (index == 0) {
-                _displayedArticles = _getFilteredArticles();
-              }
-              // Settings tab (index 2) doesn't need displayed articles
-            });
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary.withValues(alpha: 0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: SizedBox(
+                  } else if (value == 'toggle_view') {
+                    setState(() {
+                      _viewMode = _viewMode == ViewMode.cards ? ViewMode.list : ViewMode.cards;
+                    });
+                    _saveViewMode();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'check_updates',
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          icon,
-                          color: isSelected ? AppColors.primary : AppColors.textTertiary,
-                          size: 22,
+                        const Icon(Icons.system_update, color: AppColors.textPrimary),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Check for updates',
+                          style: GoogleFonts.lexend(color: AppColors.textPrimary),
                         ),
-                        if (isSelected) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              label,
-                              style: GoogleFonts.dmSans(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                letterSpacing: 0.1,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
-                ),
-              ],
+                  PopupMenuItem(
+                    value: 'toggle_view',
+                    child: Row(
+                      children: [
+                        Icon(
+                          _viewMode == ViewMode.cards ? Icons.view_list : Icons.grid_view,
+                          color: AppColors.textPrimary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _viewMode == ViewMode.cards ? 'List View' : 'Card View',
+                          style: GoogleFonts.lexend(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search bar
+          if (_isSearchActive)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search articles, sources, or content...',
+                  hintStyle: GoogleFonts.lexend(
+                    color: AppColors.textTertiary,
+                    fontSize: 15,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? Semantics(
+                          button: true,
+                          label: 'Clear search',
+                          child: IconButton(
+                            icon: const Icon(Icons.clear_rounded, color: AppColors.textSecondary),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _displayedArticles = _getFilteredArticles();
+                              });
+                            },
+                          ),
+                        )
+                      : null,
+                ),
+                style: GoogleFonts.lexend(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                    _displayedArticles = _getFilteredArticles();
+                  });
+                },
+              ),
+            ),
+
+          // Category filter for feeds tab
+          if (_selectedTab == 0 && !_isSearchActive && (_articles.isNotEmpty || _isLoading == false))
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: SingleChildScrollableRow(
+                scrollDirection: Axis.horizontal,
+                spacing: 10,
+                children: _categories.map((category) {
+                  final isSelected = _selectedFilter == category;
+                  final color = category == 'All' ? AppColors.primary : getCategoryColor(category);
+
+                  return _buildCategoryChip(
+                    category: category,
+                    isSelected: isSelected,
+                    color: color,
+                    onTap: () {
+                      setState(() {
+                        _selectedFilter = category;
+                        _displayedArticles = _getFilteredArticles();
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+
+          // Search results indicator
+          if (_isSearchActive && _searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, size: 16, color: AppColors.textTertiary),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
+                    style: GoogleFonts.lexend(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Offline indicator
+          if (!_isOnline && _selectedTab == 0)
+            Container(
+              margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.warningSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.cloud_off_rounded, size: 16, color: AppColors.warning),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Offline - Showing cached content',
+                      style: GoogleFonts.lexend(
+                        fontSize: 13,
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Content
+          Expanded(
+            child: _isLoading
+                ? _buildLoadingState()
+                : RefreshIndicator(
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.surface,
+                    strokeWidth: 2.5,
+                    onRefresh: _isLoading ? () async {} : () async {
+                      await _refreshFeeds();
+                    },
+                    child: _selectedTab == 0
+                        ? (_viewMode == ViewMode.cards
+                            ? _buildCardView()
+                            : _buildListView())
+                        : _selectedTab == 1
+                            ? _buildSavedArticlesView()
+                            : _buildSettingsView(),
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: _selectedTab == 0 && !_isSearchActive
+          ? FloatingActionButton.small(
+              heroTag: 'view_mode',
+              onPressed: () {
+                setState(() {
+                  _viewMode = _viewMode == ViewMode.cards
+                      ? ViewMode.list
+                      : ViewMode.cards;
+                });
+                _saveViewMode();
+              },
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _viewMode == ViewMode.cards ? Icons.view_list_rounded : Icons.grid_view_rounded,
+                size: 20,
+              ),
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.surface,
+        elevation: 0,
+        indicatorColor: AppColors.primarySurface,
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedTab = index;
+            if (index == 1) {
+              _displayedArticles = List.from(_savedArticles);
+            } else if (index == 0) {
+              _displayedArticles = _getFilteredArticles();
+            }
+          });
+        },
+        destinations: [
+          NavigationDestination(
+            icon: Icon(
+              Icons.rss_feed_outlined,
+              color: _selectedTab == 0 ? AppColors.primary : AppColors.textTertiary,
+            ),
+            selectedIcon: Icon(
+              Icons.rss_feed_rounded,
+              color: AppColors.primary,
+            ),
+            label: 'Feeds',
+          ),
+          NavigationDestination(
+            icon: Icon(
+              _savedArticles.isEmpty ? Icons.bookmark_border_outlined : Icons.bookmark_outline,
+              color: _selectedTab == 1 ? AppColors.primary : AppColors.textTertiary,
+            ),
+            selectedIcon: Icon(
+              Icons.bookmark_rounded,
+              color: AppColors.secondary,
+            ),
+            label: 'Saved',
+          ),
+          NavigationDestination(
+            icon: Icon(
+              Icons.settings_outlined,
+              color: _selectedTab == 2 ? AppColors.primary : AppColors.textTertiary,
+            ),
+            selectedIcon: Icon(
+              Icons.settings_rounded,
+              color: AppColors.primary,
+            ),
+            label: 'Settings',
+          ),
+        ],
       ),
     );
   }

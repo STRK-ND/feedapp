@@ -15,7 +15,7 @@ class AppCacheManager extends CacheManager {
           Config(
             key,
             stalePeriod: const Duration(days: 7),
-            maxNrOfCacheObjects: 200,
+            maxNrOfCacheObjects: 500, // Increased from 200 for better caching
             repo: JsonCacheInfoRepository(databaseName: key),
             fileSystem: IOFileSystem(key),
             fileService: HttpFileService(),
