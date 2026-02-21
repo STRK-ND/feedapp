@@ -100,28 +100,28 @@ jobs:
             if [ -f "CHANGELOG.md" ]; then
               # Extract changelog section for the current version
               VERSION_NO_V=${VERSION#v}
-              awk '/^## '${VERSION_NO_V}'/{flag=1; next} /^## [0-9]/{if(flag)exit} flag' CHANGELOG.md > /tmp/changelog.txt
+              awk '/^## '${VERSION_NO_V}'/{flag=1; next} /^## [0-9]/{if(flag)exit} flag' CHANGELOG.md > ./changelog.txt
 
-              if [ -s /tmp/changelog.txt ]; then
+              if [ -s ./changelog.txt ]; then
                 echo "✅ Changelog extracted for version ${VERSION_NO_V}"
               else
                 echo "⚠️ No changelog found for ${VERSION_NO_V}"
-                echo "Release version ${VERSION_NO_V}" > /tmp/changelog.txt
+                echo "Release version ${VERSION_NO_V}" > ./changelog.txt
               fi
             else
               echo "⚠️ CHANGELOG.md not found"
-              echo "Release version ${VERSION}" > /tmp/changelog.txt
+              echo "Release version ${VERSION}" > ./changelog.txt
             fi
 
-            cat /tmp/changelog.txt
-            echo "export CHANGELOG_PATH=\"/tmp/changelog.txt\"" >> $BASH_ENV
+            cat ./changelog.txt
+            echo "export CHANGELOG_PATH=\"./changelog.txt\"" >> $BASH_ENV
 
       # Store APK as artifact (temporary storage)
       - persist_to_workspace:
           root: .
           paths:
             - build/app/outputs/flutter-apk/app-release.apk
-            - /tmp/changelog.txt
+            - changelog.txt
 
   create_release:
     docker:
@@ -147,7 +147,7 @@ jobs:
             ls -la "/tmp/workspace/build/app/outputs/flutter-apk/app-release.apk"
 
             echo "Checking for changelog..."
-            ls -la "/tmp/workspace/tmp/changelog.txt"
+            ls -la "/tmp/workspace/changelog.txt"
 
       # Create GitHub release using gh CLI
       - run:
@@ -166,7 +166,7 @@ jobs:
             gh release create "$CIRCLE_TAG" \
               --repo "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" \
               --title "Curated Feeds v${VERSION}" \
-              --notes-file "/tmp/workspace/tmp/changelog.txt" \
+              --notes-file "/tmp/workspace/changelog.txt" \
               "/tmp/workspace/build/app/outputs/flutter-apk/app-release.apk"
 
             echo "✅ Release $CIRCLE_TAG created successfully"
