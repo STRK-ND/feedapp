@@ -30,15 +30,6 @@ class RssFeedService {
       color: AppColors.techSecondary,
       icon: Icons.devices,
     ),
-    RssSource(
-      id: 'hackernews',
-      name: 'Hacker News',
-      url: 'https://hnrss.org/frontpage',
-      category: 'Tech',
-      color: const Color(0xFF8B5CF6),
-      icon: Icons.code,
-    ),
-
     // News
     RssSource(
       id: 'bbc',
@@ -160,34 +151,34 @@ class RssFeedService {
 
           String description = '';
           if (descriptionElement != null) {
-            description = Helpers.stripHtmlTags(descriptionElement.text);
+            description = Helpers.stripHtmlTags(descriptionElement.innerText);
           }
 
           String fullContent = '';
           final contentElement = item.descendants.whereType<XmlElement>().where((e) => e.localName?.endsWith(':encoded') == true).firstOrNull;
           if (contentElement != null) {
-            fullContent = contentElement.text;
+            fullContent = contentElement.innerText;
           } else {
             fullContent = description;
           }
 
           DateTime pubDate = DateTime.now();
           if (pubDateElement != null) {
-            pubDate = Helpers.parseDate(pubDateElement.text);
+            pubDate = Helpers.parseDate(pubDateElement.innerText);
           }
 
-          final articleId = linkElement.text.hashCode.toString();
+          final articleId = linkElement.innerText.hashCode.toString();
 
           articles.add(Article(
             id: articleId,
-            title: Helpers.stripHtmlTags(titleElement.text).trim(),
+            title: Helpers.stripHtmlTags(titleElement.innerText).trim(),
             description: Helpers.truncateText(description, 150),
             fullContent: fullContent,
-            link: linkElement.text,
+            link: linkElement.innerText,
             sourceId: source.id,
             sourceName: source.name,
             pubDate: pubDate,
-            author: authorElement?.text.trim(),
+            author: authorElement?.innerText.trim(),
             imageUrl: imageUrl,
           ));
         } catch (e) {
@@ -215,17 +206,17 @@ class RssFeedService {
     String? imageUrl;
 
     // Helper function to find element by name in item's descendants
-    XmlElement? _findElement(XmlElement item, String name) {
+    XmlElement? findElement(XmlElement item, String name) {
       return item.descendants.whereType<XmlElement>().where((e) => e.localName == name).firstOrNull;
     }
 
     // Helper function to find element by suffix (for namespaced elements like media:content)
-    XmlElement? _findElementBySuffix(XmlElement item, String suffix) {
+    XmlElement? findElementBySuffix(XmlElement item, String suffix) {
       return item.descendants.whereType<XmlElement>().where((e) => e.localName?.endsWith(suffix) == true).firstOrNull;
     }
 
     // Method 1: enclosure element (most common)
-    final enclosureElement = _findElement(item, 'enclosure');
+    final enclosureElement = findElement(item, 'enclosure');
     if (enclosureElement != null) {
       final url = enclosureElement.getAttribute('url');
       if (url != null) {
@@ -235,7 +226,7 @@ class RssFeedService {
 
     // Method 2: media:content element
     if (imageUrl == null) {
-      final mediaElement = _findElementBySuffix(item, 'content');
+      final mediaElement = findElementBySuffix(item, 'content');
       if (mediaElement != null) {
         final url = mediaElement.getAttribute('url');
         if (url != null) {
@@ -246,7 +237,7 @@ class RssFeedService {
 
     // Method 2.5: media:thumbnail element
     if (imageUrl == null) {
-      final thumbnailElement = _findElementBySuffix(item, 'thumbnail');
+      final thumbnailElement = findElementBySuffix(item, 'thumbnail');
       if (thumbnailElement != null) {
         final url = thumbnailElement.getAttribute('url');
         if (url != null) {
@@ -257,22 +248,22 @@ class RssFeedService {
 
     // Method 3: description HTML img tags
     if (imageUrl == null && descriptionElement != null) {
-      final descriptionText = descriptionElement.text;
+      final descriptionText = descriptionElement.innerText;
       imageUrl = _extractFirstImageUrl(descriptionText);
     }
 
     // Method 4: Try content:encoded for embedded HTML images
     if (imageUrl == null) {
-      final contentElement = _findElementBySuffix(item, 'encoded');
+      final contentElement = findElementBySuffix(item, 'encoded');
       if (contentElement != null) {
-        final contentText = contentElement.text;
+        final contentText = contentElement.innerText;
         imageUrl = _extractFirstImageUrl(contentText);
       }
     }
 
     // Method 5: Try to extract ANY URL from description as fallback
     if (imageUrl == null && descriptionElement != null) {
-      final descriptionText = descriptionElement.text;
+      final descriptionText = descriptionElement.innerText;
       if (descriptionText.isNotEmpty && descriptionText.contains('http')) {
         final urlMatches = RegExp(r'https?://\S+', multiLine: true)
             .allMatches(descriptionText)
@@ -280,7 +271,7 @@ class RssFeedService {
 
         for (final url in urlMatches) {
           // Skip if it's the main article link
-          if (linkElement != null && url == linkElement.text) continue;
+          if (linkElement != null && url == linkElement.innerText) continue;
 
           // Just accept it - be very lenient to catch any images
           imageUrl = url;
@@ -291,16 +282,16 @@ class RssFeedService {
 
     // If still no image, try extracting from the full content/encoded
     if (imageUrl == null) {
-      final contentElement = _findElementBySuffix(item, 'encoded');
+      final contentElement = findElementBySuffix(item, 'encoded');
       if (contentElement != null) {
-        final contentText = contentElement.text;
+        final contentText = contentElement.innerText;
         if (contentText.isNotEmpty && contentText.contains('http')) {
           final urlMatches = RegExp(r'https?://\S+', multiLine: true)
               .allMatches(contentText)
               .map((m) => m.group(0)!);
 
           for (final url in urlMatches) {
-            if (linkElement != null && url == linkElement.text) continue;
+            if (linkElement != null && url == linkElement.innerText) continue;
             imageUrl = url;
             break;
           }
