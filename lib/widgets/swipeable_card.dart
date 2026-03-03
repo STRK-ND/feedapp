@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import '../utils/constants.dart';
 
 /// Swipeable card widget for article cards

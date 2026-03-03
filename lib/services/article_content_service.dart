@@ -4,7 +4,6 @@ import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
 import '../utils/constants.dart';
 import '../utils/error_handler.dart';
-import '../utils/helpers.dart';
 
 /// Service to fetch and extract full article content from URLs
 class ArticleContentService {
@@ -29,10 +28,10 @@ class ArticleContentService {
       'article p',
       '.story-body p',
     ],
-    'cnn.com': [
-      '.l-container p',
-      '.zn-body__paragraph',
-      'article .pg-rail-tall__body p',
+    'variety.com': [
+      '.article-content',
+      'article p',
+      '.story-body p',
     ],
   };
 
@@ -164,15 +163,12 @@ class ArticleContentService {
         final tagName = node.localName?.toLowerCase();
 
         // Skip these elements
-        if (['script', 'style', 'nav', 'header', 'footer', 'aside',
-              'iframe', 'video', 'audio', 'figure', 'img'].contains(tagName)) {
+        if (['script', 'style', 'nav', 'header', 'footer', 'aside', 'iframe', 'video', 'audio', 'figure', 'img'].contains(tagName)) {
           continue;
         }
 
         // Add paragraph breaks
-        if (tagName == 'p' || tagName == 'div' || tagName == 'h1' ||
-            tagName == 'h2' || tagName == 'h3' || tagName == 'h4' ||
-            tagName == 'h5' || tagName == 'h6') {
+        if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6') {
           if (hasContent) {
             textBuilder.add('\n\n');
           }
@@ -190,8 +186,28 @@ class ArticleContentService {
     return cleanText(textBuilder.toString());
   }
 
-  /// Clean extracted text
+  /// Clean extracted text - enhanced to strip HTML, URLs, and RSS artifacts
   static String cleanText(String text) {
+    if (text.isEmpty) return text;
+
+    // 2.1 Strip HTML tags using regex
+    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
+
+    // 2.3 Remove HTML anchor tags while preserving link text
+    // This handles <a href="...">link text</a> patterns already handled by HTML tag removal above
+
+    // 2.2 Remove bare URLs (http/https/www patterns)
+    text = text.replaceAll(RegExp(r'https?://\S+'), '');
+    text = text.replaceAll(RegExp(r'www\.\S+'), '');
+
+    // 2.4 Remove common RSS artifacts like [+], [More], [Read More]
+    text = text.replaceAll(RegExp(r'\[(?:\+ ?|More|Read More)\]'), '');
+    text = text.replaceAll(RegExp(r'\[\+\]'), '');
+    text = text.replaceAll(RegExp(r'\[MORE\]', caseSensitive: false), '');
+
+    // 2.5 Decode HTML entities (both named and numeric)
+    text = _decodeHtmlEntities(text);
+
     // Remove extra whitespace
     text = text.replaceAll(RegExp(r'\s+'), ' ');
 
@@ -214,6 +230,56 @@ class ArticleContentService {
     }
 
     return text.trim();
+  }
+
+  /// Decode HTML entities (both named entities and numeric character references)
+  static String _decodeHtmlEntities(String text) {
+    // First decode numeric entities (&#8221;, &#8217;, etc.)
+    text = text.replaceAllMapped(
+      RegExp(r'&#(\d+);'),
+      (match) {
+        final code = int.tryParse(match.group(1) ?? '');
+        if (code != null) {
+          return String.fromCharCode(code);
+        }
+        return match.group(0) ?? '';
+      },
+    );
+
+    // Decode hex numeric entities (&#x2019;, etc.)
+    text = text.replaceAllMapped(
+      RegExp(r'&#x([0-9a-fA-F]+);'),
+      (match) {
+        final code = int.tryParse(match.group(1) ?? '', radix: 16);
+        if (code != null) {
+          return String.fromCharCode(code);
+        }
+        return match.group(0) ?? '';
+      },
+    );
+
+    // Then decode named entities
+    return text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&apos;', "'")
+        .replaceAll('&mdash;', '—')
+        .replaceAll('&ndash;', '–')
+        .replaceAll('&hellip;', '…')
+        .replaceAll('&copy;', '©')
+        .replaceAll('&reg;', '®')
+        .replaceAll('&trade;', '™')
+        .replaceAll('&lsquo;', ''')
+        .replaceAll('&rsquo;', ''')
+        .replaceAll('&ldquo;', '"')
+        .replaceAll('&rdquo;', '"')
+        .replaceAll('&bull;', '•')
+        .replaceAll('&middot;', '·')
+        .replaceAll('&deg;', '°');
   }
 }
 

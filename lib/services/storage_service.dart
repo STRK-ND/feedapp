@@ -14,9 +14,6 @@ class StorageService {
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
     ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock,
-    ),
   );
 
   /// Save articles list (public data)

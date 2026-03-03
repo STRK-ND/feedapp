@@ -11,17 +11,9 @@ import '../utils/error_handler.dart';
 class RssFeedService {
   RssFeedService._();
 
-  /// Predefined RSS sources as a list (for iteration)
+  /// Predefined RSS sources as a list (for iteration) - filtered to image-friendly sources
   static final List<RssSource> predefinedSources = [
     // Tech
-    RssSource(
-      id: 'techcrunch',
-      name: 'TechCrunch',
-      url: 'https://techcrunch.com/feed/',
-      category: 'Tech',
-      color: AppColors.techPrimary,
-      icon: Icons.computer,
-    ),
     RssSource(
       id: 'verge',
       name: 'The Verge',
@@ -29,6 +21,14 @@ class RssFeedService {
       category: 'Tech',
       color: AppColors.techSecondary,
       icon: Icons.devices,
+    ),
+    RssSource(
+      id: 'wired',
+      name: 'Wired',
+      url: 'https://www.wired.com/feed/rss',
+      category: 'Tech',
+      color: AppColors.techSecondary,
+      icon: Icons.memory,
     ),
     // News
     RssSource(
@@ -39,35 +39,24 @@ class RssFeedService {
       color: AppColors.newsPrimary,
       icon: Icons.public,
     ),
-    RssSource(
-      id: 'cnn',
-      name: 'CNN Top Stories',
-      url: 'https://rss.cnn.com/rss/cnn_topstories.rss',
-      category: 'News',
-      color: AppColors.newsSecondary,
-      icon: Icons.article_rounded,
-    ),
-
     // Science
     RssSource(
-      id: 'sciencedaily',
-      name: 'Science Daily',
-      url: 'https://www.sciencedaily.com/rss/top.xml',
+      id: 'newscientist',
+      name: 'New Scientist',
+      url: 'https://www.newscientist.com/feed/home/',
       category: 'Science',
-      color: AppColors.sciencePrimary,
-      icon: Icons.science_rounded,
+      color: AppColors.scienceSecondary,
+      icon: Icons.biotech,
     ),
-
-    // Sports
+    // Sports - using ESPN as Bleacher Report URL is broken
     RssSource(
-      id: 'espn',
-      name: 'ESPN Top',
-      url: 'https://www.espn.com/espn/rss/news',
+      id: 'skysports',
+      name: 'Sky Sports',
+      url: 'https://www.skysports.com/rss/12040',
       category: 'Sports',
-      color: AppColors.sportsPrimary,
-      icon: Icons.sports,
+      color: AppColors.sportsSecondary,
+      icon: Icons.sports_soccer,
     ),
-
     // Entertainment
     RssSource(
       id: 'variety',
@@ -84,6 +73,21 @@ class RssFeedService {
     for (var source in predefinedSources) source.id: source,
   };
 
+  /// Helper to safely get text from XmlElement
+  static String _getElementText(XmlElement? element) {
+    if (element == null) return '';
+    try {
+      // Use innerText property which should work on XmlElement
+      return element.innerText;
+    } catch (e) {
+      // Fallback: manually get text content from children
+      return element.children
+          .whereType<XmlText>()
+          .map((e) => e.value)
+          .join('');
+    }
+  }
+
   /// Fetch articles from a single RSS source
   static Future<List<Article>> fetchArticles(RssSource source) async {
     debugPrint('[RSS] Fetching from ${source.name} (${source.url})');
@@ -92,7 +96,7 @@ class RssFeedService {
           .get(Uri.parse(source.url))
           .timeout(
             const Duration(seconds: AppConfig.rssTimeoutSeconds),
-      );
+          );
 
       debugPrint('[RSS] ${source.name}: HTTP ${response.statusCode}');
       if (response.statusCode == 200) {
@@ -136,49 +140,54 @@ class RssFeedService {
 
       for (final item in items) {
         try {
-          // Use findElements on the item's descendants instead of the item itself
-          final titleElement = item.descendants.whereType<XmlElement>().where((e) => e.localName == 'title').firstOrNull;
-          final linkElement = item.descendants.whereType<XmlElement>().where((e) => e.localName == 'link').firstOrNull;
-          final descriptionElement = item.descendants.whereType<XmlElement>().where((e) => e.localName == 'description').firstOrNull;
-          final pubDateElement = item.descendants.whereType<XmlElement>().where((e) => e.localName == 'pubDate').firstOrNull;
-          final authorElement = item.descendants.whereType<XmlElement>().where((e) => e.localName == 'author').firstOrNull
-              ?? item.descendants.whereType<XmlElement>().where((e) => e.localName?.endsWith(':creator') == true).firstOrNull;
+          // Find elements safely
+          final titleElement = _findElement(item, 'title');
+          final linkElement = _findElement(item, 'link');
+          final descriptionElement = _findElement(item, 'description');
+          final pubDateElement = _findElement(item, 'pubDate');
+          final authorElement = _findElement(item, 'author')
+              ?? _findElementBySuffix(item, 'creator');
 
           // Image extraction - try multiple common fields
           String? imageUrl = _extractImageUrl(item, descriptionElement, linkElement);
 
           if (titleElement == null || linkElement == null) continue;
 
-          String description = '';
-          if (descriptionElement != null) {
-            description = Helpers.stripHtmlTags(descriptionElement.innerText);
-          }
+          // Get text using safe helper
+          String titleText = _getElementText(titleElement);
+          String linkText = _getElementText(linkElement);
+          String descriptionText = _getElementText(descriptionElement);
+          String pubDateText = _getElementText(pubDateElement);
+          String authorText = _getElementText(authorElement);
 
+          String description = Helpers.stripHtmlTags(descriptionText);
           String fullContent = '';
-          final contentElement = item.descendants.whereType<XmlElement>().where((e) => e.localName?.endsWith(':encoded') == true).firstOrNull;
+
+          // Try to get content:encoded
+          final contentElement = _findElementBySuffix(item, 'encoded');
           if (contentElement != null) {
-            fullContent = contentElement.innerText;
+            fullContent = _getElementText(contentElement);
           } else {
             fullContent = description;
           }
 
           DateTime pubDate = DateTime.now();
-          if (pubDateElement != null) {
-            pubDate = Helpers.parseDate(pubDateElement.innerText);
+          if (pubDateText.isNotEmpty) {
+            pubDate = Helpers.parseDate(pubDateText);
           }
 
-          final articleId = linkElement.innerText.hashCode.toString();
+          final articleId = linkText.hashCode.toString();
 
           articles.add(Article(
             id: articleId,
-            title: Helpers.stripHtmlTags(titleElement.innerText).trim(),
+            title: Helpers.stripHtmlTags(titleText).trim(),
             description: Helpers.truncateText(description, 150),
             fullContent: fullContent,
-            link: linkElement.innerText,
+            link: linkText,
             sourceId: source.id,
             sourceName: source.name,
             pubDate: pubDate,
-            author: authorElement?.innerText.trim(),
+            author: authorText.isNotEmpty ? authorText.trim() : null,
             imageUrl: imageUrl,
           ));
         } catch (e) {
@@ -197,26 +206,26 @@ class RssFeedService {
     }
   }
 
+  /// Helper to find element by name in item's descendants
+  static XmlElement? _findElement(XmlElement item, String name) {
+    return item.descendants.whereType<XmlElement>().where((e) => e.localName == name).firstOrNull;
+  }
+
+  /// Helper to find element by suffix (for namespaced elements like media:content)
+  static XmlElement? _findElementBySuffix(XmlElement item, String suffix) {
+    return item.descendants.whereType<XmlElement>().where((e) => e.localName.endsWith(suffix)).firstOrNull;
+  }
+
   /// Extract image URL from RSS item
   static String? _extractImageUrl(
-    dynamic item,
-    dynamic descriptionElement,
-    dynamic linkElement,
+    XmlElement item,
+    XmlElement? descriptionElement,
+    XmlElement? linkElement,
   ) {
     String? imageUrl;
 
-    // Helper function to find element by name in item's descendants
-    XmlElement? findElement(XmlElement item, String name) {
-      return item.descendants.whereType<XmlElement>().where((e) => e.localName == name).firstOrNull;
-    }
-
-    // Helper function to find element by suffix (for namespaced elements like media:content)
-    XmlElement? findElementBySuffix(XmlElement item, String suffix) {
-      return item.descendants.whereType<XmlElement>().where((e) => e.localName?.endsWith(suffix) == true).firstOrNull;
-    }
-
     // Method 1: enclosure element (most common)
-    final enclosureElement = findElement(item, 'enclosure');
+    final enclosureElement = _findElement(item, 'enclosure');
     if (enclosureElement != null) {
       final url = enclosureElement.getAttribute('url');
       if (url != null) {
@@ -226,7 +235,7 @@ class RssFeedService {
 
     // Method 2: media:content element
     if (imageUrl == null) {
-      final mediaElement = findElementBySuffix(item, 'content');
+      final mediaElement = _findElementBySuffix(item, 'content');
       if (mediaElement != null) {
         final url = mediaElement.getAttribute('url');
         if (url != null) {
@@ -237,7 +246,7 @@ class RssFeedService {
 
     // Method 2.5: media:thumbnail element
     if (imageUrl == null) {
-      final thumbnailElement = findElementBySuffix(item, 'thumbnail');
+      final thumbnailElement = _findElementBySuffix(item, 'thumbnail');
       if (thumbnailElement != null) {
         final url = thumbnailElement.getAttribute('url');
         if (url != null) {
@@ -248,22 +257,23 @@ class RssFeedService {
 
     // Method 3: description HTML img tags
     if (imageUrl == null && descriptionElement != null) {
-      final descriptionText = descriptionElement.innerText;
+      final descriptionText = _getElementText(descriptionElement);
       imageUrl = _extractFirstImageUrl(descriptionText);
     }
 
     // Method 4: Try content:encoded for embedded HTML images
     if (imageUrl == null) {
-      final contentElement = findElementBySuffix(item, 'encoded');
+      final contentElement = _findElementBySuffix(item, 'encoded');
       if (contentElement != null) {
-        final contentText = contentElement.innerText;
+        final contentText = _getElementText(contentElement);
         imageUrl = _extractFirstImageUrl(contentText);
       }
     }
 
     // Method 5: Try to extract ANY URL from description as fallback
     if (imageUrl == null && descriptionElement != null) {
-      final descriptionText = descriptionElement.innerText;
+      final descriptionText = _getElementText(descriptionElement);
+      final linkText = linkElement != null ? _getElementText(linkElement) : '';
       if (descriptionText.isNotEmpty && descriptionText.contains('http')) {
         final urlMatches = RegExp(r'https?://\S+', multiLine: true)
             .allMatches(descriptionText)
@@ -271,8 +281,7 @@ class RssFeedService {
 
         for (final url in urlMatches) {
           // Skip if it's the main article link
-          if (linkElement != null && url == linkElement.innerText) continue;
-
+          if (linkText.isNotEmpty && url == linkText) continue;
           // Just accept it - be very lenient to catch any images
           imageUrl = url;
           break;
@@ -282,16 +291,17 @@ class RssFeedService {
 
     // If still no image, try extracting from the full content/encoded
     if (imageUrl == null) {
-      final contentElement = findElementBySuffix(item, 'encoded');
+      final contentElement = _findElementBySuffix(item, 'encoded');
       if (contentElement != null) {
-        final contentText = contentElement.innerText;
+        final contentText = _getElementText(contentElement);
+        final linkText = linkElement != null ? _getElementText(linkElement) : '';
         if (contentText.isNotEmpty && contentText.contains('http')) {
           final urlMatches = RegExp(r'https?://\S+', multiLine: true)
               .allMatches(contentText)
               .map((m) => m.group(0)!);
 
           for (final url in urlMatches) {
-            if (linkElement != null && url == linkElement.innerText) continue;
+            if (linkText.isNotEmpty && url == linkText) continue;
             imageUrl = url;
             break;
           }

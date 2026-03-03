@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background padding to center the icon in adaptive icon safe zone -->
+    <group
+        android:translateX="30"
+        android:translateY="30">
+
+        <!-- Outer circle gradient stroke -->
+        <path
+            android:fillColor="#00000000"
+            android:pathData="M24,24m-21,0a21,21 0,1 1,42 0a21,21 0,1 1,-42 0"
+            android:strokeWidth="3"
+            android:strokeColor="#ff6b9d"/>
+
+        <!-- Eye arc shape -->
+        <path
+            android:fillColor="#00000000"
+            android:pathData="M18,24a6,6 0,0 0,12 0"
+            android:strokeWidth="1.5"
+            android:strokeColor="#c9b6df"
+            android:strokeLineCap="round"/>
+
+        <!-- Center filled circle -->
+        <path
+            android:fillColor="#ff6b9d"
+            android:pathData="M24,24m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0"/>
+    </group>
+</vector>

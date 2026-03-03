@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/article.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 
@@ -90,23 +91,23 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   void _openInBrowser() async {
     final uri = Uri.parse(widget.article.link);
     if (await canLaunchUrl(uri)) {
+      await AnalyticsService.logArticleLinkOpen(articleId: widget.article.id);
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   void _shareArticle() {
+    AnalyticsService.logArticleShare(articleId: widget.article.id);
     SharePlus.instance.share(ShareParams(text: '${widget.article.title}\n\n${widget.article.link}'));
   }
 
   bool _showRatingSection() {
-    return widget.article.author != null || widget.article.pubDate != null;
+    return widget.article.author != null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final source =
-        RssFeedService.getSourceById(widget.article.sourceId) ??
-        RssFeedService.predefinedSources.first;
+    final source = RssFeedService.getSourceById(widget.article.sourceId) ?? RssFeedService.predefinedSources.first;
     final screenHeight = MediaQuery.of(context).size.height;
     final imageHeight = screenHeight * 0.6;
 
@@ -151,7 +152,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             ),
                           ),
                   ),
-
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -167,7 +167,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       ),
                     ),
                   ),
-
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -193,7 +192,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               ),
                             ),
                           ),
-
                           Material(
                             color: Colors.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(22),
@@ -221,7 +219,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       ),
                     ),
                   ),
-
                   Positioned(
                     left: 20,
                     top: imageHeight - 60,
@@ -255,7 +252,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               ),
             ),
           ),
-
           SliverToBoxAdapter(
             child: Container(
               padding: const EdgeInsets.all(24),
@@ -321,7 +317,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ),
                     const SizedBox(height: 24),
                   ],
-
                   Text(
                     widget.article.title,
                     style: GoogleFonts.playfairDisplay(
@@ -333,17 +328,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  Text(
-                    _fullContent ?? widget.article.description,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 18,
-                      color: AppColors.textPrimary,
-                      height: 1.7,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
                   if (_isLoadingContent)
                     Center(
                       child: Column(
@@ -372,9 +356,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         height: 1.8,
                         letterSpacing: 0.05,
                       ),
+                    )
+                  else
+                    Text(
+                      widget.article.description,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 18,
+                        color: AppColors.textPrimary,
+                        height: 1.7,
+                      ),
                     ),
                   const SizedBox(height: 40),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -399,8 +391,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 40),
-
-                                                    ],
+                ],
               ),
             ),
           ),
@@ -442,79 +433,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           ),
         ),
       ),
-    );
-  }
-    final relatedArticles = RssFeedService.predefinedSources
-        .where((s) => s.id != widget.article.sourceId)
-        .take(3)
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'More from this source',
-          style: GoogleFonts.playfairDisplay(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 120,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: relatedArticles.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final source = relatedArticles[index];
-              return Container(
-                width: 200,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.divider.withValues(alpha: 0.5),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(source.icon, size: 20, color: source.color),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            source.name,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${source.category} →',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 12,
-                              color: source.color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }

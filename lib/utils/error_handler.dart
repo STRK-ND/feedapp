@@ -136,10 +136,13 @@ class Result<T> {
   /// Map the data if successful
   Result<R> map<R>(R Function(T) mapper) {
     if (isFailure) {
-      return Result.failure(error!);
+      return Result.failure(error);
+    }
+    if (data == null) {
+      return Result.failure('No data available');
     }
     try {
-      return Result.success(mapper(data!));
+      return Result.success(mapper(data as T));
     } catch (e) {
       return Result.failure(e.toString());
     }

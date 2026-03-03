@@ -68,7 +68,6 @@ class AppConfig {
     'All',
     'Tech',
     'News',
-    'Science',
     'Sports',
     'Entertainment',
   ];
@@ -81,8 +80,6 @@ Color getCategoryColor(String category) {
       return AppColors.techPrimary;
     case 'News':
       return AppColors.newsPrimary;
-    case 'Science':
-      return AppColors.sciencePrimary;
     case 'Sports':
       return AppColors.sportsPrimary;
     case 'Entertainment':

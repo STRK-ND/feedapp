@@ -167,7 +167,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                           _buildHeaderButton(
                             icon: Icons.share_rounded,
                             onPressed: () {
-                              Share.share('${widget.article.title}\n\n${widget.article.link}');
+                              SharePlus.instance.share(ShareParams(text: '${widget.article.title}\n\n${widget.article.link}'));
                             },
                             color: sourceColor,
                             label: 'Share article',

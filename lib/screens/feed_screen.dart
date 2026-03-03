@@ -8,6 +8,7 @@ import '../services/rss_feed_service.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
 import '../services/version_provider.dart';
+import '../services/analytics_service.dart';
 import '../widgets/card_stack.dart';
 import '../widgets/expanded_article_card.dart';
 import '../widgets/update_dialog.dart';
@@ -163,6 +164,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Future<void> _refreshFeeds() async {
     debugPrint('[Feed] Starting refresh...');
+  await AnalyticsService.logFeedRefresh();
 
     // Check if offline
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -302,6 +304,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       print('Warning: Article not found in main list: ${article.id}');
       return;
     }
+    AnalyticsService.logArticleOpen(articleId: article.id, title: article.title);
 
     if (articleIndex >= _articles.length) {
       print('Warning: Article index out of bounds: $articleIndex');
