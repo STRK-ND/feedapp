@@ -17,8 +17,11 @@ import '../utils/helpers.dart';
 import '../utils/error_handler.dart';
 
 /// Main RSS Feed Screen
+/// [showSavedArticles] - when true, displays saved articles instead of feed
 class RssFeedScreen extends StatefulWidget {
-  const RssFeedScreen({super.key});
+  final bool showSavedArticles;
+
+  const RssFeedScreen({super.key, this.showSavedArticles = false});
 
   @override
   State<RssFeedScreen> createState() => _RssFeedScreenState();
@@ -1274,7 +1277,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   ),
                 ),
 
-              // Category filter for feeds tab (hide when search is active)
+              // Category filter chips for feeds tab (hidden when search is active)
               if (_selectedTab == 0 && !_isSearchActive && (_articles.isNotEmpty || _isLoading == false)) ...[
                 Container(
                   height: 50,
@@ -1457,8 +1460,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               )
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        bottomNavigationBar: _buildBottomAppBar(),
-      ),
+              ),
     );
   }
 

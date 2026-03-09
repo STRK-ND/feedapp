@@ -3,6 +3,7 @@ import '../repositories/article_repository.dart';
 import '../repositories/feed_repository.dart';
 import '../services/storage_service.dart';
 import '../services/cache_manager.dart';
+import '../services/settings_service.dart';
 
 /// Global service locator instance
 /// Uses GetIt for dependency injection to manage service lifecycles
@@ -11,13 +12,13 @@ final GetIt getIt = GetIt.instance;
 /// Setup all service dependencies
 /// This should be called before runApp in main()
 Future<void> setupServiceLocator() async {
-  // Register singleton services - only one instance exists for the app lifetime
+  // Register singleton services
   getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<AppCacheManager>(() => AppCacheManager());
   getIt.registerLazySingleton<ApkCacheManager>(() => ApkCacheManager());
+  getIt.registerLazySingleton<SettingsService>(() => SettingsService());
 
-  // Register repositories - instances are created when requested
-  // Using factory to allow new instances per request (or change to registerLazySingleton for singletons)
+  // Register repositories
   getIt.registerFactory<ArticleRepository>(
     () => ArticleRepository(
       storageService: getIt<StorageService>(),

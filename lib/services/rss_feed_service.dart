@@ -66,6 +66,58 @@ class RssFeedService {
       color: AppColors.entertainmentPrimary,
       icon: Icons.theaters_rounded,
     ),
+    // Tech - Additional sources
+    RssSource(
+      id: 'arstechnica',
+      name: 'Ars Technica',
+      url: 'https://feeds.arstechnica.com/arstechnica/index',
+      category: 'Tech',
+      color: AppColors.techSecondary,
+      icon: Icons.computer,
+    ),
+    RssSource(
+      id: 'techcrunch',
+      name: 'TechCrunch',
+      url: 'https://techcrunch.com/feed/',
+      category: 'Tech',
+      color: AppColors.techSecondary,
+      icon: Icons.rocket_launch,
+    ),
+    RssSource(
+      id: 'engadget',
+      name: 'Engadget',
+      url: 'https://www.engadget.com/rss.xml',
+      category: 'Tech',
+      color: AppColors.techSecondary,
+      icon: Icons.devices_other,
+    ),
+    // News - Additional sources
+    RssSource(
+      id: 'guardian',
+      name: 'The Guardian',
+      url: 'https://www.theguardian.com/world/rss',
+      category: 'News',
+      color: AppColors.newsPrimary,
+      icon: Icons.newspaper,
+    ),
+    // Gaming
+    RssSource(
+      id: 'ign',
+      name: 'IGN',
+      url: 'https://feeds.ign.com/ign/games-all',
+      category: 'Gaming',
+      color: AppColors.gamingSecondary,
+      icon: Icons.sports_esports,
+    ),
+    // Science - Additional sources
+    RssSource(
+      id: 'nasa',
+      name: 'NASA',
+      url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss',
+      category: 'Science',
+      color: AppColors.scienceSecondary,
+      icon: Icons.rocket,
+    ),
   ];
 
   /// Predefined RSS sources as a Map for O(1) lookups by ID
@@ -360,5 +412,64 @@ class RssFeedService {
   /// Get source by ID
   static RssSource? getSourceById(String id) {
     return sourcesById[id];
+  }
+
+  /// Get source color from article - checks embedded metadata first, falls back to source lookup
+  static Color getSourceColorFromArticle(Article article) {
+    if (article.sourceColor != null) {
+      try {
+        return Color(int.parse(article.sourceColor!.replaceFirst('#', '0xFF')));
+      } catch (e) {
+        // Fall through to fallback
+      }
+    }
+    final source = getSourceById(article.sourceId);
+    return source?.color ?? AppColors.primary;
+  }
+
+  /// Get source icon from article - checks embedded metadata first, falls back to source lookup
+  static IconData getSourceIconFromArticle(Article article) {
+    if (article.sourceIcon != null) {
+      return _iconNameToData(article.sourceIcon!) ?? Icons.article;
+    }
+    final source = getSourceById(article.sourceId);
+    return source?.icon ?? Icons.article;
+  }
+
+  /// Get source name from article - returns embedded name or falls back to source lookup
+  static String getSourceNameFromArticle(Article article) {
+    if (article.sourceName.isNotEmpty) {
+      return article.sourceName;
+    }
+    final source = getSourceById(article.sourceId);
+    return source?.name ?? 'Unknown';
+  }
+
+  /// Get source category from article - checks embedded metadata first, falls back to source lookup
+  static String? getSourceCategoryFromArticle(Article article) {
+    if (article.sourceCategory != null) {
+      return article.sourceCategory;
+    }
+    final source = getSourceById(article.sourceId);
+    return source?.category;
+  }
+
+  /// Convert icon string name to IconData
+  static IconData? _iconNameToData(String iconName) {
+    const iconMap = {
+      'rocket_launch': Icons.rocket_launch,
+      'devices': Icons.devices,
+      'memory': Icons.memory,
+      'computer': Icons.computer,
+      'devices_other': Icons.devices_other,
+      'public': Icons.public,
+      'newspaper': Icons.newspaper,
+      'biotech': Icons.biotech,
+      'rocket': Icons.rocket,
+      'sports_soccer': Icons.sports_soccer,
+      'theaters_rounded': Icons.theaters_rounded,
+      'sports_esports': Icons.sports_esports,
+    };
+    return iconMap[iconName];
   }
 }

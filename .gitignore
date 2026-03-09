@@ -1,5 +1,8 @@
 # Miscellaneous
 *.class
+google-services.json
+*.apk
+*.aab
 *.log
 *.pyc
 *.swp
@@ -46,3 +49,11 @@ app.*.map.json
 
 # Planning directory (not tracked in git per configuration)
 .planning/
+.openspec/
+
+# Platform-specific directories (Android only build)
+web/
+linux/
+windows/
+macos/
+ios/

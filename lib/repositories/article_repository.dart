@@ -1,6 +1,6 @@
 import 'package:get_it/get_it.dart';
 import '../models/article.dart';
-import '../services/rss_feed_service.dart';
+import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
 import '../repositories/feed_repository.dart';
 import '../utils/error_handler.dart';
@@ -18,8 +18,8 @@ class ArticleRepository {
   ArticleRepository({
     StorageService? storageService,
     FeedRepository? feedRepository,
-  })  : _storageService = storageService ?? getStorage(),
-        _feedRepository = feedRepository ?? const FeedRepository();
+  }) : _storageService = storageService ?? getStorage(),
+  _feedRepository = feedRepository ?? const FeedRepository();
 
   // Helper to get storage instance safely (can't use default parameter with factory)
   static StorageService getStorage() => StorageService();
@@ -63,13 +63,13 @@ class ArticleRepository {
     }
   }
 
-  /// Fetch new articles from RSS feeds and merge with existing
+  /// Fetch new articles from Worker API and merge with existing
   Future<Result<List<Article>>> fetchNewArticles() async {
     try {
-      ErrorHandlerExtensions.logInfo('Fetching new articles from RSS feeds');
+      ErrorHandlerExtensions.logInfo('Fetching new articles from Worker API');
 
-      // Fetch from all RSS sources
-      final newArticles = await RssFeedService.fetchAllArticles();
+      // Fetch from Worker API
+      final newArticles = await WorkerFeedService.fetchArticles();
 
       if (newArticles.isEmpty) {
         return Result.success([]);
@@ -201,7 +201,7 @@ class ArticleRepository {
     }
   }
 
-  /// Filter articles by category
+  /// Filter articles by category using source metadata from Worker response
   Future<Result<List<Article>>> filterByCategory(String category) async {
     try {
       if (category.isEmpty || category == 'All') {
@@ -210,15 +210,6 @@ class ArticleRepository {
 
       ErrorHandlerExtensions.logInfo('Filtering articles by category: $category');
 
-      // Get sources for the category
-      final sourcesResult = await _feedRepository.getSourcesByCategory(category);
-      if (sourcesResult.isFailure) {
-        return Result.failure(sourcesResult.error ?? 'Failed to get sources');
-      }
-
-      final sources = sourcesResult.data ?? [];
-      final sourceIds = sources.map((s) => s.id).toSet();
-
       // Get all articles
       final allResult = await fetchAllArticles();
       if (allResult.isFailure) {
@@ -226,7 +217,8 @@ class ArticleRepository {
       }
 
       final articles = allResult.data ?? [];
-      final filteredArticles = articles.where((a) => sourceIds.contains(a.sourceId)).toList();
+      // Filter by sourceCategory from article metadata (provided by Worker)
+      final filteredArticles = articles.where((a) => a.sourceCategory == category).toList();
 
       return Result.success(filteredArticles);
     } catch (e, stackTrace) {

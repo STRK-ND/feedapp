@@ -5,6 +5,14 @@ import 'package:html/dom.dart' as dom;
 import '../utils/constants.dart';
 import '../utils/error_handler.dart';
 
+/// Article content with extracted images
+class ArticleContent {
+  final String text;
+  final List<String> images;
+  
+  ArticleContent({required this.text, required this.images});
+}
+
 /// Service to fetch and extract full article content from URLs
 class ArticleContentService {
   ArticleContentService._();
@@ -35,15 +43,21 @@ class ArticleContentService {
     ],
   };
 
-  /// Fetch full article content from URL
-  static Future<String> fetchArticleContent(String url) async {
+  /// Fetch full article content from URL with images
+  static Future<ArticleContent> fetchArticleContentWithImages(String url) async {
     debugPrint('[ArticleContent] Fetching content from: $url');
 
     try {
       final response = await http
-          .get(Uri.parse(url))
+          .get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36',
+              'Accept': 'text/html,application/xhtml+xml',
+            },
+          )
           .timeout(
-            const Duration(seconds: AppConfig.rssTimeoutSeconds),
+            Duration(seconds: AppConfig.rssTimeoutSeconds),
           );
 
       if (response.statusCode != 200) {
@@ -54,18 +68,22 @@ class ArticleContentService {
       final htmlContent = response.body;
       final document = parser.parse(htmlContent);
 
+      // Extract images first
+      final images = _extractImages(document, url);
+      debugPrint('[ArticleContent] Found ${images.length} images');
+
       // Try domain-specific selectors first
       final uri = Uri.parse(url);
       final domain = uri.host.replaceFirst('www.', '');
 
-      for (var domainPattern in _domainSelectors.keys) {
+      for (final domainPattern in _domainSelectors.keys) {
         if (domain.contains(domainPattern)) {
           final selectors = _domainSelectors[domainPattern]!;
-          for (var selector in selectors) {
+          for (final selector in selectors) {
             final content = _extractContentBySelector(document, selector);
             if (content.isNotEmpty) {
               debugPrint('[ArticleContent] Found content using selector: $selector');
-              return content;
+              return ArticleContent(text: content, images: images);
             }
           }
         }
@@ -85,11 +103,11 @@ class ArticleContentService {
         '.post-body',
       ];
 
-      for (var selector in genericSelectors) {
+      for (final selector in genericSelectors) {
         final content = _extractContentBySelector(document, selector);
         if (content.isNotEmpty) {
           debugPrint('[ArticleContent] Found content using generic selector: $selector');
-          return content;
+          return ArticleContent(text: content, images: images);
         }
       }
 
@@ -98,21 +116,96 @@ class ArticleContentService {
       final content = paragraphs
           .map((p) => p.text.trim())
           .where((text) => text.isNotEmpty && text.length > 20)
-          .take(30) // Limit to 30 paragraphs
+          .take(30)
           .join('\n\n');
 
       if (content.isNotEmpty) {
         debugPrint('[ArticleContent] Found content using paragraph extraction');
-        return content;
+        return ArticleContent(text: content, images: images);
       }
 
       debugPrint('[ArticleContent] No content found');
-      return 'Unable to extract article content. Please open in browser to read full article.';
+      return ArticleContent(
+        text: 'Unable to extract article content. Please open in browser to read full article.',
+        images: images,
+      );
     } catch (e) {
       debugPrint('[ArticleContent] Error fetching content: $e');
       ErrorHandler.logError('Error fetching article content', error: e);
-      return 'Failed to load article content. Please tap "Open in browser" to read the full article.';
+      return ArticleContent(
+        text: 'Failed to load article content. Please tap "Open in browser" to read the full article.',
+        images: [],
+      );
     }
+  }
+
+  /// Fetch full article content (backward compatible)
+  static Future<String> fetchArticleContent(String url) async {
+    final result = await fetchArticleContentWithImages(url);
+    return result.text;
+  }
+
+  /// Extract images from the document
+  static List<String> _extractImages(dom.Document document, String baseUrl) {
+    final images = <String>[];
+    final uri = Uri.parse(baseUrl);
+
+    // Try different image selectors
+    final selectors = [
+      'article img',
+      '.article-content img',
+      '.post-content img',
+      'main img',
+      '[role="article"] img',
+      '.entry-content img',
+      '.article-body img',
+      'img.wp-post-image',
+      'img.attachment-post-thumbnail',
+    ];
+
+    for (final selector in selectors) {
+      final elements = document.querySelectorAll(selector);
+      for (final img in elements) {
+        // Try different attributes
+        String? src = img.attributes['src'] ?? 
+                      img.attributes['data-src'] ?? 
+                      img.attributes['data-lazy-src'] ??
+                      img.attributes['data-original'];
+        
+        if (src != null && src.isNotEmpty) {
+          // Skip base64 images, tracking pixels, icons
+          if (src.startsWith('data:') || 
+              src.contains('pixel') || 
+              src.contains('icon') ||
+              src.contains('logo') && !src.contains('article')) {
+            continue;
+          }
+
+          // Handle relative URLs
+          if (src.startsWith('//')) {
+            src = '${uri.scheme}:$src';
+          } else if (src.startsWith('/')) {
+            src = '${uri.scheme}://${uri.host}$src';
+          }
+
+          // Skip duplicates
+          if (!images.contains(src)) {
+            images.add(src);
+          }
+        }
+      }
+    }
+
+    // Also check for Open Graph and Twitter images
+    final ogImage = document.querySelector('meta[property="og:image"]');
+    if (ogImage != null) {
+      final content = ogImage.attributes['content'];
+      if (content != null && content.isNotEmpty && !images.contains(content)) {
+        images.insert(0, content); // Prioritize OG image
+      }
+    }
+
+    return images;
   }
 
   /// Extract content using a CSS selector
@@ -123,7 +216,7 @@ class ArticleContentService {
 
     final textBuilder = StringBuilder();
 
-    for (var element in elements) {
+    for (final element in elements) {
       // Skip if this is a container element with nested elements
       if (element.children.isNotEmpty) {
         // Extract text from child elements recursively
@@ -151,7 +244,7 @@ class ArticleContentService {
     bool hasContent = false;
 
     // Get all text nodes and paragraph elements
-    for (var node in element.nodes) {
+    for (final node in element.nodes) {
       if (node.nodeType == dom.Node.TEXT_NODE) {
         final text = node.text?.trim() ?? '';
         if (text.isNotEmpty) {
@@ -163,12 +256,16 @@ class ArticleContentService {
         final tagName = node.localName?.toLowerCase();
 
         // Skip these elements
-        if (['script', 'style', 'nav', 'header', 'footer', 'aside', 'iframe', 'video', 'audio', 'figure', 'img'].contains(tagName)) {
+        if (tagName != null && [
+          'script', 'style', 'nav', 'header', 'footer', 
+          'aside', 'iframe', 'video', 'audio', 'figure'
+        ].contains(tagName)) {
           continue;
         }
 
         // Add paragraph breaks
-        if (tagName == 'p' || tagName == 'div' || tagName == 'h1' || tagName == 'h2' || tagName == 'h3' || tagName == 'h4' || tagName == 'h5' || tagName == 'h6') {
+        if (tagName == 'p' || tagName == 'div' || 
+            (tagName != null && tagName.startsWith('h'))) {
           if (hasContent) {
             textBuilder.add('\n\n');
           }
@@ -190,42 +287,39 @@ class ArticleContentService {
   static String cleanText(String text) {
     if (text.isEmpty) return text;
 
-    // 2.1 Strip HTML tags using regex
+    // Strip HTML tags using regex
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
-    // 2.3 Remove HTML anchor tags while preserving link text
-    // This handles <a href="...">link text</a> patterns already handled by HTML tag removal above
-
-    // 2.2 Remove bare URLs (http/https/www patterns)
+    // Remove bare URLs (http/https/www patterns)
     text = text.replaceAll(RegExp(r'https?://\S+'), '');
     text = text.replaceAll(RegExp(r'www\.\S+'), '');
 
-    // 2.4 Remove common RSS artifacts like [+], [More], [Read More]
+    // Remove common RSS artifacts like [+], [More], [Read More]
     text = text.replaceAll(RegExp(r'\[(?:\+ ?|More|Read More)\]'), '');
     text = text.replaceAll(RegExp(r'\[\+\]'), '');
     text = text.replaceAll(RegExp(r'\[MORE\]', caseSensitive: false), '');
 
-    // 2.5 Decode HTML entities (both named and numeric)
+    // Decode HTML entities (both named and numeric)
     text = _decodeHtmlEntities(text);
 
     // Remove extra whitespace
     text = text.replaceAll(RegExp(r'\s+'), ' ');
 
     // Remove common unwanted phrases
-    final unwantedPhrases = [
-      r'Share on Facebook',
-      r'Share on Twitter',
-      r'Share via Email',
-      r'Read more',
-      r'Continue reading',
-      r'Advertisement',
-      r'Ad: ',
-      r'Sponsored',
-      r'Subscribe to',
-      r'Follow us on',
+    const unwantedPhrases = [
+      'Share on Facebook',
+      'Share on Twitter',
+      'Share via Email',
+      'Read more',
+      'Continue reading',
+      'Advertisement',
+      'Ad: ',
+      'Sponsored',
+      'Subscribe to',
+      'Follow us on',
     ];
 
-    for (var phrase in unwantedPhrases) {
+    for (final phrase in unwantedPhrases) {
       text = text.replaceAll(RegExp(phrase, caseSensitive: false), '');
     }
 

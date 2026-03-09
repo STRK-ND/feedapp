@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,6 +11,7 @@ import '../utils/helpers.dart';
 import 'swipeable_card.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
+/// Features: Glassmorphism, tactile press, hero image fade-in
 class CardStack extends StatefulWidget {
   final List<Article> articles;
   final Function(int) onSwipeRight;
@@ -32,9 +34,9 @@ class CardStack extends StatefulWidget {
   State<CardStack> createState() => _CardStackState();
 }
 
-class _CardStackState extends State<CardStack>
-    with TickerProviderStateMixin {
+class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   late AnimationController _cardEntranceController;
+  int? _pressedCardIndex;
 
   @override
   void initState() {
@@ -43,12 +45,22 @@ class _CardStackState extends State<CardStack>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _cardEntranceController.forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Check for reduced motion preference (must be in didChangeDependencies)
+    final mediaQuery = MediaQuery.of(context);
+    if (mediaQuery.disableAnimations) {
+      _cardEntranceController.value = 1.0;
+    } else if (_cardEntranceController.value == 0) {
+      _cardEntranceController.forward();
+    }
   }
 
   @override
   void dispose() {
-    // Memory leak fix: Explicitly dispose controller
     _cardEntranceController.dispose();
     super.dispose();
   }
@@ -58,240 +70,271 @@ class _CardStackState extends State<CardStack>
     super.didUpdateWidget(oldWidget);
     if (widget.articles.length != oldWidget.articles.length) {
       _cardEntranceController.reset();
-      _cardEntranceController.forward();
+      final mediaQuery = MediaQuery.of(context);
+      if (mediaQuery.disableAnimations) {
+        _cardEntranceController.value = 1.0;
+      } else {
+        _cardEntranceController.forward();
+      }
     }
   }
 
-  Widget _buildArticleCard(Article article, int index, bool isFront) {
-    final source = RssFeedService.getSourceById(article.sourceId) ??
-        RssFeedService.predefinedSources.first;
-    final sourceColor = source.color;
+  Widget _buildGlassImage(String? imageUrl) {
+    if (imageUrl == null) return const SizedBox.shrink();
 
-    return AnimatedBuilder(
-      animation: _cardEntranceController,
-      builder: (context, child) {
-        final animation = CurvedAnimation(
-          parent: _cardEntranceController,
-          curve: Interval(
-            (index * 0.1).clamp(0.0, 0.7),
-            (0.3 + index * 0.1).clamp(0.3, 1.0),
-            curve: Curves.easeOutQuart,
-          ),
-        );
-
-        final scale = isFront
-            ? 1.0
-            : 1.0 - (0.06 * (index + 1)) + (0.03 * animation.value);
-        final offset = isFront ? 0.0 : -6.0 - (index * 3.0);
-
-        return Transform.translate(
-          offset: Offset(0, offset * (1 - animation.value)),
-          child: Transform.scale(
-            scale: scale,
-            child: FadeTransition(
-              opacity: animation,
-              child: child,
+    return Semantics(
+      image: true,
+      label: 'Article image',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
+        child: Stack(
+          children: [
+            CachedNetworkImage(
+              imageUrl: imageUrl,
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              cacheManager: AppCacheManager(),
+              placeholder: (context, url) => _buildImagePlaceholder(),
+              errorWidget: (context, url, error) => _buildImageError(),
             ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: sourceColor.withValues(alpha: 0.12),
-              blurRadius: 40,
-              offset: const Offset(0, 20),
-              spreadRadius: -8,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+            // Travel-style gradient overlay
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.5),
+                    ],
+                    stops: const [0.3, 0.7, 1.0],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-        child: Semantics(
-          label: '${article.title}. ${article.description}. From ${source.name}. Published ${Helpers.formatTimeAgo(article.pubDate)}.',
-          image: article.imageUrl != null,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: AppColors.divider.withValues(alpha: 0.5),
-                width: 1,
+      ),
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Container(
+      height: 180,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.image_outlined,
+          size: 32,
+          color: AppColors.textTertiary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageError() {
+    return Container(
+      height: 180,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.broken_image_outlined,
+          size: 32,
+          color: AppColors.textTertiary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArticleCard(Article article, int index, bool isFront) {
+    // Use source metadata from article (provided by Worker) or fallback to RssFeedService
+    final sourceColor = RssFeedService.getSourceColorFromArticle(article);
+    final sourceIcon = RssFeedService.getSourceIconFromArticle(article);
+    final sourceName = article.sourceName.isNotEmpty
+        ? article.sourceName
+        : (RssFeedService.getSourceById(article.sourceId)?.name ?? 'Unknown');
+    final isPressed = _pressedCardIndex == index;
+
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _pressedCardIndex = index);
+        HapticFeedback.lightImpact();
+      },
+      onTapUp: (_) => setState(() => _pressedCardIndex = null),
+      onTapCancel: () => setState(() => _pressedCardIndex = null),
+      child: AnimatedBuilder(
+        animation: _cardEntranceController,
+        builder: (context, child) {
+          final animation = CurvedAnimation(
+            parent: _cardEntranceController,
+            curve: Interval(
+              (index * 0.1).clamp(0.0, 0.7),
+              (0.3 + index * 0.1).clamp(0.3, 1.0),
+              curve: Curves.easeOutQuart,
+            ),
+          );
+
+          // Tactile press effect: scale down when pressed
+          final pressedScale = isPressed ? 0.97 : 1.0;
+          final scale = isFront
+              ? pressedScale
+              : 1.0 - (0.06 * (index + 1)) + (0.03 * animation.value);
+          final offset = isFront ? 0.0 : -6.0 - (index * 3.0);
+
+          return Transform.translate(
+            offset: Offset(0, offset * (1 - animation.value)),
+            child: Transform.scale(
+              scale: scale,
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Source badge
-                  Semantics(
-                    label: 'Source: ${source.name}',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: sourceColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            source.icon,
-                            size: 14,
-                            color: sourceColor,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            source.name,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: sourceColor,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Hero image if available
-                  if (article.imageUrl != null)
+          );
+        },
+        // Glassmorphism card decoration
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: AppCardStyles.glassDecoration(),
+          child: Semantics(
+            label: '$sourceName. ${article.description}. From $sourceName. Published ${Helpers.formatTimeAgo(article.pubDate)}.',
+            image: article.imageUrl != null,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Glassmorphism source badge
                     Semantics(
-                      image: true,
-                      label: 'Article image',
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: CachedNetworkImage(
-                          imageUrl: article.imageUrl!,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          cacheManager: AppCacheManager(),
-                          placeholder: (context, url) => Container(
-                            height: 180,
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_outlined,
-                                size: 32,
-                                color: AppColors.textTertiary,
+                      label: 'Source: $sourceName',
+                      child: Container(
+                        decoration: AppCardStyles.chipDecoration(sourceColor),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(sourceIcon, size: 14, color: sourceColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              sourceName,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: sourceColor,
+                                letterSpacing: 0.2,
                               ),
                             ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 180,
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                size: 32,
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                          ),
+                          ],
                         ),
                       ),
                     ),
-                  if (article.imageUrl != null)
                     const SizedBox(height: 24),
 
-                  // Article title
-                  Expanded(
-                    child: Padding(
+                    // Hero image with fade-in
+                    _buildGlassImage(article.imageUrl),
+
+                    if (article.imageUrl != null) const SizedBox(height: 24),
+
+                    // Article title
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          article.title,
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            height: 1.35,
+                            letterSpacing: -0.3,
+                          ),
+                          textAlign: TextAlign.left,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Description snippet
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
-                        article.title,
-                        style: GoogleFonts.playfairDisplay(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          height: 1.35,
-                          letterSpacing: -0.3,
+                        article.description,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 15,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                          letterSpacing: 0.1,
                         ),
                         textAlign: TextAlign.left,
-                        maxLines: 4,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // Description snippet
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      article.description,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                        letterSpacing: 0.1,
-                      ),
-                      textAlign: TextAlign.left,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Publication time
-                  Semantics(
-                    label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.divider.withValues(alpha: 0.5),
-                          width: 1,
+                    // Publication time
+                    Semantics(
+                      label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                          border: Border.all(
+                            color: AppColors.divider.withValues(alpha: 0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.schedule_outlined,
+                              size: 14,
+                              color: AppColors.textTertiary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              Helpers.formatTimeAgo(article.pubDate),
+                              style: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.schedule_outlined,
-                            size: 14,
-                            color: AppColors.textTertiary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            Helpers.formatTimeAgo(article.pubDate),
-                            style: GoogleFonts.dmSans(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.1,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -306,48 +349,15 @@ class _CardStackState extends State<CardStack>
       return widget.emptyState;
     }
 
-    final visibleArticles = widget.articles.take(3).toList();
+    // Show only ONE card at a time - no overlapping stack effect
+    final article = widget.articles.first;
 
-    return Stack(
-      children: [
-        for (int i = visibleArticles.length - 1; i >= 0; i--)
-          if (i == 0)
-            SwipeableCard(
-              key: ValueKey('card_${widget.articles[i].id}'),
-              child: _buildArticleCard(
-                widget.articles[i],
-                i,
-                true,
-              ),
-              onSwipeRight: () {
-                widget.onSwipeRight(
-                  widget.articles.indexOf(widget.articles[i]),
-                );
-              },
-              onSwipeLeft: () {
-                widget.onSwipeLeft(
-                  widget.articles.indexOf(widget.articles[i]),
-                );
-              },
-              onTap: () {
-                widget.onTap(widget.articles.indexOf(widget.articles[i]));
-              },
-            )
-          else
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: _buildArticleCard(
-                  widget.articles[i],
-                  i,
-                  false,
-                ),
-              ),
-            ),
-      ],
+    return SwipeableCard(
+      key: ValueKey('card_${article.id}'),
+      child: _buildArticleCard(article, 0, true),
+      onSwipeRight: () => widget.onSwipeRight(0),
+      onSwipeLeft: () => widget.onSwipeLeft(0),
+      onTap: () => widget.onTap(0),
     );
   }
 }

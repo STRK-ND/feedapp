@@ -9,8 +9,10 @@ import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import 'shimmer_loading.dart';
 
 /// Expanded article card bottom sheet/modal widget
+/// Features: Glassmorphism, hero image fade-in transitions
 class ExpandedArticleCard extends StatefulWidget {
   final Article article;
   final VoidCallback onClose;
@@ -78,6 +80,59 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     }
   }
 
+  /// Hero image with fade-in transition animation
+  Widget _buildFadeInImage(String imageUrl, double height, double borderRadius) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        cacheManager: AppCacheManager(),
+        fadeInDuration: AppCardStyles.fadeInDuration,
+        fadeOutDuration: AppCardStyles.fadeInDuration,
+        placeholder: (context, url) => _buildImagePlaceholder(height, borderRadius),
+        errorWidget: (context, url, error) => _buildImageError(height, borderRadius),
+      ),
+    );
+  }
+
+  Widget _buildImagePlaceholder(double height, double borderRadius) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageError(double height, double borderRadius) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 20),
+          const Icon(Icons.broken_image_outlined, size: 32, color: AppColors.textTertiary),
+          const SizedBox(height: 8),
+          Text('Image unavailable', style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.textSecondary), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final source = RssFeedService.getSourceById(widget.article.sourceId) ??
@@ -89,22 +144,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       key: const Key('article_modal'),
       onDismissed: (_) => widget.onClose(),
       child: DraggableScrollableSheet(
-        initialChildSize: 0.92,
+        initialChildSize: 1.0,
         minChildSize: 0.5,
-        maxChildSize: 0.97,
+        maxChildSize: 1.0,
         builder: (context, scrollController) {
           return Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 40,
-                  offset: const Offset(0, -20),
-                ),
-              ],
-            ),
+            decoration: AppCardStyles.bottomSheetDecoration(),
             child: Column(
               children: [
                 // Handle bar
@@ -124,15 +169,10 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Glassmorphism source badge
                       Container(
-                        decoration: BoxDecoration(
-                          color: sourceColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
+                        decoration: AppCardStyles.chipDecoration(sourceColor),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -157,8 +197,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             onPressed: () async {
                               final uri = Uri.parse(widget.article.link);
                               if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri,
-                                    mode: LaunchMode.externalApplication);
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
                               }
                             },
                             color: sourceColor,
@@ -173,13 +212,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             label: 'Share article',
                           ),
                           _buildHeaderButton(
-                            icon: widget.article.isSaved
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
+                            icon: widget.article.isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                             onPressed: widget.onToggleSave,
-                            color: widget.article.isSaved
-                                ? AppColors.error
-                                : sourceColor,
+                            color: widget.article.isSaved ? AppColors.error : sourceColor,
                             label: widget.article.isSaved ? 'Saved' : 'Save',
                           ),
                           _buildHeaderButton(
@@ -203,61 +238,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Image if available
+                        // Hero image with fade-in
                         if (widget.article.imageUrl != null)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: CachedNetworkImage(
-                              imageUrl: widget.article.imageUrl!,
-                              height: 220,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              cacheManager: AppCacheManager(),
-                              placeholder: (context, url) => Container(
-                                height: 220,
-                                decoration: BoxDecoration(
-                                  color: AppColors.background,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(
-                                      Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                height: 220,
-                                decoration: BoxDecoration(
-                                  color: AppColors.background,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const SizedBox(height: 20),
-                                    Icon(
-                                      Icons.broken_image_outlined,
-                                      size: 32,
-                                      color: AppColors.textTertiary,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Image unavailable',
-                                      style: GoogleFonts.dmSans(
-                                        fontSize: 13,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+                          _buildFadeInImage(widget.article.imageUrl!, 220, AppCardStyles.imageRadius),
+
+                        if (widget.article.imageUrl != null) const SizedBox(height: 16),
 
                         // Author and date
                         Padding(
@@ -266,19 +251,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             children: [
                               if (widget.article.author != null) ...[
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: sourceColor.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: AppCardStyles.chipDecoration(sourceColor),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.person_outline_rounded,
-                                          size: 13, color: sourceColor),
+                                      Icon(Icons.person_outline_rounded, size: 13, color: sourceColor),
                                       const SizedBox(width: 6),
                                       Text(
                                         widget.article.author!,
@@ -294,8 +272,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 ),
                                 const SizedBox(width: 12),
                               ],
-                              Icon(Icons.access_time_rounded,
-                                  size: 14, color: AppColors.textTertiary),
+                              Icon(Icons.access_time_rounded, size: 14, color: AppColors.textTertiary),
                               const SizedBox(width: 6),
                               Text(
                                 Helpers.formatDate(widget.article.pubDate),
@@ -343,9 +320,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 children: [
                                   CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      sourceColor,
-                                    ),
+                                    valueColor: AlwaysStoppedAnimation<Color>(sourceColor),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
@@ -397,7 +372,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
           onPressed: onPressed,
           icon: Icon(icon, size: 20),
           color: color,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           style: IconButton.styleFrom(
             backgroundColor: color.withValues(alpha: 0.08),
           ),

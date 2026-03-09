@@ -23,15 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved update checking with hourly rate limiting
 
-## [1.0.0] - 2025-02-10
+## [1.0.0] - 2026-03-03
 
 ### Added
-- Initial release
-- RSS feed reading from multiple sources
-- Card-based and list-based article views
-- Save articles for later reading
-- Offline article storage
-- Category filtering
-- Search functionality
-- Share articles to other apps
-- Material Design 3 UI with Google Fonts
+- Initial release of Curated Feeds app
+- RSS feed reader with article list display
+- Article detail view with web content parsing
+- Swipeable card interface for browsing articles
+- Card stack layout with expanded article cards
+- Local storage for caching articles and sources
+- RSS source management and filtering
+- Automatic app updates via Shorebird
+- Error handling with user-friendly dialogs
+- Dependency injection with service locator
+- Repository pattern implementation (ArticleRepository, FeedRepository)
+
+### Fixed
+- Article detail view improvements
+- RSS source filtering
+- Date formatting for local time compatibility
+
+### Build
+- Debug and release build configurations
+- Shorebird build flavors configured

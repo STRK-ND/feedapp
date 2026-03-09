@@ -10,6 +10,10 @@ class Article {
   final DateTime pubDate;
   final String? author;
   final String? imageUrl;
+  // Source metadata from Worker API
+  final String? sourceCategory;
+  final String? sourceColor;
+  final String? sourceIcon;
   bool isRead;
   bool isSaved;
   String? fetchedFullContent;
@@ -25,6 +29,9 @@ class Article {
     required this.pubDate,
     this.author,
     this.imageUrl,
+    this.sourceCategory,
+    this.sourceColor,
+    this.sourceIcon,
     this.isRead = false,
     this.isSaved = false,
     this.fetchedFullContent,
@@ -42,6 +49,9 @@ class Article {
       'pubDate': pubDate.millisecondsSinceEpoch,
       'author': author,
       'imageUrl': imageUrl,
+      'sourceCategory': sourceCategory,
+      'sourceColor': sourceColor,
+      'sourceIcon': sourceIcon,
       'isRead': isRead,
       'isSaved': isSaved,
       'fetchedFullContent': fetchedFullContent,
@@ -62,6 +72,9 @@ class Article {
           : DateTime.now(),
       author: json['author'] as String?,
       imageUrl: json['imageUrl'] as String?,
+      sourceCategory: json['sourceCategory'] as String?,
+      sourceColor: json['sourceColor'] as String?,
+      sourceIcon: json['sourceIcon'] as String?,
       isRead: json['isRead'] as bool? ?? false,
       isSaved: json['isSaved'] as bool? ?? false,
       fetchedFullContent: json['fetchedFullContent'] as String?,
@@ -79,6 +92,9 @@ class Article {
     DateTime? pubDate,
     String? author,
     String? imageUrl,
+    String? sourceCategory,
+    String? sourceColor,
+    String? sourceIcon,
     bool? isRead,
     bool? isSaved,
     String? fetchedFullContent,
@@ -94,6 +110,9 @@ class Article {
       pubDate: pubDate ?? this.pubDate,
       author: author ?? this.author,
       imageUrl: imageUrl ?? this.imageUrl,
+      sourceCategory: sourceCategory ?? this.sourceCategory,
+      sourceColor: sourceColor ?? this.sourceColor,
+      sourceIcon: sourceIcon ?? this.sourceIcon,
       isRead: isRead ?? this.isRead,
       isSaved: isSaved ?? this.isSaved,
       fetchedFullContent: fetchedFullContent ?? this.fetchedFullContent,

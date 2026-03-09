@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../utils/constants.dart';
 
 /// Swipeable card widget for article cards
@@ -160,10 +161,11 @@ class _SwipeableCardState extends State<SwipeableCard>
       button: true,
       label: 'Article card. Swipe right to save, swipe left to dismiss, or tap to view details.',
       onTap: widget.onTap,
-      child: GestureDetector(
-        onPanUpdate: _handlePanUpdate,
-        onPanEnd: _handlePanEnd,
-        onTap: widget.onTap,
+child: GestureDetector(
+    onPanUpdate: _handlePanUpdate,
+    onPanEnd: _handlePanEnd,
+    onTapDown: (_) => HapticFeedback.lightImpact(),
+    onTap: widget.onTap,
         child: Stack(
           children: [
             // Left swipe background (dismiss)
