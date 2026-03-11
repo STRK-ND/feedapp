@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/repositories/article_repository.dart';
 import 'package:curatedfeeds/utils/error_handler.dart';
@@ -7,7 +8,9 @@ void main() {
   group('ArticleRepository', () {
     late ArticleRepository repository;
 
-    setUp(() {
+    setUp(() async {
+      // Ensure service locator is set up for testing
+      await setupServiceLocator();
       repository = ArticleRepository();
     });
 

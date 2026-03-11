@@ -6,15 +6,19 @@ import '../utils/constants.dart';
 import '../utils/error_handler.dart';
 
 /// Worker Feed Service for fetching articles from Cloudflare Worker API
+/// Now uses dependency injection for better testability
 class WorkerFeedService {
-  WorkerFeedService._();
+  final http.Client _httpClient;
+
+  WorkerFeedService({http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
 
   /// Fetch articles from the Worker API
-  static Future<List<Article>> fetchArticles() async {
+  Future<List<Article>> fetchArticles() async {
     debugPrint('[Worker] Fetching articles from ${AppConfig.workerApiUrl}');
 
     try {
-      final response = await http
+      final response = await _httpClient
           .get(Uri.parse(AppConfig.workerApiUrl))
           .timeout(
             Duration(seconds: AppConfig.workerTimeoutSeconds),
@@ -57,7 +61,7 @@ class WorkerFeedService {
   }
 
   /// Parse a single article from Worker JSON response
-  static Article _parseArticle(Map<String, dynamic> json) {
+  Article _parseArticle(Map<String, dynamic> json) {
     return Article(
       id: json['id']?.toString() ?? '',
       title: json['title'] as String? ?? 'Untitled',
@@ -76,7 +80,7 @@ class WorkerFeedService {
   }
 
   /// Parse date from ISO string or epoch milliseconds
-  static DateTime _parseDate(dynamic dateValue) {
+  DateTime _parseDate(dynamic dateValue) {
     if (dateValue == null) return DateTime.now();
 
     if (dateValue is int) {
@@ -95,9 +99,9 @@ class WorkerFeedService {
   }
 
   /// Test the Worker API connection
-  static Future<bool> testConnection() async {
+  Future<bool> testConnection() async {
     try {
-      final response = await http
+      final response = await _httpClient
           .get(Uri.parse('${AppConfig.workerApiUrl}health'))
           .timeout(const Duration(seconds: 5));
 

@@ -8,6 +8,8 @@ import 'utils/constants.dart';
 import 'screens/feed_screen.dart';
 import 'screens/settings_screen.dart';
 import 'providers/theme_provider.dart';
+import 'providers/feed_provider.dart';
+import 'repositories/article_repository.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
@@ -50,6 +52,13 @@ class CuratedFeedsApp extends StatelessWidget {
             provider.init();
             return provider;
           },
+        ),
+
+        // Provide feed provider
+        ChangeNotifierProvider<FeedProvider>(
+          create: (_) => FeedProvider(
+            articleRepository: getIt<ArticleRepository>(),
+          )..init(),
         ),
       ],
       child: Consumer<ThemeProvider>(

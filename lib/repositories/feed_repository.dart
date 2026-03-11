@@ -1,15 +1,20 @@
 import '../models/rss_source.dart';
 import '../services/rss_feed_service.dart';
 import '../utils/error_handler.dart';
+import '../di/service_locator.dart';
 
 /// Repository for RSS feed management
+/// Uses dependency injection for testability
 class FeedRepository {
-  const FeedRepository();
+  final RssFeedService _rssFeedService;
+
+  FeedRepository({RssFeedService? rssFeedService})
+      : _rssFeedService = rssFeedService ?? getIt<RssFeedService>();
 
   /// Get all predefined RSS sources
   Future<Result<List<RssSource>>> getAllSources() async {
     try {
-      final sources = RssFeedService.predefinedSources;
+      final sources = _rssFeedService.predefinedSources;
       ErrorHandler.logError(
         'Retrieved ${sources.length} predefined sources',
         severity: ErrorSeverity.low,
@@ -28,7 +33,7 @@ class FeedRepository {
   /// Get source by ID
   Future<Result<RssSource?>> getSourceById(String sourceId) async {
     try {
-      final source = RssFeedService.getSourceById(sourceId);
+      final source = _rssFeedService.getSourceById(sourceId);
 
       if (source == null) {
         ErrorHandler.logError(
@@ -53,11 +58,11 @@ class FeedRepository {
   Future<Result<List<RssSource>>> getSourcesByCategory(String category) async {
     try {
       if (category.isEmpty || category == 'All') {
-        final sources = RssFeedService.predefinedSources;
+        final sources = _rssFeedService.predefinedSources;
         return Result.success(sources);
       }
 
-      final sources = RssFeedService.predefinedSources
+      final sources = _rssFeedService.predefinedSources
           .where((source) => source.category == category)
           .toList();
 
@@ -104,7 +109,7 @@ class FeedRepository {
       // In future: actually ping each feed to check health
       // For now, return all as healthy
       final health = {
-        for (var source in RssFeedService.predefinedSources)
+        for (var source in _rssFeedService.predefinedSources)
           source.id: true
       };
 

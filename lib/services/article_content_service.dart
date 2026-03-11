@@ -14,11 +14,15 @@ class ArticleContent {
 }
 
 /// Service to fetch and extract full article content from URLs
+/// Now uses dependency injection for better testability
 class ArticleContentService {
-  ArticleContentService._();
+  final http.Client _httpClient;
+
+  ArticleContentService({http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
 
   /// Map of domain-specific CSS selectors for article content
-  static const Map<String, List<String>> _domainSelectors = {
+  final Map<String, List<String>> _domainSelectors = {
     'techcrunch.com': [
       '.article-entry',
       'article .entry-content',
@@ -44,11 +48,11 @@ class ArticleContentService {
   };
 
   /// Fetch full article content from URL with images
-  static Future<ArticleContent> fetchArticleContentWithImages(String url) async {
+  Future<ArticleContent> fetchArticleContentWithImages(String url) async {
     debugPrint('[ArticleContent] Fetching content from: $url');
 
     try {
-      final response = await http
+      final response = await _httpClient
           .get(
             Uri.parse(url),
             headers: {
@@ -140,13 +144,13 @@ class ArticleContentService {
   }
 
   /// Fetch full article content (backward compatible)
-  static Future<String> fetchArticleContent(String url) async {
+  Future<String> fetchArticleContent(String url) async {
     final result = await fetchArticleContentWithImages(url);
     return result.text;
   }
 
   /// Extract images from the document
-  static List<String> _extractImages(dom.Document document, String baseUrl) {
+  List<String> _extractImages(dom.Document document, String baseUrl) {
     final images = <String>[];
     final uri = Uri.parse(baseUrl);
 
@@ -209,7 +213,7 @@ class ArticleContentService {
   }
 
   /// Extract content using a CSS selector
-  static String _extractContentBySelector(dom.Document document, String selector) {
+  String _extractContentBySelector(dom.Document document, String selector) {
     final elements = document.querySelectorAll(selector);
 
     if (elements.isEmpty) return '';
@@ -239,7 +243,7 @@ class ArticleContentService {
   }
 
   /// Extract clean text from an element, removing unwanted content
-  static String _extractTextFromElement(dom.Element element) {
+  String _extractTextFromElement(dom.Element element) {
     final textBuilder = StringBuilder();
     bool hasContent = false;
 
@@ -284,7 +288,7 @@ class ArticleContentService {
   }
 
   /// Clean extracted text - enhanced to strip HTML, URLs, and RSS artifacts
-  static String cleanText(String text) {
+  String cleanText(String text) {
     if (text.isEmpty) return text;
 
     // Strip HTML tags using regex
@@ -327,7 +331,7 @@ class ArticleContentService {
   }
 
   /// Decode HTML entities (both named entities and numeric character references)
-  static String _decodeHtmlEntities(String text) {
+  String _decodeHtmlEntities(String text) {
     // First decode numeric entities (&#8221;, &#8217;, etc.)
     text = text.replaceAllMapped(
       RegExp(r'&#(\d+);'),

@@ -8,8 +8,12 @@ import '../utils/helpers.dart';
 import '../utils/error_handler.dart';
 
 /// RSS Feed Service for fetching and parsing RSS feeds
+/// Now uses dependency injection for better testability
 class RssFeedService {
-  RssFeedService._();
+  final http.Client _httpClient;
+
+  RssFeedService({http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
 
   /// Predefined RSS sources as a list (for iteration) - filtered to image-friendly sources
   static final List<RssSource> predefinedSources = [
@@ -141,10 +145,10 @@ class RssFeedService {
   }
 
   /// Fetch articles from a single RSS source
-  static Future<List<Article>> fetchArticles(RssSource source) async {
+  Future<List<Article>> fetchArticles(RssSource source) async {
     debugPrint('[RSS] Fetching from ${source.name} (${source.url})');
     try {
-      final response = await http
+      final response = await _httpClient
           .get(Uri.parse(source.url))
           .timeout(
             const Duration(seconds: AppConfig.rssTimeoutSeconds),
@@ -174,7 +178,7 @@ class RssFeedService {
   }
 
   /// Parse RSS XML content into articles
-  static List<Article> _parseRssXml(String xmlString, RssSource source) {
+  List<Article> _parseRssXml(String xmlString, RssSource source) {
     // Security: Validate XML size before parsing
     if (xmlString.length > AppConfig.maxXmlSizeBytes) {
       ErrorHandler.logError(
@@ -386,7 +390,7 @@ class RssFeedService {
   }
 
   /// Fetch articles from all sources
-  static Future<List<Article>> fetchAllArticles() async {
+  Future<List<Article>> fetchAllArticles() async {
     debugPrint('[RSS] Fetching from ${predefinedSources.length} sources...');
     final allArticles = <Article>[];
 
@@ -410,12 +414,12 @@ class RssFeedService {
   }
 
   /// Get source by ID
-  static RssSource? getSourceById(String id) {
+  RssSource? getSourceById(String id) {
     return sourcesById[id];
   }
 
   /// Get source color from article - checks embedded metadata first, falls back to source lookup
-  static Color getSourceColorFromArticle(Article article) {
+  Color getSourceColorFromArticle(Article article) {
     if (article.sourceColor != null) {
       try {
         return Color(int.parse(article.sourceColor!.replaceFirst('#', '0xFF')));
@@ -428,7 +432,7 @@ class RssFeedService {
   }
 
   /// Get source icon from article - checks embedded metadata first, falls back to source lookup
-  static IconData getSourceIconFromArticle(Article article) {
+  IconData getSourceIconFromArticle(Article article) {
     if (article.sourceIcon != null) {
       return _iconNameToData(article.sourceIcon!) ?? Icons.article;
     }
@@ -437,7 +441,7 @@ class RssFeedService {
   }
 
   /// Get source name from article - returns embedded name or falls back to source lookup
-  static String getSourceNameFromArticle(Article article) {
+  String getSourceNameFromArticle(Article article) {
     if (article.sourceName.isNotEmpty) {
       return article.sourceName;
     }
@@ -446,7 +450,7 @@ class RssFeedService {
   }
 
   /// Get source category from article - checks embedded metadata first, falls back to source lookup
-  static String? getSourceCategoryFromArticle(Article article) {
+  String? getSourceCategoryFromArticle(Article article) {
     if (article.sourceCategory != null) {
       return article.sourceCategory;
     }

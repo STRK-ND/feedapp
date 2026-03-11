@@ -79,12 +79,12 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildGlassImage(String? imageUrl) {
+  Widget _buildGlassImage(String? imageUrl, Article article) {
     if (imageUrl == null) return const SizedBox.shrink();
 
     return Semantics(
       image: true,
-      label: 'Article image',
+      label: '${article.title} image',
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
         child: Stack(
@@ -168,7 +168,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     return GestureDetector(
       onTapDown: (_) {
         setState(() => _pressedCardIndex = index);
-        HapticFeedback.lightImpact();
+        HapticFeedback.selectionClick();
       },
       onTapUp: (_) => setState(() => _pressedCardIndex = null),
       onTapCancel: () => setState(() => _pressedCardIndex = null),
@@ -258,7 +258,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                     const SizedBox(height: 24),
 
                     // Hero image with fade-in
-                    _buildGlassImage(article.imageUrl),
+                    _buildGlassImage(article.imageUrl, article),
 
                     if (article.imageUrl != null) const SizedBox(height: 24),
 

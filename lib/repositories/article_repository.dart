@@ -1,28 +1,24 @@
-import 'package:get_it/get_it.dart';
 import '../models/article.dart';
 import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
 import '../repositories/feed_repository.dart';
 import '../utils/error_handler.dart';
-
-/// Global service locator instance
-final GetIt getIt = GetIt.instance;
+import '../di/service_locator.dart';
 
 /// Repository for managing article data access
-/// This repository bridges between the UI layer and the services layer,
-/// providing a clean abstraction for article operations.
+/// Uses dependency injection for testability
 class ArticleRepository {
   final StorageService _storageService;
   final FeedRepository _feedRepository;
+  final WorkerFeedService _workerFeedService;
 
   ArticleRepository({
     StorageService? storageService,
     FeedRepository? feedRepository,
-  }) : _storageService = storageService ?? getStorage(),
-  _feedRepository = feedRepository ?? const FeedRepository();
-
-  // Helper to get storage instance safely (can't use default parameter with factory)
-  static StorageService getStorage() => StorageService();
+    WorkerFeedService? workerFeedService,
+  })  : _storageService = storageService ?? getIt<StorageService>(),
+        _feedRepository = feedRepository ?? getIt<FeedRepository>(),
+        _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
 
   // Cache for articles to avoid repeated storage reads
   List<Article>? _cachedArticles;
@@ -68,8 +64,8 @@ class ArticleRepository {
     try {
       ErrorHandlerExtensions.logInfo('Fetching new articles from Worker API');
 
-      // Fetch from Worker API
-      final newArticles = await WorkerFeedService.fetchArticles();
+      // Fetch from Worker API using injected service
+      final newArticles = await _workerFeedService.fetchArticles();
 
       if (newArticles.isEmpty) {
         return Result.success([]);
@@ -185,9 +181,9 @@ class ArticleRepository {
       final lowerQuery = query.toLowerCase();
 
       final filteredArticles = articles.where((a) =>
-        a.title.toLowerCase().contains(lowerQuery) ||
-        a.description.toLowerCase().contains(lowerQuery) ||
-        a.sourceName.toLowerCase().contains(lowerQuery)
+          a.title.toLowerCase().contains(lowerQuery) ||
+          a.description.toLowerCase().contains(lowerQuery) ||
+          a.sourceName.toLowerCase().contains(lowerQuery)
       ).toList();
 
       return Result.success(filteredArticles);
@@ -286,8 +282,11 @@ class ArticleRepository {
   }
 
   /// Toggle save status for an article
-  Future<Result<void>> toggleSave(Article article) async {
+  Future<Result<void>> toggleSave(Article article, {bool isSaved = false}) async {
     try {
+      // Create updated article with new save state
+      final updatedArticle = article.copyWith(isSaved: isSaved);
+
       // Update article in main list
       final allResult = await fetchAllArticles(forceRefresh: true);
       if (allResult.isSuccess) {
@@ -295,7 +294,7 @@ class ArticleRepository {
         final index = articles.indexWhere((a) => a.id == article.id);
 
         if (index != -1) {
-          articles[index] = articles[index].copyWith(isSaved: article.isSaved);
+          articles[index] = updatedArticle;
           _cachedArticles = articles;
           await _storageService.saveArticles(articles);
         }
@@ -310,10 +309,10 @@ class ArticleRepository {
       final savedArticles = savedResult.data ?? [];
       final updatedSavedArticles = List<Article>.from(savedArticles);
 
-      if (article.isSaved) {
+      if (isSaved) {
         // Add to saved if not already there
         if (!updatedSavedArticles.any((a) => a.id == article.id)) {
-          updatedSavedArticles.insert(0, article);
+          updatedSavedArticles.insert(0, updatedArticle);
         }
       } else {
         // Remove from saved

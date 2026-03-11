@@ -1,11 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/repositories/feed_repository.dart';
+import 'package:curatedfeeds/services/rss_feed_service.dart';
 
 void main() {
   late FeedRepository repository;
 
-  setUp(() {
-    repository = const FeedRepository();
+  setUp(() async {
+    // Ensure service locator is set up for testing
+    await setupServiceLocator();
+    repository = FeedRepository();
   });
 
   group('FeedRepository', () {

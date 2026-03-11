@@ -164,7 +164,7 @@ class _SwipeableCardState extends State<SwipeableCard>
 child: GestureDetector(
     onPanUpdate: _handlePanUpdate,
     onPanEnd: _handlePanEnd,
-    onTapDown: (_) => HapticFeedback.lightImpact(),
+    onTapDown: (_) => HapticFeedback.selectionClick(),
     onTap: widget.onTap,
         child: Stack(
           children: [
