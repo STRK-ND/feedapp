@@ -23,7 +23,7 @@ Future<void> main() async {
 
   // Initialize services
   await setupServiceLocator();
-  
+
   // Initialize notification service
   await NotificationService().initialize();
 
@@ -44,7 +44,7 @@ class CuratedFeedsApp extends StatelessWidget {
         Provider<SettingsService>(
           create: (_) => SettingsService(),
         ),
-        
+
         // Provide theme provider
         ChangeNotifierProvider<ThemeProvider>(
           create: (context) {
@@ -87,7 +87,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
-  
+
   final List<Widget> _screens = [
     const RssFeedScreen(),
     const SavedArticlesScreen(),
@@ -97,56 +97,62 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark 
-            ? const Color(0xFF12122A).withOpacity( 0.95)
-            : Colors.white.withOpacity( 0.95),
-          boxShadow: [
-            BoxShadow(
-              color: isDark 
-                ? AppColors.primary.withOpacity( 0.3)
-                : Colors.black.withOpacity( 0.08),
-              blurRadius: 30,
-              offset: const Offset(0, -8),
-              spreadRadius: -2,
-            ),
-          ],
+      bottomNavigationBar: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.article_outlined,
-                  selectedIcon: Icons.article,
-                  label: 'Feed',
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.bookmark_outline_rounded,
-                  selectedIcon: Icons.bookmark_rounded,
-                  label: 'Saved',
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings,
-                  label: 'Settings',
-                  isDark: isDark,
-                ),
-              ],
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF12122A).withOpacity(0.95)
+                : Colors.white.withOpacity(0.95),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? AppColors.primary.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.08),
+                blurRadius: 30,
+                offset: const Offset(0, -8),
+                spreadRadius: -2,
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: Icons.article_outlined,
+                    selectedIcon: Icons.article,
+                    label: 'Feed',
+                    isDark: isDark,
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.bookmark_outline_rounded,
+                    selectedIcon: Icons.bookmark_rounded,
+                    label: 'Saved',
+                    isDark: isDark,
+                  ),
+                  _buildNavItem(
+                    index: 2,
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings,
+                    label: 'Settings',
+                    isDark: isDark,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -154,7 +160,7 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
-Widget _buildNavItem({
+  Widget _buildNavItem({
     required int index,
     required IconData icon,
     required IconData selectedIcon,
@@ -177,7 +183,7 @@ Widget _buildNavItem({
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? selectedColor.withOpacity( 0.15)
+              ? selectedColor.withOpacity(0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: isSelected
