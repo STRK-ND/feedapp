@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// View mode enum
@@ -149,13 +148,13 @@ class AppCardStyles {
   /// Standard card shadow (with colored accent)
   static List<BoxShadow> cardShadow(Color sourceColor) => [
     BoxShadow(
-      color: sourceColor.withValues(alpha: 0.12),
+      color: sourceColor.withOpacity( 0.12),
       blurRadius: 40,
       offset: const Offset(0, 20),
       spreadRadius: -8,
     ),
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
+      color: Colors.black.withOpacity( 0.04),
       blurRadius: 15,
       offset: const Offset(0, 8),
     ),
@@ -164,7 +163,7 @@ class AppCardStyles {
   /// Pressed state shadow (reduced depth)
   static List<BoxShadow> pressedShadow(Color sourceColor) => [
     BoxShadow(
-      color: sourceColor.withValues(alpha: 0.2),
+      color: sourceColor.withOpacity( 0.2),
       blurRadius: 20,
       offset: const Offset(0, 8),
     ),
@@ -177,20 +176,20 @@ class AppCardStyles {
     double borderOpacity = 0.3,
   }) {
     return BoxDecoration(
-      color: Colors.white.withValues(alpha: opacity),
+      color: Colors.white.withOpacity( opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withValues(alpha: borderOpacity),
+        color: Colors.white.withOpacity( borderOpacity),
         width: 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.08),
+          color: Colors.black.withOpacity( 0.08),
           blurRadius: 20,
           offset: const Offset(0, 10),
         ),
         BoxShadow(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: Colors.white.withOpacity( 0.5),
           blurRadius: 5,
           offset: const Offset(0, -2),
         ),
@@ -205,15 +204,15 @@ class AppCardStyles {
     double borderOpacity = 0.1,
   }) {
     return BoxDecoration(
-      color: const Color(0xFF1A1B2E).withValues(alpha: opacity),
+      color: const Color(0xFF1A1B2E).withOpacity( opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withValues(alpha: borderOpacity),
+        color: Colors.white.withOpacity( borderOpacity),
         width: 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.3),
+          color: Colors.black.withOpacity( 0.3),
           blurRadius: 20,
           offset: const Offset(0, 10),
         ),
@@ -224,10 +223,10 @@ class AppCardStyles {
   /// Category chip glass effect
   static BoxDecoration chipDecoration(Color color) {
     return BoxDecoration(
-      color: color.withValues(alpha: 0.15),
+      color: color.withOpacity( 0.15),
       borderRadius: BorderRadius.circular(badgeRadius),
       border: Border.all(
-        color: color.withValues(alpha: 0.3),
+        color: color.withOpacity( 0.3),
         width: 1,
       ),
     );
@@ -236,13 +235,13 @@ class AppCardStyles {
   /// Bottom sheet glass effect
   static BoxDecoration bottomSheetDecoration() {
     return BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.95),
+      color: Colors.white.withOpacity( 0.95),
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(28),
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.15),
+          color: Colors.black.withOpacity( 0.15),
           blurRadius: 40,
           offset: const Offset(0, -20),
         ),

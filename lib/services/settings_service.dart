@@ -89,7 +89,7 @@ class SettingsService {
     await init();
     await _prefs.setString(
       ThemeKeys.primaryColor,
-      '#${color.toARGB32().toRadixString(16).substring(2)}',
+      '#${color.value.toRadixString(16).substring(2)}',
     );
   }
   

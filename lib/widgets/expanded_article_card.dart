@@ -374,7 +374,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
           color: color,
           padding: const EdgeInsets.all(12),
           style: IconButton.styleFrom(
-            backgroundColor: color.withValues(alpha: 0.08),
+            backgroundColor: color.withOpacity( 0.08),
           ),
         ),
       ),

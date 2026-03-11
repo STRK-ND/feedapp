@@ -4,10 +4,10 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/article.dart';
-import '../services/rss_feed_service.dart';
+import '../repositories/article_repository.dart';
 import '../services/storage_service.dart';
 import '../services/update_service.dart';
-import '../services/version_provider.dart';
+import '../providers/version_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/card_stack.dart';
 import '../widgets/expanded_article_card.dart';
@@ -48,6 +48,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   final List<String> _categories = AppConfig.categories;
   final StorageService _storage = StorageService();
+  final ArticleRepository _articleRepository = ArticleRepository();
 
   int get _unreadCount => _articles.where((a) => !a.isRead).length;
 
@@ -189,24 +190,27 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     });
 
     try {
-      final newArticles = await RssFeedService.fetchAllArticles();
-      debugPrint('[Feed] Received ${newArticles.length} new articles');
+      final result = await _articleRepository.fetchNewArticles();
 
-      final existingArticleIds = _articles.map((a) => a.id).toSet();
-      final articlesToAdd = newArticles.where((a) => !existingArticleIds.contains(a.id)).toList();
-      debugPrint('[Feed] Adding ${articlesToAdd.length} articles (existing count: ${_articles.length})');
+      if (result.isSuccess) {
+        final newArticles = result.data ?? [];
+        debugPrint('[Feed] Repository returned ${newArticles.length} new articles');
 
-      setState(() {
-        // Keep existing articles, add new ones, then sort
-        _articles.addAll(articlesToAdd);
-        _articles.sort((a, b) => b.pubDate.compareTo(a.pubDate));
-        _displayedArticles = _getFilteredArticles();
-        _lastRefreshTime = DateTime.now();
-        _isLoading = false;
-      });
+        setState(() {
+          _articles = newArticles;
+          _displayedArticles = _getFilteredArticles();
+          _lastRefreshTime = DateTime.now();
+          _isLoading = false;
+        });
 
-      debugPrint('[Feed] Refresh complete. Total articles: ${_articles.length}');
-      await _saveArticles();
+        debugPrint('[Feed] Refresh complete. Total articles: ${_articles.length}');
+      } else {
+        debugPrint('[Feed] ERROR: ${result.error}');
+        setState(() {
+          _errorMessage = result.error ?? 'Failed to refresh feeds';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('[Feed] ERROR during refresh: $e');
       ErrorHandler.logError('Failed to refresh feeds', error: e);
@@ -373,7 +377,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: color.withValues(alpha: 0.2),
+            color: color.withOpacity( 0.2),
             width: 1,
           ),
         ),
@@ -402,7 +406,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.divider.withValues(alpha: 0.3),
+                color: AppColors.divider.withOpacity( 0.3),
                 width: 1,
               ),
             ),
@@ -573,12 +577,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: sourceColor.withValues(alpha: 0.08),
+                      color: sourceColor.withOpacity( 0.08),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withOpacity( 0.03),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -589,7 +593,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.divider.withValues(alpha: 0.5),
+                      color: AppColors.divider.withOpacity( 0.5),
                       width: 1,
                     ),
                   ),
@@ -600,7 +604,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: sourceColor.withValues(alpha: 0.08),
+                            color: sourceColor.withOpacity( 0.08),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -702,7 +706,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 color: AppColors.surface,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.divider.withValues(alpha: 0.3),
+                  color: AppColors.divider.withOpacity( 0.3),
                   width: 1,
                 ),
               ),
@@ -777,12 +781,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: sourceColor.withValues(alpha: 0.08),
+                  color: sourceColor.withOpacity( 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
+                  color: Colors.black.withOpacity( 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -795,7 +799,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: sourceColor.withValues(alpha: 0.08),
+                      color: sourceColor.withOpacity( 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -947,7 +951,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withOpacity( 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 4),
               ),
@@ -978,7 +982,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.divider.withValues(alpha: 0.3),
+                  color: AppColors.divider.withOpacity( 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -1080,10 +1084,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white.withOpacity( 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity( 0.2),
                     width: 1,
                   ),
                 ),
@@ -1094,7 +1098,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       child: Icon(
                         Icons.article_outlined,
                         size: 18,
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: Colors.white.withOpacity( 0.9),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1222,22 +1226,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     decoration: InputDecoration(
                       hintText: 'Search articles, sources, or content...',
                       hintStyle: GoogleFonts.dmSans(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: Colors.white.withOpacity( 0.7),
                         fontSize: 15,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.1),
+                      fillColor: Colors.white.withOpacity( 0.1),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withOpacity( 0.2),
                           width: 1,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withOpacity( 0.2),
                           width: 1,
                         ),
                       ),
@@ -1307,7 +1311,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               });
                             },
                             borderRadius: BorderRadius.circular(20),
-                            splashColor: Colors.white.withValues(alpha: 0.1),
+                            splashColor: Colors.white.withOpacity( 0.1),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               padding: const EdgeInsets.symmetric(
@@ -1315,12 +1319,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: isSelected ? color : Colors.white.withValues(alpha: 0.1),
+                                color: isSelected ? color : Colors.white.withOpacity( 0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isSelected
                                       ? color
-                                      : Colors.white.withValues(alpha: 0.2),
+                                      : Colors.white.withOpacity( 0.2),
                                   width: 1,
                                 ),
                               ),
@@ -1351,12 +1355,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.search_rounded, size: 16, color: Colors.white.withValues(alpha: 0.7)),
+                      Icon(Icons.search_rounded, size: 16, color: Colors.white.withOpacity( 0.7)),
                       const SizedBox(width: 8),
                       Text(
                         '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
                         style: GoogleFonts.dmSans(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: Colors.white.withOpacity( 0.7),
                           fontSize: 13,
                         ),
                       ),
@@ -1370,10 +1374,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.2),
+                    color: Colors.orange.withOpacity( 0.2),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
+                      color: Colors.orange.withOpacity( 0.3),
                       width: 1,
                     ),
                   ),
@@ -1427,7 +1431,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
+                      color: Colors.black.withOpacity( 0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -1472,7 +1476,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: Colors.black.withOpacity( 0.15),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -1543,7 +1547,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppColors.primary.withValues(alpha: 0.1)
+                        ? AppColors.primary.withOpacity( 0.1)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                   ),

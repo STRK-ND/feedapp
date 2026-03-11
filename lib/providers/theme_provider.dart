@@ -166,7 +166,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _primaryColor.withValues(alpha: 0.5);
+            return _primaryColor.withOpacity( 0.5);
           }
           return _lightDivider;
         }),
@@ -296,7 +296,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _accentColor.withValues(alpha: 0.5);
+            return _accentColor.withOpacity( 0.5);
           }
           return _darkDivider;
         }),

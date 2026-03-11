@@ -192,7 +192,7 @@ gradient: LinearGradient(
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.4),
+                  Colors.black.withOpacity( 0.4),
                 ],
               ),
               borderRadius: const BorderRadius.vertical(
@@ -210,7 +210,7 @@ gradient: LinearGradient(
                         children: [
                           // Back button
                           Material(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: Colors.white.withOpacity( 0.9),
                             borderRadius: BorderRadius.circular(22),
                             elevation: 2,
                             child: InkWell(
@@ -233,7 +233,7 @@ gradient: LinearGradient(
                             children: [
                               // Save button
                               Material(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: Colors.white.withOpacity( 0.9),
                                 borderRadius: BorderRadius.circular(22),
                                 elevation: 2,
                                 child: InkWell(
@@ -258,7 +258,7 @@ gradient: LinearGradient(
                               const SizedBox(width: 8),
                               // Share button
                               Material(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: Colors.white.withOpacity( 0.9),
                                 borderRadius: BorderRadius.circular(22),
                                 elevation: 2,
                                 child: InkWell(
@@ -343,7 +343,7 @@ gradient: LinearGradient(
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: source.color.withValues(alpha: 0.1),
+                              color: source.color.withOpacity( 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -528,7 +528,7 @@ gradient: LinearGradient(
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Colors.white.withOpacity( 0.5),
                   ),
                 ),
               ),
@@ -572,7 +572,7 @@ gradient: LinearGradient(
     return Material(
       borderRadius: BorderRadius.circular(16),
       elevation: 2,
-      shadowColor: color.withValues(alpha: 0.1),
+      shadowColor: color.withOpacity( 0.1),
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,

@@ -24,7 +24,7 @@ class RssSource {
       'name': name,
       'url': url,
       'category': category,
-      'color': color.toARGB32(),
+      'color': color.value,
       'icon': icon.codePoint,
     };
   }

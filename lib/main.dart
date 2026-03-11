@@ -7,7 +7,7 @@ import 'di/service_locator.dart';
 import 'utils/constants.dart';
 import 'screens/feed_screen.dart';
 import 'screens/settings_screen.dart';
-import 'services/theme_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
@@ -97,13 +97,13 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark 
-            ? const Color(0xFF12122A).withValues(alpha: 0.95)
-            : Colors.white.withValues(alpha: 0.95),
+            ? const Color(0xFF12122A).withOpacity( 0.95)
+            : Colors.white.withOpacity( 0.95),
           boxShadow: [
             BoxShadow(
               color: isDark 
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.08),
+                ? AppColors.primary.withOpacity( 0.3)
+                : Colors.black.withOpacity( 0.08),
               blurRadius: 30,
               offset: const Offset(0, -8),
               spreadRadius: -2,
@@ -168,11 +168,11 @@ Widget _buildNavItem({
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? selectedColor.withValues(alpha: 0.15)
+              ? selectedColor.withOpacity( 0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: isSelected
-              ? Border.all(color: selectedColor.withValues(alpha: 0.3), width: 1.5)
+              ? Border.all(color: selectedColor.withOpacity(0.3), width: 1.5)
               : null,
         ),
         child: Column(
@@ -212,7 +212,7 @@ Widget _buildNavItem({
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: selectedColor.withValues(alpha: 0.5),
+                          color: selectedColor.withOpacity(0.5),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

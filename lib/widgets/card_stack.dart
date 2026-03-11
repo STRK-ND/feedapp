@@ -108,8 +108,8 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.1),
-                      Colors.black.withValues(alpha: 0.5),
+                      Colors.black.withOpacity( 0.1),
+                      Colors.black.withOpacity( 0.5),
                     ],
                     stops: const [0.3, 0.7, 1.0],
                   ),
@@ -172,6 +172,11 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
       },
       onTapUp: (_) => setState(() => _pressedCardIndex = null),
       onTapCancel: () => setState(() => _pressedCardIndex = null),
+      onTap: () {
+        if (isFront) {
+          widget.onTap(index);
+        }
+      },
       child: AnimatedBuilder(
         animation: _cardEntranceController,
         builder: (context, child) {
@@ -213,7 +218,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withOpacity( 0.5),
                   width: 1,
                 ),
               ),
@@ -221,6 +226,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                 padding: const EdgeInsets.all(28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Glassmorphism source badge
                     Semantics(
@@ -256,23 +262,21 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
 
                     if (article.imageUrl != null) const SizedBox(height: 24),
 
-                    // Article title
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          article.title,
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            height: 1.35,
-                            letterSpacing: -0.3,
-                          ),
-                          textAlign: TextAlign.left,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
+                    // Article title - no Expanded to prevent layout issues
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        article.title,
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          height: 1.3,
+                          letterSpacing: -0.3,
                         ),
+                        textAlign: TextAlign.left,
+                        maxLines: 6,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -289,7 +293,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                           letterSpacing: 0.1,
                         ),
                         textAlign: TextAlign.left,
-                        maxLines: 2,
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -307,7 +311,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
                           border: Border.all(
-                            color: AppColors.divider.withValues(alpha: 0.5),
+                            color: AppColors.divider.withOpacity( 0.5),
                             width: 1,
                           ),
                         ),
