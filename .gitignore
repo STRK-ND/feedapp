@@ -51,6 +51,9 @@ app.*.map.json
 .planning/
 .openspec/
 
+# Worktrees for isolated feature development
+.worktrees/
+
 # Platform-specific directories (Android only build)
 web/
 linux/
