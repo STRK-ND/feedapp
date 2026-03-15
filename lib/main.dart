@@ -27,14 +27,21 @@ Future<void> main() async {
   // Initialize notification service
   await NotificationService().initialize();
 
+  // Initialize FeedProvider (prevents frame drops)
+  final articleRepository = getIt<ArticleRepository>();
+  final feedProvider = FeedProvider(articleRepository: articleRepository);
+  await feedProvider.init();
+
   // Log app open event
   await AnalyticsService.logAppOpen();
 
-  runApp(const CuratedFeedsApp());
+  runApp(CuratedFeedsApp(feedProvider: feedProvider));
 }
 
 class CuratedFeedsApp extends StatelessWidget {
-  const CuratedFeedsApp({super.key});
+  final FeedProvider feedProvider;
+
+  const CuratedFeedsApp({super.key, required this.feedProvider});
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +61,9 @@ class CuratedFeedsApp extends StatelessWidget {
           },
         ),
 
-        // Provide feed provider
-        ChangeNotifierProvider<FeedProvider>(
-          create: (_) => FeedProvider(
-            articleRepository: getIt<ArticleRepository>(),
-          )..init(),
+        // Provide feed provider (already initialized)
+        ChangeNotifierProvider<FeedProvider>.value(
+          value: feedProvider,
         ),
       ],
       child: Consumer<ThemeProvider>(
@@ -111,13 +116,13 @@ class _MainNavigationState extends State<MainNavigation> {
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF12122A).withOpacity(0.95)
-                : Colors.white.withOpacity(0.95),
+                ? const Color(0xFF12122A).withValues(alpha: 0.95)
+                : Colors.white.withValues(alpha: 0.95),
             boxShadow: [
               BoxShadow(
                 color: isDark
-                    ? AppColors.primary.withOpacity(0.3)
-                    : Colors.black.withOpacity(0.08),
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.08),
                 blurRadius: 30,
                 offset: const Offset(0, -8),
                 spreadRadius: -2,
@@ -168,7 +173,7 @@ class _MainNavigationState extends State<MainNavigation> {
     required bool isDark,
   }) {
     final isSelected = _selectedIndex == index;
-    final selectedColor = isDark ? AppColors.accent : AppColors.primary;
+    final selectedColor = AppColors.primary; // Stitch purple for both themes
     final unselectedColor = isDark ? Colors.white38 : AppColors.textTertiary;
     final color = isSelected ? selectedColor : unselectedColor;
 
@@ -183,11 +188,11 @@ class _MainNavigationState extends State<MainNavigation> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? selectedColor.withOpacity(0.15)
+              ? selectedColor.withValues(alpha: 0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: isSelected
-              ? Border.all(color: selectedColor.withOpacity(0.3), width: 1.5)
+              ? Border.all(color: selectedColor.withValues(alpha: 0.3), width: 1.5)
               : null,
         ),
         child: Column(
@@ -227,7 +232,7 @@ class _MainNavigationState extends State<MainNavigation> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: selectedColor.withOpacity(0.5),
+                          color: selectedColor.withValues(alpha: 0.5),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

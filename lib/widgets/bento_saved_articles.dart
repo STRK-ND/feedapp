@@ -8,6 +8,7 @@ import '../services/rss_feed_service.dart';
 import '../services/cache_manager.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import '../di/service_locator.dart';
 
 /// Bento Grid layout for saved articles
 /// Features different card sizes: 1x1 (standard), 2x1 (featured)
@@ -85,9 +86,9 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
 
   Widget _buildBentoCard(int index, int span) {
     final article = widget.articles[index];
-                final sourceColor = RssFeedService.getSourceColorFromArticle(article);
-  final sourceIcon = RssFeedService.getSourceIconFromArticle(article);
-  final sourceName = RssFeedService.getSourceNameFromArticle(article);
+                final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(article);
+  final sourceIcon = getIt<RssFeedService>().getSourceIconFromArticle(article);
+  final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(article);
 
     // Entrance animation with stagger
     final Animation<double> animation = CurvedAnimation(
@@ -156,21 +157,21 @@ child: GestureDetector(
                           color: AppColors.background,
                         ),
                         errorWidget: (context, url, error) => Container(
-                          color: sourceColor.withOpacity( 0.1),
+                          color: sourceColor.withValues(alpha:  0.1),
                           child: Icon(
                             sourceIcon,
                             size: 48,
-                            color: sourceColor.withOpacity( 0.3),
+                            color: sourceColor.withValues(alpha:  0.3),
                           ),
                         ),
                       )
                     else
                       Container(
-                        color: sourceColor.withOpacity( 0.1),
+                        color: sourceColor.withValues(alpha:  0.1),
                         child: Icon(
                           sourceIcon,
                           size: 48,
-                          color: sourceColor.withOpacity( 0.3),
+                          color: sourceColor.withValues(alpha:  0.3),
                         ),
                       ),
 
@@ -182,7 +183,7 @@ child: GestureDetector(
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity( 0.8),
+                            Colors.black.withValues(alpha:  0.8),
                           ],
                           stops: const [0.3, 1.0],
                         ),
@@ -203,7 +204,7 @@ child: GestureDetector(
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity( 0.9),
+                              color: Colors.white.withValues(alpha:  0.9),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -271,7 +272,7 @@ child: GestureDetector(
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity( 0.9),
+                          color: Colors.white.withValues(alpha:  0.9),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -350,20 +351,20 @@ child: GestureDetector(
                               ),
                             ),
                             errorWidget: (context, url, error) => Container(
-                              color: sourceColor.withOpacity( 0.1),
+                              color: sourceColor.withValues(alpha:  0.1),
                               child: Icon(
                                 sourceIcon,
-                                color: sourceColor.withOpacity( 0.3),
+                                color: sourceColor.withValues(alpha:  0.3),
                               ),
                             ),
                           )
                         else
                           Container(
-                            color: sourceColor.withOpacity( 0.1),
+                            color: sourceColor.withValues(alpha:  0.1),
                             child: Icon(
                               sourceIcon,
                               size: 32,
-                              color: sourceColor.withOpacity( 0.3),
+                              color: sourceColor.withValues(alpha:  0.3),
                             ),
                           ),
 
@@ -377,7 +378,7 @@ child: GestureDetector(
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity( 0.9),
+                              color: Colors.white.withValues(alpha:  0.9),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -405,7 +406,7 @@ child: GestureDetector(
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity( 0.9),
+                              color: Colors.white.withValues(alpha:  0.9),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -474,7 +475,7 @@ child: GestureDetector(
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.only(right: 20),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity( 0.1),
+        color: AppColors.error.withValues(alpha:  0.1),
         borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
       ),
       child: const Icon(
@@ -494,7 +495,7 @@ child: GestureDetector(
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity( 0.1),
+              color: AppColors.accent.withValues(alpha:  0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(

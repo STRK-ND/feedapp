@@ -14,7 +14,6 @@ class ArticleContent {
 }
 
 /// Service to fetch and extract full article content from URLs
-/// Now uses dependency injection for better testability
 class ArticleContentService {
   final http.Client _httpClient;
 

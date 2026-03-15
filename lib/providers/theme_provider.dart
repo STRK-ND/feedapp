@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'settings_service.dart';
+import '../services/settings_service.dart';
 
 /// Theme provider for managing app theme state
 class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
   ThemeMode _themeMode = ThemeMode.system;
-  Color _primaryColor = const Color(0xFF1A1B4D);
-  Color _accentColor = const Color(0xFFC9A962);
+  Color _primaryColor = const Color(0xFFBF83FC); // Stitch primary purple
+  Color _accentColor = const Color(0xFFBF83FC); // Stitch primary for accent
   
   ThemeProvider(this._settingsService);
   
@@ -14,15 +14,15 @@ class ThemeProvider extends ChangeNotifier {
   Color get primaryColor => _primaryColor;
   Color get accentColor => _accentColor;
   
-  /// Light theme colors
-  static const Color _lightBackground = Color(0xFFF8F7F4);
+  /// Light theme colors - Stitch "Curated" design
+  static const Color _lightBackground = Color(0xFFF7F5F8); // Stitch light background
   static const Color _lightSurface = Color(0xFFFFFFFF);
   static const Color _lightTextPrimary = Color(0xFF1A1B2E);
   static const Color _lightTextSecondary = Color(0xFF6B7280);
   static const Color _lightDivider = Color(0xFFE5E7EB);
   
   /// Dark theme colors  
-  static const Color _darkBackground = Color(0xFF121220);
+  static const Color _darkBackground = Color(0xFF190F23);
   static const Color _darkSurface = Color(0xFF1E1E2E);
   static const Color _darkTextPrimary = Color(0xFFF8F7F4);
   static const Color _darkTextSecondary = Color(0xFF9CA3AF);
@@ -166,7 +166,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _primaryColor.withOpacity( 0.5);
+            return _primaryColor.withValues(alpha:  0.5);
           }
           return _lightDivider;
         }),
@@ -296,7 +296,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _accentColor.withOpacity( 0.5);
+            return _accentColor.withValues(alpha:  0.5);
           }
           return _darkDivider;
         }),

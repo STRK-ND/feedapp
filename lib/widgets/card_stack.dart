@@ -104,14 +104,12 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
                     colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity( 0.1),
-                      Colors.black.withOpacity( 0.5),
+                    AppColors.backgroundDark,                    AppColors.backgroundDark.withValues(alpha: 0.4),                    Colors.transparent,
                     ],
-                    stops: const [0.3, 0.7, 1.0],
+                    stops: const [0.0, 0.6, 1.0],
                   ),
                 ),
               ),

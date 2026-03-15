@@ -3,6 +3,7 @@ import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
 import '../repositories/feed_repository.dart';
 import '../utils/error_handler.dart';
+import '../utils/helpers.dart';
 import '../di/service_locator.dart';
 
 /// Repository for managing article data access
@@ -172,19 +173,13 @@ class ArticleRepository {
 
       ErrorHandlerExtensions.logInfo('Searching articles with query: $query');
 
-      final allResult = await fetchAllArticles();
+final allResult = await fetchAllArticles();
       if (allResult.isFailure) {
         return allResult;
       }
 
       final articles = allResult.data ?? [];
-      final lowerQuery = query.toLowerCase();
-
-      final filteredArticles = articles.where((a) =>
-          a.title.toLowerCase().contains(lowerQuery) ||
-          a.description.toLowerCase().contains(lowerQuery) ||
-          a.sourceName.toLowerCase().contains(lowerQuery)
-      ).toList();
+      final filteredArticles = Helpers.filterArticlesByQuery(articles, query);
 
       return Result.success(filteredArticles);
     } catch (e, stackTrace) {
@@ -254,21 +249,28 @@ class ArticleRepository {
   /// Mark an article as read
   Future<Result<void>> markAsRead(Article article) async {
     try {
-      final allResult = await fetchAllArticles(forceRefresh: true);
-      if (allResult.isFailure) {
-        return Result.failure(allResult.error ?? 'Failed to fetch articles');
+      // Work with cached data directly - avoid full refresh
+      var articles = _cachedArticles;
+      if (articles == null) {
+        final allResult = await fetchAllArticles();
+        if (allResult.isFailure) {
+          return Result.failure(allResult.error ?? 'Failed to fetch articles');
+        }
+        articles = allResult.data ?? [];
       }
 
-      final articles = allResult.data ?? [];
       final index = articles.indexWhere((a) => a.id == article.id);
-
       if (index == -1) {
         return Result.failure('Article not found');
       }
 
-      articles[index] = articles[index].copyWith(isRead: true);
-      _cachedArticles = articles;
-      await _storageService.saveArticles(articles);
+      // Create updated list with immutable copy
+      final updatedArticles = List<Article>.from(articles);
+      updatedArticles[index] = updatedArticles[index].copyWith(isRead: true);
+
+      // Update cache and persist
+      _cachedArticles = updatedArticles;
+      await _storageService.saveArticles(updatedArticles);
 
       return Result.success(null);
     } catch (e, stackTrace) {
@@ -287,40 +289,36 @@ class ArticleRepository {
       // Create updated article with new save state
       final updatedArticle = article.copyWith(isSaved: isSaved);
 
-      // Update article in main list
-      final allResult = await fetchAllArticles(forceRefresh: true);
-      if (allResult.isSuccess) {
-        final articles = allResult.data ?? [];
+      // Update main articles cache directly without full refresh
+      var articles = _cachedArticles;
+      if (articles != null) {
         final index = articles.indexWhere((a) => a.id == article.id);
-
         if (index != -1) {
-          articles[index] = updatedArticle;
-          _cachedArticles = articles;
-          await _storageService.saveArticles(articles);
+          final updatedArticles = List<Article>.from(articles);
+          updatedArticles[index] = updatedArticle;
+          _cachedArticles = updatedArticles;
+          await _storageService.saveArticles(updatedArticles);
         }
       }
 
-      // Update saved articles list
-      final savedResult = await fetchSavedArticles();
-      if (savedResult.isFailure) {
-        return Result.failure(savedResult.error ?? 'Failed to fetch saved articles');
-      }
+      // Update saved articles cache directly
+      final savedArticles = _cachedSavedArticles;
+      if (savedArticles != null) {
+        final updatedSavedArticles = List<Article>.from(savedArticles);
 
-      final savedArticles = savedResult.data ?? [];
-      final updatedSavedArticles = List<Article>.from(savedArticles);
-
-      if (isSaved) {
-        // Add to saved if not already there
-        if (!updatedSavedArticles.any((a) => a.id == article.id)) {
-          updatedSavedArticles.insert(0, updatedArticle);
+        if (isSaved) {
+          // Add to saved if not already there
+          if (!updatedSavedArticles.any((a) => a.id == article.id)) {
+            updatedSavedArticles.insert(0, updatedArticle);
+          }
+        } else {
+          // Remove from saved
+          updatedSavedArticles.removeWhere((a) => a.id == article.id);
         }
-      } else {
-        // Remove from saved
-        updatedSavedArticles.removeWhere((a) => a.id == article.id);
-      }
 
-      _cachedSavedArticles = updatedSavedArticles;
-      await _storageService.saveSavedArticles(updatedSavedArticles);
+        _cachedSavedArticles = updatedSavedArticles;
+        await _storageService.saveSavedArticles(updatedSavedArticles);
+      }
 
       return Result.success(null);
     } catch (e, stackTrace) {

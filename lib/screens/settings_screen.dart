@@ -120,10 +120,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF1A1B4D), Color(0xFF2D2F73), Color(0xFF4A3B5C)],
+                colors: [Color(0xFF190F23), Color(0xFF2D2F73), Color(0xFF4A3B5C)],
               )
             : null,
-        color: isDark ? null : theme.scaffoldBackgroundColor,
+        color: isDark ? null : AppColors.backgroundLight,
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -327,18 +327,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withOpacity( 0.08)
+              ? Colors.white.withValues(alpha:  0.08)
               : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isDark
-                ? Colors.white.withOpacity( 0.1)
-                : AppColors.divider.withOpacity( 0.5),
+                ? Colors.white.withValues(alpha:  0.1)
+                : AppColors.divider.withValues(alpha:  0.5),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity( isDark ? 0.3 : 0.05),
+              color: Colors.black.withValues(alpha:  isDark ? 0.3 : 0.05),
               blurRadius: isDark ? 20 : 15,
               offset: const Offset(0, 8),
             ),
@@ -357,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       height: 1,
       indent: 56,
       endIndent: 16,
-      color: AppColors.divider.withOpacity( 0.3),
+      color: AppColors.divider.withValues(alpha:  0.3),
     );
   }
 
@@ -374,7 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity( isDark ? 0.2 : 0.1),
+          color: AppColors.primary.withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 20, color: isDark ? AppColors.accent : AppColors.primary),
@@ -414,7 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity( isDark ? 0.2 : 0.1),
+          color: AppColors.primary.withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 20, color: isDark ? AppColors.accent : AppColors.primary),
@@ -450,7 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.primary).withOpacity( isDark ? 0.2 : 0.1),
+          color: (iconColor ?? AppColors.primary).withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 20, color: iconColor ?? (isDark ? AppColors.accent : AppColors.primary)),
@@ -482,7 +482,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity( isDark ? 0.2 : 0.1),
+          color: AppColors.primary.withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -562,7 +562,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity( isDark ? 0.2 : 0.1),
+          color: AppColors.primary.withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(Icons.timer_outlined, size: 20, color: isDark ? AppColors.accent : AppColors.primary),
@@ -625,7 +625,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity( isDark ? 0.2 : 0.1),
+          color: AppColors.primary.withValues(alpha:  isDark ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(Icons.inventory_2_outlined, size: 20, color: isDark ? AppColors.accent : AppColors.primary),

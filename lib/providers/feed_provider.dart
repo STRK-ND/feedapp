@@ -3,6 +3,7 @@ import '../models/article.dart';
 import '../repositories/article_repository.dart';
 import '../utils/error_handler.dart';
 import '../utils/constants.dart';
+import '../utils/helpers.dart';
 
 /// Feed state for UI consumption
 class FeedState {
@@ -120,16 +121,21 @@ class FeedProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load saved articles
-      final savedResult = await _articleRepository.fetchSavedArticles();
+      // Load saved articles and all articles in parallel
+      final results = await Future.wait([
+        _articleRepository.fetchSavedArticles(),
+        _articleRepository.fetchAllArticles(),
+      ]);
+
+      final savedResult = results[0] as Result<List<Article>>;
+      final allResult = results[1] as Result<List<Article>>;
+
       if (savedResult.isSuccess) {
         _state = _state.copyWith(
           savedArticles: savedResult.data ?? [],
         );
       }
 
-      // Load all articles
-      final allResult = await _articleRepository.fetchAllArticles();
       if (allResult.isSuccess) {
         _state = _state.copyWith(
           articles: allResult.data ?? [],
@@ -145,7 +151,7 @@ class FeedProvider extends ChangeNotifier {
         );
       }
 
-      // Get unread count
+      // Get unread count independently
       await _updateUnreadCount();
     } catch (e) {
       _state = _state.copyWith(
@@ -334,12 +340,9 @@ class FeedProvider extends ChangeNotifier {
     return _filterArticlesByCategory(articles, _state.selectedCategory);
   }
 
-  /// Filter articles by category
+/// Filter articles by category
   List<Article> _filterArticlesByCategory(List<Article> articles, String category) {
-    if (category == 'All' || category.isEmpty) {
-      return articles;
-    }
-    return articles.where((a) => a.sourceCategory == category).toList();
+    return Helpers.filterArticlesByCategory(articles, category);
   }
 
   /// Filter by search query
@@ -351,14 +354,9 @@ class FeedProvider extends ChangeNotifier {
     );
   }
 
-  /// Search articles by query
+/// Search articles by query
   List<Article> _filterBySearchQuery(List<Article> articles, String query) {
-    final lowerQuery = query.toLowerCase();
-    return articles.where((a) {
-      return a.title.toLowerCase().contains(lowerQuery) ||
-          a.description.toLowerCase().contains(lowerQuery) ||
-          a.sourceName.toLowerCase().contains(lowerQuery);
-    }).toList();
+    return Helpers.filterArticlesByQuery(articles, query);
   }
 
   /// Update unread count from repository

@@ -14,7 +14,7 @@ class FeedRepository {
   /// Get all predefined RSS sources
   Future<Result<List<RssSource>>> getAllSources() async {
     try {
-      final sources = _rssFeedService.predefinedSources;
+      final sources = RssFeedService.predefinedSources;
       ErrorHandler.logError(
         'Retrieved ${sources.length} predefined sources',
         severity: ErrorSeverity.low,
@@ -58,11 +58,11 @@ class FeedRepository {
   Future<Result<List<RssSource>>> getSourcesByCategory(String category) async {
     try {
       if (category.isEmpty || category == 'All') {
-        final sources = _rssFeedService.predefinedSources;
+        final sources = RssFeedService.predefinedSources;
         return Result.success(sources);
       }
 
-      final sources = _rssFeedService.predefinedSources
+      final sources = RssFeedService.predefinedSources
           .where((source) => source.category == category)
           .toList();
 
@@ -86,7 +86,7 @@ class FeedRepository {
           .toList()
         ..sort();
 
-      final allCategories = ['All', ...categories];
+      final allCategories = <String>['All', ...categories];
 
       ErrorHandler.logError(
         'Retrieved ${allCategories.length} categories',
@@ -109,11 +109,11 @@ class FeedRepository {
       // In future: actually ping each feed to check health
       // For now, return all as healthy
       final health = {
-        for (var source in _rssFeedService.predefinedSources)
+        for (var source in RssFeedService.predefinedSources)
           source.id: true
       };
 
-      return Result.success(health);
+      return Result.success(health.cast<String, bool>());
     } catch (e, stackTrace) {
       ErrorHandler.logError(
         'Failed to get feed health',

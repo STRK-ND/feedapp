@@ -1,3 +1,5 @@
+import '../models/article.dart';
+
 /// Utility functions for common operations
 class Helpers {
   Helpers._();
@@ -159,7 +161,7 @@ class Helpers {
   }
 
   static int _hashCode(String string) {
-    var hash = 0xcbf29ce484222325.toUnsigned(64);
+    var hash = 0xcbf29ce4.toUnsigned(32);
 
     for (var i = 0; i < string.length; i++) {
       final codeUnit = string.codeUnitAt(i);
@@ -170,5 +172,25 @@ class Helpers {
     }
 
     return hash;
+  }
+
+  /// Filter articles by search query across title, description, and source name
+  static List<Article> filterArticlesByQuery(List<Article> articles, String query) {
+    if (query.isEmpty) return articles;
+
+    final lowerQuery = query.toLowerCase();
+    return articles.where((a) {
+      return a.title.toLowerCase().contains(lowerQuery) ||
+          a.description.toLowerCase().contains(lowerQuery) ||
+          a.sourceName.toLowerCase().contains(lowerQuery);
+    }).toList();
+  }
+
+  /// Filter articles by category
+  static List<Article> filterArticlesByCategory(List<Article> articles, String category) {
+    if (category == 'All' || category.isEmpty) {
+      return articles;
+    }
+    return articles.where((a) => a.sourceCategory == category).toList();
   }
 }

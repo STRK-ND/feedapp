@@ -287,52 +287,52 @@ class BentoGridConfig {
 }
 
 /// App-wide text theme
-final appTextTheme = GoogleFonts.dmSansTextTheme().copyWith(
-  headlineLarge: GoogleFonts.playfairDisplay(
+final appTextTheme = GoogleFonts.lexendTextTheme().copyWith(
+  headlineLarge: GoogleFonts.lexend(
     fontSize: 48,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.5,
     color: AppColors.textPrimary,
   ),
-  headlineMedium: GoogleFonts.playfairDisplay(
+  headlineMedium: GoogleFonts.lexend(
     fontSize: 32,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.3,
     color: AppColors.textPrimary,
   ),
-  headlineSmall: GoogleFonts.playfairDisplay(
+  headlineSmall: GoogleFonts.lexend(
     fontSize: 24,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
     color: AppColors.textPrimary,
   ),
-  titleLarge: GoogleFonts.playfairDisplay(
+  titleLarge: GoogleFonts.lexend(
     fontSize: 22,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
     color: AppColors.textPrimary,
   ),
-  titleMedium: GoogleFonts.dmSans(
+  titleMedium: GoogleFonts.lexend(
     fontSize: 18,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.1,
     color: AppColors.textPrimary,
   ),
-  bodyLarge: GoogleFonts.dmSans(
+  bodyLarge: GoogleFonts.lexend(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     letterSpacing: 0.1,
     color: AppColors.textPrimary,
     height: 1.6,
   ),
-  bodyMedium: GoogleFonts.dmSans(
+  bodyMedium: GoogleFonts.lexend(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     letterSpacing: 0.1,
     color: AppColors.textPrimary,
     height: 1.5,
   ),
-  labelLarge: GoogleFonts.dmSans(
+  labelLarge: GoogleFonts.lexend(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.3,

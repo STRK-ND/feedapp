@@ -175,7 +175,7 @@ child: GestureDetector(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
                   color: AppColors.textSecondary
-                      .withOpacity( _position.dx < 0
+                      .withValues(alpha:  _position.dx < 0
                           ? _position.dx.abs() / 600
                           : 0),
                   child: _position.dx < -50
@@ -206,7 +206,7 @@ child: GestureDetector(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
                   color: AppColors.success
-                      .withOpacity( _position.dx > 0
+                      .withValues(alpha:  _position.dx > 0
                           ? (_position.dx / 600) * 0.15
                           : 0),
                   child: _position.dx > 50

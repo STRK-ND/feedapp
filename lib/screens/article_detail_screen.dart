@@ -61,7 +61,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     setState(() => _isLoadingContent = true);
 
     try {
-      final result = await ArticleContentService.fetchArticleContentWithImages(
+      final result = await getIt<ArticleContentService>().fetchArticleContentWithImages(
         widget.article.link,
       );
       setState(() {
@@ -84,7 +84,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     setState(() => _isLoadingImages = true);
 
     try {
-      final result = await ArticleContentService.fetchArticleContentWithImages(
+      final result = await getIt<ArticleContentService>().fetchArticleContentWithImages(
         widget.article.link,
       );
       if (mounted) {
@@ -142,8 +142,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final source = RssFeedService.getSourceById(widget.article.sourceId) ?? 
-                   RssFeedService.predefinedSources.first;
+    final source = getIt<RssFeedService>().getSourceById(widget.article.sourceId) ?? 
+                   getIt<RssFeedService>().predefinedSources.first;
     final screenHeight = MediaQuery.of(context).size.height;
     final imageHeight = screenHeight * 0.55;
 
@@ -192,7 +192,7 @@ gradient: LinearGradient(
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity( 0.4),
+                  Colors.black.withValues(alpha:  0.4),
                 ],
               ),
               borderRadius: const BorderRadius.vertical(
@@ -210,7 +210,7 @@ gradient: LinearGradient(
                         children: [
                           // Back button
                           Material(
-                            color: Colors.white.withOpacity( 0.9),
+                            color: Colors.white.withValues(alpha:  0.9),
                             borderRadius: BorderRadius.circular(22),
                             elevation: 2,
                             child: InkWell(
@@ -233,7 +233,7 @@ gradient: LinearGradient(
                             children: [
                               // Save button
                               Material(
-                                color: Colors.white.withOpacity( 0.9),
+                                color: Colors.white.withValues(alpha:  0.9),
                                 borderRadius: BorderRadius.circular(22),
                                 elevation: 2,
                                 child: InkWell(
@@ -258,7 +258,7 @@ gradient: LinearGradient(
                               const SizedBox(width: 8),
                               // Share button
                               Material(
-                                color: Colors.white.withOpacity( 0.9),
+                                color: Colors.white.withValues(alpha:  0.9),
                                 borderRadius: BorderRadius.circular(22),
                                 elevation: 2,
                                 child: InkWell(
@@ -343,7 +343,7 @@ gradient: LinearGradient(
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: source.color.withOpacity( 0.1),
+                              color: source.color.withValues(alpha:  0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -528,7 +528,7 @@ gradient: LinearGradient(
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity( 0.5),
+                    color: Colors.white.withValues(alpha:  0.5),
                   ),
                 ),
               ),
@@ -572,7 +572,7 @@ gradient: LinearGradient(
     return Material(
       borderRadius: BorderRadius.circular(16),
       elevation: 2,
-      shadowColor: color.withOpacity( 0.1),
+      shadowColor: color.withValues(alpha:  0.1),
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,

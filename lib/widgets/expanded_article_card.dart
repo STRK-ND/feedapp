@@ -7,9 +7,9 @@ import '../models/article.dart';
 import '../services/cache_manager.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
+import '../di/service_locator.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
-import 'shimmer_loading.dart';
 
 /// Expanded article card bottom sheet/modal widget
 /// Features: Glassmorphism, hero image fade-in transitions
@@ -50,7 +50,14 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
 
     // Try to fetch full content only if RSS content is short
     if (widget.article.fullContent.length < 200) {
-      _fetchFullContent();
+      // Call async method with proper error handling
+      _fetchFullContent().catchError((error) {
+        if (mounted) {
+          setState(() {
+            _fullContent = widget.article.fullContent;
+          });
+        }
+      });
     } else {
       setState(() {
         _fullContent = widget.article.fullContent;
@@ -64,7 +71,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     });
 
     try {
-      final content = await ArticleContentService.fetchArticleContent(widget.article.link);
+      final content = await getIt<ArticleContentService>().fetchArticleContent(widget.article.link);
       setState(() {
         _fullContent = content;
         _isLoadingContent = false;
@@ -135,7 +142,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
 
   @override
   Widget build(BuildContext context) {
-    final source = RssFeedService.getSourceById(widget.article.sourceId) ??
+    final source = getIt<RssFeedService>().getSourceById(widget.article.sourceId) ??
         RssFeedService.predefinedSources.first;
     final sourceColor = source.color;
 
@@ -374,7 +381,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
           color: color,
           padding: const EdgeInsets.all(12),
           style: IconButton.styleFrom(
-            backgroundColor: color.withOpacity( 0.08),
+            backgroundColor: color.withValues(alpha:  0.08),
           ),
         ),
       ),
