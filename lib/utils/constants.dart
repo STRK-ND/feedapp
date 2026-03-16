@@ -8,10 +8,14 @@ enum ViewMode { cards, list }
 class AppColors {
   AppColors._();
 
-  // Primary colors
-  static const Color primary = Color(0xFF1A1B4D); // Deep midnight blue
-  static const Color accent = Color(0xFFC9A962); // Muted gold
-  static const Color background = Color(0xFFF8F7F4); // Cream white
+  // Primary colors - Stitch Design System
+  static const Color primary = Color(0xFFBF83FC); // Purple (Stitch primary)
+  static const Color primary10 = Color(0x1ABF83FC); // 10% opacity
+  static const Color primary5 = Color(0x0DBF83FC); // 5% opacity
+  static const Color accent = Color(0xFFBF83FC); // Same as primary
+  static const Color background = Color(0xFF190F23); // Deep purple (dark mode)
+  static const Color backgroundLight = Color(0xFFF7F5F8); // Light mode bg
+  static const Color backgroundDark = Color(0xFF190F23); // Stitch dark background
   static const Color surface = Color(0xFFFFFFFF); // Pure white
 
   // Text colors
@@ -133,11 +137,11 @@ IconData getCategoryIcon(String category) {
 class AppCardStyles {
   AppCardStyles._();
 
-  // Border radius
+  // Border radius - Stitch Design System
   static const double cardRadius = 24.0;
   static const double imageRadius = 20.0;
-  static const double badgeRadius = 12.0;
-  static const double buttonRadius = 12.0;
+  static const double badgeRadius = 16.0;
+  static const double buttonRadius = 999.0; // Full circular
 
   // Animation durations
   static const Duration pressDuration = Duration(milliseconds: 150);

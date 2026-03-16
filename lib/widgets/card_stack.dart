@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../di/service_locator.dart';
 import '../models/article.dart';
 import '../services/rss_feed_service.dart';
 import '../services/cache_manager.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import 'swipeable_card.dart';
+import 'stitch/stitch_widgets.dart';
+import '../utils/read_time_calculator.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
 /// Features: Glassmorphism, tactile press, hero image fade-in
@@ -155,189 +158,143 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   }
 
   Widget _buildArticleCard(Article article, int index, bool isFront) {
-    // Use source metadata from article (provided by Worker) or fallback to RssFeedService
-    final sourceColor = RssFeedService.getSourceColorFromArticle(article);
-    final sourceIcon = RssFeedService.getSourceIconFromArticle(article);
     final sourceName = article.sourceName.isNotEmpty
         ? article.sourceName
-        : (RssFeedService.getSourceById(article.sourceId)?.name ?? 'Unknown');
-    final isPressed = _pressedCardIndex == index;
+        : (getIt<RssFeedService>().getSourceById(article.sourceId)?.name ?? 'Unknown');
+    final sourceCategory = article.sourceCategory ?? 'Technology';
+    final readTime = ReadTimeCalculator.calculateReadTime(article.description);
 
     return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _pressedCardIndex = index);
-        HapticFeedback.selectionClick();
-      },
-      onTapUp: (_) => setState(() => _pressedCardIndex = null),
-      onTapCancel: () => setState(() => _pressedCardIndex = null),
       onTap: () {
         if (isFront) {
           widget.onTap(index);
         }
       },
-      child: AnimatedBuilder(
-        animation: _cardEntranceController,
-        builder: (context, child) {
-          final animation = CurvedAnimation(
-            parent: _cardEntranceController,
-            curve: Interval(
-              (index * 0.1).clamp(0.0, 0.7),
-              (0.3 + index * 0.1).clamp(0.3, 1.0),
-              curve: Curves.easeOutQuart,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-          );
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: AspectRatio(
+            aspectRatio: 3 / 4,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background image
+                if (article.imageUrl != null)
+                  CachedNetworkImage(
+                    imageUrl: article.imageUrl!,
+                    fit: BoxFit.cover,
+                    cacheManager: AppCacheManager(),
+                  )
+                else
+                  Container(color: AppColors.primary10),
 
-          // Tactile press effect: scale down when pressed
-          final pressedScale = isPressed ? 0.97 : 1.0;
-          final scale = isFront
-              ? pressedScale
-              : 1.0 - (0.06 * (index + 1)) + (0.03 * animation.value);
-          final offset = isFront ? 0.0 : -6.0 - (index * 3.0);
-
-          return Transform.translate(
-            offset: Offset(0, offset * (1 - animation.value)),
-            child: Transform.scale(
-              scale: scale,
-              child: FadeTransition(
-                opacity: animation,
-                child: child,
-              ),
-            ),
-          );
-        },
-        // Glassmorphism card decoration
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          decoration: AppCardStyles.glassDecoration(),
-          child: Semantics(
-            label: '$sourceName. ${article.description}. From $sourceName. Published ${Helpers.formatTimeAgo(article.pubDate)}.',
-            image: article.imageUrl != null,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-                border: Border.all(
-                  color: Colors.white.withOpacity( 0.5),
-                  width: 1,
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        AppColors.backgroundDark,
+                        AppColors.backgroundDark.withOpacity(0.6),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.4, 0.8],
+                    ),
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Glassmorphism source badge
-                    Semantics(
-                      label: 'Source: $sourceName',
-                      child: Container(
-                        decoration: AppCardStyles.chipDecoration(sourceColor),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+
+                // Content
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Category badges
+                        Row(
                           children: [
-                            Icon(sourceIcon, size: 14, color: sourceColor),
+                            CategoryBadge(category: sourceCategory),
                             const SizedBox(width: 8),
-                            Text(
-                              sourceName,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: sourceColor,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
+                            ReadTimeBadge(minutes: readTime),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
-                    // Hero image with fade-in
-                    _buildGlassImage(article.imageUrl, article),
-
-                    if (article.imageUrl != null) const SizedBox(height: 24),
-
-                    // Article title - no Expanded to prevent layout issues
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        article.title,
-                        style: GoogleFonts.playfairDisplay(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          height: 1.3,
-                          letterSpacing: -0.3,
+                        // Title
+                        Text(
+                          article.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.left,
-                        maxLines: 6,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                        const SizedBox(height: 12),
 
-                    // Description snippet
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        article.description,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 15,
-                          color: AppColors.textSecondary,
-                          height: 1.5,
-                          letterSpacing: 0.1,
+                        // Description
+                        Text(
+                          article.description,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            height: 1.5,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.left,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                    // Publication time
-                    Semantics(
-                      label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                          border: Border.all(
-                            color: AppColors.divider.withOpacity( 0.5),
-                            width: 1,
+                        // Read more button
+                        GestureDetector(
+                          onTap: () => widget.onTap(index),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary10,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Read Full Story',
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.arrow_forward, size: 16, color: AppColors.primary),
+                              ],
+                            ),
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.schedule_outlined,
-                              size: 14,
-                              color: AppColors.textTertiary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              Helpers.formatTimeAgo(article.pubDate),
-                              style: GoogleFonts.dmSans(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
