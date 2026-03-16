@@ -12,6 +12,7 @@ import '../services/analytics_service.dart';
 import '../widgets/card_stack.dart';
 import '../widgets/expanded_article_card.dart';
 import '../widgets/update_dialog.dart';
+import '../widgets/bento_saved_articles.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../utils/error_handler.dart';
@@ -57,6 +58,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.showSavedArticles ? 1 : 0;
     _loadData();
     _loadViewMode();
     _checkConnectivity();
@@ -697,182 +699,38 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Widget _buildSavedArticlesView() {
-    if (_savedArticles.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.divider.withValues(alpha:  0.3),
-                  width: 1,
-                ),
-              ),
-              child: Semantics(
-                label: 'No saved articles',
-                child: const Icon(
-                  Icons.bookmark_outline_rounded,
-                  size: 72,
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No saved articles yet',
-              style: GoogleFonts.dmSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Swipe right on articles to save them for later',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                  letterSpacing: 0.1,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-      itemCount: _savedArticles.length,
-      itemBuilder: (context, index) {
-        final article = _savedArticles[index];
-        final source = getIt<RssFeedService>().getSourceById(article.sourceId) ??
-            RssFeedService.predefinedSources.first;
-        final sourceColor = source.color;
-
-        return Dismissible(
-          key: ValueKey(article.id),
-          direction: DismissDirection.endToStart,
-          onDismissed: (direction) {
-            _onToggleSave(article);
-          },
-          background: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            decoration: BoxDecoration(
-              color: AppColors.textSecondary,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 24),
-            child: Icon(Icons.delete_rounded, color: Colors.white, size: 24),
-          ),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: sourceColor.withValues(alpha:  0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:  0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: sourceColor.withValues(alpha:  0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(source.icon, size: 14, color: sourceColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          source.name,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: sourceColor,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          article.title,
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            height: 1.3,
-                            letterSpacing: -0.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          article.description,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                            height: 1.5,
-                            letterSpacing: 0.05,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Semantics(
-                    button: true,
-                    label: article.isSaved ? 'Remove from saved' : 'Save article',
-                    child: IconButton(
-                      icon: Icon(
-                        article.isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: article.isSaved ? AppColors.error : AppColors.textTertiary,
-                      ),
-                      onPressed: () => _onToggleSave(article),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    return BentoSavedArticlesGrid(
+      articles: _savedArticles,
+      onTap: (index) => _onTapSavedArticle(index),
+      onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
+      onDismiss: (index) => _onToggleSave(_savedArticles[index]),
+      isEmpty: _savedArticles.isEmpty,
     );
   }
+
+  void _onTapSavedArticle(int index) {
+    if (index >= _savedArticles.length) return;
+    final article = _savedArticles[index];
+    AnalyticsService.logArticleOpen(articleId: article.id, title: article.title);
+    setState(() {
+      article.isRead = true;
+    });
+    _saveArticles();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ExpandedArticleCard(
+        article: article,
+        onClose: () => Navigator.pop(context),
+        onToggleSave: () {
+          _onToggleSave(article);
+        },
+      ),
+    );
+  }
+
 
   Widget _buildSettingsView() {
     return ListView(
