@@ -401,22 +401,3 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     );
   }
 }
-
-// Stub to keep compatibility - can be removed later
-class ExpandedArticleCard extends StatelessWidget {
-  final Article article;
-  final VoidCallback onClose;
-  final VoidCallback onToggleSave;
-
-  const ExpandedArticleCard({
-    required this.article,
-    required this.onClose,
-    required this.onToggleSave,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container();
-  }
-}
