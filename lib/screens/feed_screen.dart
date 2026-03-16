@@ -76,6 +76,24 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   @override
+  void didUpdateWidget(RssFeedScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload saved articles when switching to this screen (IndexedStack visibility)
+    if (oldWidget.showSavedArticles != widget.showSavedArticles || widget.showSavedArticles) {
+      _loadSavedArticlesOnly();
+    }
+  }
+
+  Future<void> _loadSavedArticlesOnly() async {
+    final savedArticles = await _storage.loadSavedArticles();
+    if (mounted) {
+      setState(() {
+        _savedArticles = savedArticles;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     // Memory leak fix: Cancel subscription explicitly
     _connectivitySubscription?.cancel();
