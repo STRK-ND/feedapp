@@ -10,7 +10,7 @@ import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../di/service_locator.dart';
 
-/// Bento Grid layout for saved articles
+/// Bento Grid layout for saved articles - Stitch Design
 /// Features different card sizes: 1x1 (standard), 2x1 (featured)
 class BentoSavedArticlesGrid extends StatefulWidget {
   final List<Article> articles;
@@ -86,9 +86,8 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
 
   Widget _buildBentoCard(int index, int span) {
     final article = widget.articles[index];
-                final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(article);
-  final sourceIcon = getIt<RssFeedService>().getSourceIconFromArticle(article);
-  final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(article);
+    final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(article);
+    final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(article);
 
     // Entrance animation with stagger
     final Animation<double> animation = CurvedAnimation(
@@ -100,17 +99,15 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
       ),
     );
 
-    // Featured (2-column) or standard (1-column)
     if (span == 2) {
-      return _buildFeaturedCard(article, sourceName, sourceIcon, sourceColor, index, animation);
+      return _buildFeaturedCard(article, sourceName, sourceColor, index, animation);
     }
-    return _buildStandardCard(article, sourceName, sourceIcon, sourceColor, index, animation);
+    return _buildStandardCard(article, sourceName, sourceColor, index, animation);
   }
 
   Widget _buildFeaturedCard(
     Article article,
     String sourceName,
-  IconData sourceIcon,
     Color sourceColor,
     int index,
     Animation<double> animation,
@@ -127,163 +124,109 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
         );
       },
       child: AspectRatio(
-        aspectRatio: 2.0, // Wide card
-        child: Dismissible(
-          key: Key('saved_${article.id}'),
-          direction: DismissDirection.endToStart,
-          onDismissed: (_) => widget.onDismiss(index),
-          background: _buildDismissBackground(),
-child: GestureDetector(
-                    onTapDown: (_) => HapticFeedback.lightImpact(),
-                    onTap: () => widget.onTap(index),
-                    onLongPress: () {
-                      HapticFeedback.mediumImpact();
-                      widget.onToggleSave(index);
-                    },
-            child: Container(
-              decoration: AppCardStyles.glassDecoration(),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Background image
-                    if (article.imageUrl != null)
-                      CachedNetworkImage(
-                        imageUrl: article.imageUrl!,
-                        fit: BoxFit.cover,
-                        cacheManager: AppCacheManager(),
-                        placeholder: (context, url) => Container(
-                          color: AppColors.background,
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: sourceColor.withValues(alpha:  0.1),
-                          child: Icon(
-                            sourceIcon,
-                            size: 48,
-                            color: sourceColor.withValues(alpha:  0.3),
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        color: sourceColor.withValues(alpha:  0.1),
-                        child: Icon(
-                          sourceIcon,
-                          size: 48,
-                          color: sourceColor.withValues(alpha:  0.3),
-                        ),
+        aspectRatio: 2.0,
+        child: GestureDetector(
+          onTapDown: (_) => HapticFeedback.lightImpact(),
+          onTap: () => widget.onTap(index),
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            widget.onToggleSave(index);
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.backgroundDark,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.1),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Background image
+                  if (article.imageUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: article.imageUrl!,
+                      fit: BoxFit.cover,
+                      cacheManager: AppCacheManager(),
+                      placeholder: (context, url) => Container(
+                        color: AppColors.background,
                       ),
-
-                    // Gradient overlay for text readability
+                      errorWidget: (context, url, error) => Container(
+                        color: sourceColor.withOpacity(0.1),
+                      ),
+                    )
+                  else
                     Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha:  0.8),
-                          ],
-                          stops: const [0.3, 1.0],
-                        ),
-                      ),
+                      color: sourceColor.withOpacity(0.1),
                     ),
 
-                    // Content
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          // Source badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha:  0.9),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  sourceIcon,
-                                  size: 12,
-                                  color: sourceColor,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  sourceName,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: sourceColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Title
-                          Text(
-                            article.title,
-                            style: GoogleFonts.playfairDisplay(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              height: 1.3,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Time
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.schedule_outlined,
-                                size: 12,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                Helpers.formatTimeAgo(article.pubDate),
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 11,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
+                  // Gradient overlay
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          AppColors.backgroundDark.withOpacity(0.9),
                         ],
+                        stops: const [0.4, 1.0],
                       ),
                     ),
+                  ),
 
-                    // Save indicator
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha:  0.9),
-                          shape: BoxShape.circle,
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            sourceName,
+                            style: GoogleFonts.lexend(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
-                        child: Icon(
-                          Icons.favorite,
-                          size: 16,
-                          color: AppColors.error,
+                        const SizedBox(height: 8),
+                        Text(
+                          article.title,
+                          style: GoogleFonts.lexend(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          Helpers.formatTimeAgo(article.pubDate),
+                          style: GoogleFonts.lexend(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -295,7 +238,6 @@ child: GestureDetector(
   Widget _buildStandardCard(
     Article article,
     String sourceName,
-  IconData sourceIcon,
     Color sourceColor,
     int index,
     Animation<double> animation,
@@ -311,177 +253,111 @@ child: GestureDetector(
           ),
         );
       },
-      child: Dismissible(
-        key: Key('saved_${article.id}'),
-        direction: DismissDirection.endToStart,
-        onDismissed: (_) => widget.onDismiss(index),
-        background: _buildDismissBackground(),
-child: GestureDetector(
-                  onTapDown: (_) => HapticFeedback.lightImpact(),
-                  onTap: () => widget.onTap(index),
-                  onLongPress: () {
-                    HapticFeedback.mediumImpact();
-                    widget.onToggleSave(index);
-                  },
-          child: Container(
-            decoration: AppCardStyles.glassDecoration(),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Image (top half)
-                  Expanded(
-                    flex: 3,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (article.imageUrl != null)
-                          CachedNetworkImage(
-                            imageUrl: article.imageUrl!,
-                            fit: BoxFit.cover,
-                            cacheManager: AppCacheManager(),
-                            placeholder: (context, url) => Container(
-                              color: AppColors.background,
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_outlined,
-                                  color: AppColors.textTertiary,
-                                ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: sourceColor.withValues(alpha:  0.1),
-                              child: Icon(
-                                sourceIcon,
-                                color: sourceColor.withValues(alpha:  0.3),
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            color: sourceColor.withValues(alpha:  0.1),
-                            child: Icon(
-                              sourceIcon,
-                              size: 32,
-                              color: sourceColor.withValues(alpha:  0.3),
-                            ),
-                          ),
+      child: GestureDetector(
+        onTapDown: (_) => HapticFeedback.lightImpact(),
+        onTap: () => widget.onTap(index),
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          widget.onToggleSave(index);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.backgroundDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.1),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background image
+                if (article.imageUrl != null)
+                  CachedNetworkImage(
+                    imageUrl: article.imageUrl!,
+                    fit: BoxFit.cover,
+                    cacheManager: AppCacheManager(),
+                    placeholder: (context, url) => Container(
+                      color: AppColors.background,
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: sourceColor.withOpacity(0.1),
+                    ),
+                  )
+                else
+                  Container(
+                    color: sourceColor.withOpacity(0.1),
+                  ),
 
-                        // Source badge overlay
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha:  0.9),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(sourceIcon, size: 10, color: sourceColor),
-                                const SizedBox(width: 4),
-                                Text(
-                                  sourceName,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: sourceColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Save indicator
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha:  0.9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.favorite,
-                              size: 12,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ),
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        AppColors.backgroundDark.withOpacity(0.95),
                       ],
+                      stops: const [0.5, 1.0],
                     ),
                   ),
+                ),
 
-                  // Content (bottom half)
-                  Expanded(
-                    flex: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            article.title,
-                            style: GoogleFonts.playfairDisplay(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          sourceName,
+                          style: GoogleFonts.lexend(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
                           ),
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.schedule_outlined,
-                                size: 10,
-                                color: AppColors.textTertiary,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                Helpers.formatTimeAgo(article.pubDate),
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 10,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Text(
+                        article.title,
+                        style: GoogleFonts.lexend(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1.3,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        Helpers.formatTimeAgo(article.pubDate),
+                        style: GoogleFonts.lexend(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDismissBackground() {
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha:  0.1),
-        borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-      ),
-      child: const Icon(
-        Icons.delete_outline_rounded,
-        color: AppColors.error,
-        size: 28,
       ),
     );
   }
@@ -492,41 +368,55 @@ child: GestureDetector(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 80,
-            height: 80,
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha:  0.1),
+              color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.bookmark_outline_rounded,
-              size: 40,
-              color: AppColors.accent,
+              size: 48,
+              color: AppColors.primary,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Text(
             'No saved articles',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 22,
+            style: GoogleFonts.lexend(
+              fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Swipe right on articles to save them for later reading',
-              style: GoogleFonts.dmSans(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
+          Text(
+            'Swipe right on articles to save them',
+            style: GoogleFonts.lexend(
+              fontSize: 14,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+// Stub to keep compatibility - can be removed later
+class ExpandedArticleCard extends StatelessWidget {
+  final Article article;
+  final VoidCallback onClose;
+  final VoidCallback onToggleSave;
+
+  const ExpandedArticleCard({
+    required this.article,
+    required this.onClose,
+    required this.onToggleSave,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container();
   }
 }

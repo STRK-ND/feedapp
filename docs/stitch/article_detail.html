@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Article Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#bf83fc",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#190f23",
+                    },
+                    fontFamily: {
+                        "display": ["Lexend", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<!-- Main Container -->
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md p-4 justify-between border-b border-primary/10">
+<div class="flex items-center gap-4">
+<button class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined" data-icon="arrow_back" data-size="24px">arrow_back</span>
+</button>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight">Article Detail</h2>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined" data-icon="bookmark" data-size="22px">bookmark</span>
+</button>
+<button class="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined" data-icon="share" data-size="22px">share</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1">
+<!-- Hero Image Section -->
+<div class="@container">
+<div class="@[480px]:px-4 @[480px]:py-4">
+<div class="w-full bg-center bg-no-repeat bg-cover flex flex-col justify-end overflow-hidden bg-primary/20 @[480px]:rounded-xl min-h-[400px] shadow-2xl relative" data-alt="Modern sustainable glass skyscraper reaching into clouds" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD-qZ5lPoqXKGfrQq5vIxxr6bQ7yduB7m_LDCFijQ4B8Fz7NE-Ot4YIXqHMNw-hhjhGL0wOK0Xz5DiBGAeHnUkxR4Qde_ae6Uf_bilPs1OurOGn_iV5BRTrUMb5uwItU6ak1F8WnXKuiDDkP0_5bqRay6HJQUYn1_-mqf4q9By3A4x31LGyU2BMqI_rqgdApAapbJJ83Ut404JVGi3_6mPrCRsXOxrFa1Zhknx1_PDePT_LGOenD5KF29_7PlPRf35F9MSOfopFmSp8");'>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark/80 via-transparent to-transparent"></div>
+</div>
+</div>
+</div>
+<!-- Article Title -->
+<div class="max-w-4xl mx-auto">
+<h1 class="text-slate-900 dark:text-slate-100 tracking-tight text-4xl md:text-5xl font-bold leading-tight px-4 pb-4 pt-8">
+                    The Future of Sustainable Architecture in Modern Metropolises
+                </h1>
+<!-- Author Info -->
+<div class="flex p-4 @container border-b border-primary/10 mb-6">
+<div class="flex w-full flex-col gap-4 @[520px]:flex-row @[520px]:justify-between @[520px]:items-center">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-14 w-14 ring-2 ring-primary/20" data-alt="Close up portrait of male architect Alex Rivers" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCDz7QRmN1f7_qXz-W4vfCJ8Cx3J-pWwmLHlc_pTVrTvBZ5Bg-3IDDnAauG355pTDx-7spQYc5rHXaUCQGXn6c1jHub-LN8-nCswPmTqDboDei9cj4wmyWsHMzDBBt14gOUynfvnJpwhYMQDgE120G03FMvEwsB6RhxWJLL1DBdNeG-NqwD0jra4-aobh3lhncyJB4hspszE155ImViXtB-mke5nhDsU2ZulTUpw5JSSRdwLqy-kdX-TdjTw3_XcqfDKa6r9LY96wT_");'></div>
+<div class="flex flex-col">
+<p class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Alex Rivers</p>
+<p class="text-slate-500 dark:text-primary/70 text-sm font-normal">Senior Design Analyst • 8 min read</p>
+</div>
+</div>
+<div class="flex items-center text-slate-500 dark:text-primary/70 text-sm font-medium italic">
+                            Published Oct 24, 2023
+                        </div>
+</div>
+</div>
+<!-- Article Body -->
+<article class="px-4 prose prose-invert max-w-none">
+<p class="text-slate-700 dark:text-slate-300 text-lg leading-relaxed mb-6 font-light">
+                        As we look toward the next decade, the integration of living ecosystems within our urban environments is no longer just a dream. Sustainable architecture is evolving from simple energy efficiency to regenerative design that actively restores the local environment. Lexend typography ensures that every word of this exploration is as clear as the vision it describes.
+                    </p>
+<p class="text-slate-700 dark:text-slate-300 text-lg leading-relaxed mb-6">
+                        The core philosophy of modern sustainability has shifted. It is no longer enough to simply "do less harm." Today's leading architects are asking how buildings can contribute positively to their surroundings—producing more energy than they consume, filtering rainwater for the neighborhood, and providing habitats for local biodiversity.
+                    </p>
+<blockquote class="border-l-4 border-primary pl-6 py-2 my-8 italic text-xl text-primary font-medium">
+                        "The building of the future is not a machine for living, but an organism that breathes with the city."
+                    </blockquote>
+<p class="text-slate-700 dark:text-slate-300 text-lg leading-relaxed mb-6">
+                        Case studies in cities like Singapore and Copenhagen reveal that high-density living can coexist with lush vertical forests. These "living skins" on skyscrapers reduce the urban heat island effect while significantly improving the mental well-being of the residents inside.
+                    </p>
+</article>
+<!-- Tags Section -->
+<div class="px-4 pt-10 pb-16">
+<h3 class="text-slate-900 dark:text-slate-100 text-sm font-bold uppercase tracking-widest mb-4">Related Topics</h3>
+<div class="flex flex-wrap gap-2">
+<span class="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 cursor-pointer transition-colors">Sustainability</span>
+<span class="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 cursor-pointer transition-colors">Urban Planning</span>
+<span class="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 cursor-pointer transition-colors">Innovation</span>
+<span class="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 cursor-pointer transition-colors">Ecology</span>
+<span class="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 cursor-pointer transition-colors">Future Cities</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Simple Bottom Navigation for Reading Progress -->
+<footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-primary/10 p-4">
+<div class="max-w-4xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined">thumb_up</span>
+<span class="text-sm font-bold">1.2k</span>
+</button>
+<button class="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span class="text-sm font-bold">48</span>
+</button>
+</div>
+<div class="w-1/2 h-1.5 bg-primary/20 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-2/3"></div>
+</div>
+</div>
+</footer>
+</div>
+</body></html>

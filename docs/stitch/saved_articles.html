@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#bf83fc",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#190f23",
+                    },
+                    fontFamily: {
+                        "display": ["Lexend"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Saved Articles</title>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
+<header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-4 pt-6 pb-2">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 rounded-full bg-slate-200 dark:bg-primary/10 text-slate-700 dark:text-primary">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-2xl font-bold tracking-tight">Saved</h1>
+</div>
+<button class="flex items-center justify-center size-10 rounded-full bg-slate-200 dark:bg-primary/10 text-slate-700 dark:text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-slate-400 dark:text-primary/60">search</span>
+</div>
+<input class="block w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-primary/5 border-none rounded-xl focus:ring-2 focus:ring-primary/50 text-sm placeholder-slate-500 dark:placeholder-primary/40" placeholder="Search saved articles..." type="text"/>
+</div>
+<div class="flex gap-2 mt-4 overflow-x-auto pb-2 no-scrollbar">
+<span class="px-4 py-1.5 bg-primary text-white text-xs font-medium rounded-full shrink-0">All</span>
+<span class="px-4 py-1.5 bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-primary text-xs font-medium rounded-full shrink-0">Technology</span>
+<span class="px-4 py-1.5 bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-primary text-xs font-medium rounded-full shrink-0">Architecture</span>
+<span class="px-4 py-1.5 bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-primary text-xs font-medium rounded-full shrink-0">Design</span>
+</div>
+</header>
+<main class="flex-1 px-4 py-2 space-y-4">
+<div class="flex items-center justify-between py-2 border-b border-slate-200 dark:border-primary/10">
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-primary/60">Recently Saved</span>
+<span class="text-xs font-medium text-primary">Sort by Date</span>
+</div>
+<div class="space-y-3">
+<div class="flex gap-4 p-3 bg-white dark:bg-primary/5 rounded-2xl hover:bg-slate-50 dark:hover:bg-primary/10 transition-colors">
+<div class="size-20 rounded-xl bg-slate-200 dark:bg-primary/20 shrink-0 overflow-hidden">
+<img alt="Wind turbines in a green field" class="w-full h-full object-cover" data-alt="Green energy wind turbines in field" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUSv-Tuh472v6Fu6q988JgO37RXouaHY8PnEwbEIZ5TtVATM4qOKZ__7Ys5VGPBbGYqkfPrQ93Wk7xo4gnEE8Apa-qvYOa1XcEb6GqIHvJV8fVJFhG1Hl4hcgxEDKgNE6VD-71lU11G8mJZyHcFQ_oMnzMm0fUdy1pZaGx6KnO9EPQpoYrVnydcyAxccsSyWKYqxlkMOztBVZDnVEtAaSFgdjPyD85LSusHCI033Z6uA8L3lsJcFhCQWfKlVJfxXgFlc7S4dj87EpD"/>
+</div>
+<div class="flex flex-col justify-between flex-1 py-0.5">
+<div>
+<h3 class="text-sm font-semibold leading-tight line-clamp-2">The Future of Renewable Energy: Scaling Solar and Wind power</h3>
+<p class="text-[10px] mt-1 text-slate-500 dark:text-primary/60 font-medium">Green Tech Monthly • 2 days ago</p>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">Tech</span>
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-white dark:bg-primary/5 rounded-2xl hover:bg-slate-50 dark:hover:bg-primary/10 transition-colors">
+<div class="size-20 rounded-xl bg-slate-200 dark:bg-primary/20 shrink-0 overflow-hidden">
+<img alt="Glass skyscraper reflecting blue sky" class="w-full h-full object-cover" data-alt="Modern architectural glass skyscraper reflecting sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6-GMX-D5Dw1R6oCwE1T5CN-eZEftR5pDCz78aTyCUdNeKorj_IGfj9bjW_CBKKkFKgQqkwP1112TppKmViSeZqpRMyvw6ZozGmHi9sPieGVfFUM2o6fE6CwyXeZ2XceKA_rbL8DPOzKRrEWIwegty3zSzNdEF5BeD5HxUui-EMW5Ywo-V_VWQFzVAjFhTdIfSnIXfMzRGvEXgbXykzqq_svfzFRkzZkXIoUYh5ZIBX0LUjCEhWniHehqEAdd1zpPlc1PNBkUH6RRG"/>
+</div>
+<div class="flex flex-col justify-between flex-1 py-0.5">
+<div>
+<h3 class="text-sm font-semibold leading-tight line-clamp-2">Modern Architecture Trends 2024: Sustainable Skyscrapers</h3>
+<p class="text-[10px] mt-1 text-slate-500 dark:text-primary/60 font-medium">Design Digest • 1 week ago</p>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">Architecture</span>
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-white dark:bg-primary/5 rounded-2xl hover:bg-slate-50 dark:hover:bg-primary/10 transition-colors">
+<div class="size-20 rounded-xl bg-slate-200 dark:bg-primary/20 shrink-0 overflow-hidden">
+<img alt="Abstract digital network circuit board" class="w-full h-full object-cover" data-alt="Abstract cyber security digital circuit board" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP6JVj9F99iYNOAJvCBE9ebO_r5AiUWr7IqD-8PXAZ38V9ITXVtSgAFwvJtAXza699kE2MY_ezSDLWck96DHMRSBlQdz0rOMTzEGcu7SgVqPoBouxK6orMwbNQfAU14Oc8kkIW_qqF_hM7VK3kl4Zj35m3I_DJM7cxmGGKz0IH3k1jdDFPOuQ1_NJy4IJK2v-G1snK9s-H1ropXCa_C9DTLy7piY6_vP3zt646xCU1IYJRy2W8u33JZjzF2AeErQnTGd_7NGSKFac0"/>
+</div>
+<div class="flex flex-col justify-between flex-1 py-0.5">
+<div>
+<h3 class="text-sm font-semibold leading-tight line-clamp-2">Cybersecurity in the Age of AI: Protecting Global Networks</h3>
+<p class="text-[10px] mt-1 text-slate-500 dark:text-primary/60 font-medium">The Tech Weekly • 2 weeks ago</p>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">Security</span>
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-white dark:bg-primary/5 rounded-2xl hover:bg-slate-50 dark:hover:bg-primary/10 transition-colors">
+<div class="size-20 rounded-xl bg-slate-200 dark:bg-primary/20 shrink-0 overflow-hidden">
+<img alt="Peaceful yoga setting in nature" class="w-full h-full object-cover" data-alt="Tranquil yoga scene with mat in garden" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSgOpRz84aRtyS4RHUUFPOHxooNEzeq6x5P14ATlGUnYDKLRsVMdueOnAyVMDCGq07OTWcxZRsxWyN6jBYvWQO2naXdQOI8uvGmSMyaRsbTI_yPM7sZ7sep4ikyPGpW6gH-BhpfwnfeZebuSwCQ7vXvLEli2ZJ4rQkGnODwIyI2EJbKSSI29ypCb6Bj96Pk5Z1KCxkyp8eO3EITUTmgPH2ohUJyy20-jeJCMlF2FnEBKTe1Nvfzes8w5QAsRZcJe0oouQoZQcr9lgG"/>
+</div>
+<div class="flex flex-col justify-between flex-1 py-0.5">
+<div>
+<h3 class="text-sm font-semibold leading-tight line-clamp-2">Mindfulness Practices for High-Stress Environments</h3>
+<p class="text-[10px] mt-1 text-slate-500 dark:text-primary/60 font-medium">Health &amp; Mind • 3 weeks ago</p>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">Health</span>
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-white dark:bg-primary/5 rounded-2xl hover:bg-slate-50 dark:hover:bg-primary/10 transition-colors opacity-80">
+<div class="size-20 rounded-xl bg-slate-200 dark:bg-primary/20 shrink-0 overflow-hidden">
+<img alt="Silver laptop on dark background" class="w-full h-full object-cover" data-alt="Modern laptop on dark minimalist background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoUaWu0k4sb9omkFrV_IAUXgwLNMGMyG1q_xClxqzDbF8giMLzzQ6p9QLKrhwLhr_I3YcAQt-Jay4whXuSd-c5OEra8SnTc5hCP8jZQWzMIwfdGUam5SXwBrcf3STeogByvO_UEQuDg6m6qwGM3FhKuwUCbLDZAEz0HhvV7GL090vR8unCA4rTg7QfI_baRfH_tqYAkKahx_38ZI4522UqttqvM2Pke6juONaKrWACwmb-Ftry7YbzJ_VZSuCP8J99Ni560bEisyjJ"/>
+</div>
+<div class="flex flex-col justify-between flex-1 py-0.5">
+<div>
+<h3 class="text-sm font-semibold leading-tight line-clamp-2">Web Development in 2024: Beyond the Frameworks</h3>
+<p class="text-[10px] mt-1 text-slate-500 dark:text-primary/60 font-medium">Code Journal • 1 month ago</p>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">Code</span>
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1">bookmark</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="sticky bottom-0 bg-background-light dark:bg-background-dark border-t border-slate-200 dark:border-primary/20 px-6 py-3">
+<nav class="flex justify-between items-center max-w-md mx-auto">
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-primary/40 hover:text-primary" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-primary/40 hover:text-primary" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-[10px] font-medium">Discover</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">bookmark</span>
+<span class="text-[10px] font-bold">Saved</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-primary/40 hover:text-primary" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-medium">Settings</span>
+</a>
+</nav>
+</footer>
+</body></html>

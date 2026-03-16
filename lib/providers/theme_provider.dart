@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/settings_service.dart';
 
 /// Theme provider for managing app theme state
@@ -66,7 +67,7 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.lexend(
           color: _lightTextPrimary,
           fontSize: 28,
           fontWeight: FontWeight.w700,
@@ -88,44 +89,44 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: TextTheme(
-        headlineLarge: TextStyle(
+        headlineLarge: GoogleFonts.lexend(
           fontSize: 48,
           fontWeight: FontWeight.w700,
           color: _lightTextPrimary,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.lexend(
           fontSize: 32,
           fontWeight: FontWeight.w600,
           color: _lightTextPrimary,
         ),
-        headlineSmall: TextStyle(
+        headlineSmall: GoogleFonts.lexend(
           fontSize: 24,
           fontWeight: FontWeight.w600,
           color: _lightTextPrimary,
         ),
-        titleLarge: TextStyle(
+        titleLarge: GoogleFonts.lexend(
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: _lightTextPrimary,
         ),
-        titleMedium: TextStyle(
+        titleMedium: GoogleFonts.lexend(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: _lightTextPrimary,
         ),
-        bodyLarge: TextStyle(
+        bodyLarge: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: _lightTextPrimary,
           height: 1.6,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.lexend(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: _lightTextSecondary,
           height: 1.5,
         ),
-        labelLarge: TextStyle(
+        labelLarge: GoogleFonts.lexend(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: _lightTextPrimary,
@@ -145,7 +146,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: _lightSurface,
-        contentTextStyle: TextStyle(color: _lightTextPrimary),
+        contentTextStyle: GoogleFonts.lexend(color: _lightTextPrimary),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -196,7 +197,7 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.lexend(
           color: _darkTextPrimary,
           fontSize: 28,
           fontWeight: FontWeight.w700,
@@ -218,44 +219,44 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: TextTheme(
-        headlineLarge: TextStyle(
+        headlineLarge: GoogleFonts.lexend(
           fontSize: 48,
           fontWeight: FontWeight.w700,
           color: _darkTextPrimary,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.lexend(
           fontSize: 32,
           fontWeight: FontWeight.w600,
           color: _darkTextPrimary,
         ),
-        headlineSmall: TextStyle(
+        headlineSmall: GoogleFonts.lexend(
           fontSize: 24,
           fontWeight: FontWeight.w600,
           color: _darkTextPrimary,
         ),
-        titleLarge: TextStyle(
+        titleLarge: GoogleFonts.lexend(
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: _darkTextPrimary,
         ),
-        titleMedium: TextStyle(
+        titleMedium: GoogleFonts.lexend(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: _darkTextPrimary,
         ),
-        bodyLarge: TextStyle(
+        bodyLarge: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: _darkTextPrimary,
           height: 1.6,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.lexend(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: _darkTextSecondary,
           height: 1.5,
         ),
-        labelLarge: TextStyle(
+        labelLarge: GoogleFonts.lexend(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: _darkTextPrimary,
@@ -275,7 +276,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: _darkSurface,
-        contentTextStyle: TextStyle(color: _darkTextPrimary),
+        contentTextStyle: GoogleFonts.lexend(color: _darkTextPrimary),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
