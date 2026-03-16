@@ -240,6 +240,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     }
 
     setState(() {
+      // Create new list to trigger rebuild
+      _savedArticles = List.from(_savedArticles);
       _articles[articleIndex].isSaved = true;
 
       if (!_savedArticles.any((a) => a.id == article.id)) {
@@ -286,10 +288,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
       if (article.isSaved) {
         if (!_savedArticles.any((a) => a.id == article.id)) {
-          _savedArticles.insert(0, article);
+          _savedArticles = [article, ..._savedArticles];
         }
       } else {
-        _savedArticles.removeWhere((a) => a.id == article.id);
+        _savedArticles = _savedArticles.where((a) => a.id != article.id).toList();
       }
     });
 
@@ -703,9 +705,20 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       articles: _savedArticles,
       onTap: (index) => _onTapSavedArticle(index),
       onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
-      onDismiss: (index) => _onToggleSave(_savedArticles[index]),
+      onDismiss: (index) => _removeSavedArticle(index),
       isEmpty: _savedArticles.isEmpty,
     );
+  }
+
+  void _removeSavedArticle(int index) {
+    if (index >= _savedArticles.length) return;
+    final article = _savedArticles[index];
+    setState(() {
+      article.isSaved = false;
+      _savedArticles = _savedArticles.where((a) => a.id != article.id).toList();
+    });
+    _saveArticles();
+    _showSnackBar('Article removed from saved', AppColors.textSecondary);
   }
 
   void _onTapSavedArticle(int index) {
