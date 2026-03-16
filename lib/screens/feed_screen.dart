@@ -78,8 +78,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   @override
   void didUpdateWidget(RssFeedScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload saved articles when switching to this screen (IndexedStack visibility)
-    if (oldWidget.showSavedArticles != widget.showSavedArticles || widget.showSavedArticles) {
+    // Only reload if transitioning TO saved view (was not saved view before)
+    if (!oldWidget.showSavedArticles && widget.showSavedArticles) {
       _loadSavedArticlesOnly();
     }
   }
