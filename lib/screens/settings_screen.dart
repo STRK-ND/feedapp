@@ -106,6 +106,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     if (_isLoading) {
       return const Scaffold(
@@ -114,16 +116,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           'Settings',
           style: GoogleFonts.lexend(
             fontSize: 24,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: colorScheme.onSurface,
           ),
         ),
         centerTitle: false,
@@ -264,7 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: GoogleFonts.lexend(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
+          color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(153),
           letterSpacing: 1.5,
         ),
       ),
@@ -272,12 +274,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSettingsCard(List<Widget> children) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.primary5,
+        color: colorScheme.surfaceContainerHighest?.withAlpha(26) ?? colorScheme.surface.withAlpha(26),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+        border: Border.all(color: colorScheme.primary.withAlpha(26)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -288,13 +291,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   List<Widget> _divideTiles(List<Widget> tiles) {
     final result = <Widget>[];
+    final colorScheme = Theme.of(context).colorScheme;
     for (var i = 0; i < tiles.length; i++) {
       result.add(tiles[i]);
       if (i < tiles.length - 1) {
         result.add(Divider(
           height: 1,
           indent: 72,
-          color: AppColors.primary.withOpacity(0.1),
+          color: colorScheme.primary.withAlpha(26),
         ));
       }
     }
@@ -302,10 +306,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDivider() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Divider(
       height: 1,
       indent: 72,
-      color: AppColors.primary.withOpacity(0.1),
+      color: colorScheme.primary.withAlpha(26),
     );
   }
 
@@ -317,35 +322,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required ValueChanged<bool> onChanged,
     bool indented = false,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary10,
+          color: colorScheme.primary.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: AppColors.primary),
+        child: Icon(icon, size: 20, color: colorScheme.primary),
       ),
       title: Text(
         title,
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: GoogleFonts.lexend(
           fontSize: 12,
-          color: AppColors.textSecondary,
+          color: textTheme.bodyMedium?.color,
         ),
       ),
       trailing: Switch(
         value: value,
-        activeColor: AppColors.primary,
+        activeColor: colorScheme.primary,
         onChanged: (newValue) {
           HapticFeedback.selectionClick();
           onChanged(newValue);
@@ -359,30 +366,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String value,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary10,
+          color: colorScheme.primary.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: AppColors.primary),
+        child: Icon(icon, size: 20, color: colorScheme.primary),
       ),
       title: Text(
         title,
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       trailing: Text(
         value,
         style: GoogleFonts.lexend(
           fontSize: 14,
-          color: AppColors.primary,
+          color: colorScheme.primary,
         ),
       ),
     );
@@ -395,6 +404,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       onTap: onTap,
@@ -402,47 +413,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.primary).withOpacity(0.15),
+          color: (iconColor ?? colorScheme.primary).withAlpha(38),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: iconColor ?? AppColors.primary),
+        child: Icon(icon, size: 20, color: iconColor ?? colorScheme.primary),
       ),
       title: Text(
         title,
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: GoogleFonts.lexend(
           fontSize: 12,
-          color: AppColors.textSecondary,
+          color: textTheme.bodyMedium?.color,
         ),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: AppColors.textSecondary,
+        color: textTheme.bodyMedium?.color?.withAlpha(153),
       ),
     );
   }
 
   Widget _buildThemeSelector() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary10,
+          color: colorScheme.primary.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           _getThemeIcon(_themeMode),
           size: 20,
-          color: AppColors.primary,
+          color: colorScheme.primary,
         ),
       ),
       title: Text(
@@ -450,27 +463,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       trailing: DropdownButton<ThemeMode>(
         value: _themeMode,
-        dropdownColor: AppColors.background,
+        dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
         borderRadius: BorderRadius.circular(12),
-        icon: Icon(Icons.expand_more, color: AppColors.primary),
+        icon: Icon(Icons.expand_more, color: colorScheme.primary),
         items: [
           DropdownMenuItem(
             value: ThemeMode.system,
-            child: Text('System', style: GoogleFonts.lexend(color: Colors.white)),
+            child: Text('System', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
           ),
           DropdownMenuItem(
             value: ThemeMode.light,
-            child: Text('Light', style: GoogleFonts.lexend(color: Colors.white)),
+            child: Text('Light', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
           ),
           DropdownMenuItem(
             value: ThemeMode.dark,
-            child: Text('Dark', style: GoogleFonts.lexend(color: Colors.white)),
+            child: Text('Dark', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
           ),
         ],
         onChanged: (mode) {
@@ -481,36 +494,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildIntervalSelector() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary10,
+          color: colorScheme.primary.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(Icons.timer_outlined, size: 20, color: AppColors.primary),
+        child: Icon(Icons.timer_outlined, size: 20, color: colorScheme.primary),
       ),
       title: Text(
         'Refresh Interval',
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       trailing: DropdownButton<int>(
         value: _refreshInterval,
-        dropdownColor: AppColors.background,
+        dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: AppColors.primary),
+        icon: Icon(Icons.expand_more, color: colorScheme.primary),
         items: [15, 30, 60, 120].map((interval) {
           return DropdownMenuItem(
             value: interval,
             child: Text(
               '$interval min',
-              style: GoogleFonts.lexend(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface, fontSize: 14),
             ),
           );
         }).toList(),
@@ -525,36 +540,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildMaxArticlesSelector() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary10,
+          color: colorScheme.primary.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(Icons.format_list_numbered, size: 20, color: AppColors.primary),
+        child: Icon(Icons.format_list_numbered, size: 20, color: colorScheme.primary),
       ),
       title: Text(
         'Max Articles',
         style: GoogleFonts.lexend(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
       trailing: DropdownButton<int>(
         value: _maxArticles,
-        dropdownColor: AppColors.background,
+        dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: AppColors.primary),
+        icon: Icon(Icons.expand_more, color: colorScheme.primary),
         items: [100, 250, 500, 1000, 2000].map((max) {
           return DropdownMenuItem(
             value: max,
             child: Text(
               '$max',
-              style: GoogleFonts.lexend(color: Colors.white, fontSize: 14),
+              style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface, fontSize: 14),
             ),
           );
         }).toList(),
