@@ -20,87 +20,114 @@ const RSS_SOURCES = [
 const CACHE_TTL = 15 * 60;
 
 function cleanHtmlEntities(text) {
-  if (!text) return '';
-  text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
-  text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-  const ents = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&mdash;': '-', '&ndash;': '-', '&hellip;': '...', '&copy;': '(c)', '&reg;': '(R)', '&trade;': '(TM)', '&lsquo;': "'", '&rsquo;': "'", '&ldquo;': '"', '&rdquo;': '"', '&bull;': '-', '&middot;': '-', '&deg;': ' deg ' };
-  for (const [e, c] of Object.entries(ents)) text = text.replace(new RegExp(e, 'g'), c);
-  return text;
+ if (!text) return '';
+ text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+ text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+ const ents = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&mdash;': '-', '&ndash;': '-', '&hellip;': '...', '&copy;': '(c)', '&reg;': '(R)', '&trade;': '(TM)', '&lsquo;': "'", '&rsquo;': "'", '&ldquo;': '"', '&rdquo;': '"', '&bull;': '-', '&middot;': '-', '&deg;': ' deg ' };
+ for (const [e, c] of Object.entries(ents)) text = text.replace(new RegExp(e, 'g'), c);
+ return text;
 }
 
 function stripHtmlTags(text) {
-  if (!text) return '';
-  text = cleanHtmlEntities(text);
-  text = text.replace(/<[^>]*>/g, '');
-  return cleanHtmlEntities(text).replace(/\s+/g, ' ').trim();
+ if (!text) return '';
+ text = cleanHtmlEntities(text);
+ text = text.replace(/<[^>]*>/g, '');
+ return cleanHtmlEntities(text).replace(/\s+/g, ' ').trim();
 }
 
 function cleanContent(text) {
-  if (!text) return '';
-  let c = stripHtmlTags(text);
-  c = c.replace(/\[\+\]/g, '').replace(/\[more\]/gi, '').replace(/\[read more\]/gi, '').replace(/\s*\.\.\.\s*$/g, '');
-  return c.replace(/\s{2,}/g, ' ').trim();
+ if (!text) return '';
+ let c = stripHtmlTags(text);
+ c = c.replace(/\[\+\]/g, '').replace(/\[more\]/gi, '').replace(/\[read more\]/gi, '').replace(/\s*\.\.\.\s*$/g, '');
+ return c.replace(/\s{2,}/g, ' ').trim();
 }
 
 function getXmlText(xml, tag) {
-  let m = xml.match(new RegExp('<' + tag + '[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></' + tag + '>', 'i'));
-  if (m) return m[1].trim();
-  m = xml.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i'));
-  return m ? m[1].trim() : '';
+ let m = xml.match(new RegExp('<' + tag + '[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></' + tag + '>', 'i'));
+ if (m) return m[1].trim();
+ m = xml.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i'));
+ return m ? m[1].trim() : '';
 }
 
 function parseRssXml(xmlText, source) {
-  const articles = [];
-  try {
-    const items = xmlText.match(/<item[\s\S]*?<\/item>/gi) || [];
-    for (let i = 0; i < Math.min(items.length, 20); i++) {
-      const item = items[i];
-      const title = cleanContent(getXmlText(item, 'title'));
-      const link = getXmlText(item, 'link');
-      if (!title || !link) continue;
-      const desc = cleanContent(getXmlText(item, 'description'));
-      const full = cleanContent(getXmlText(item, 'content:encoded')) || desc;
-      let pub = new Date().toISOString();
-      try { const d = new Date(getXmlText(item, 'pubDate')); if (!isNaN(d.getTime())) pub = d.toISOString(); } catch(e) {}
-      const auth = getXmlText(item, 'author') || getXmlText(item, 'dc:creator') || null;
-      let img = null;
-      let em = item.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image\/"[^>]*\/?>/i);
-      if (!em) em = item.match(/<media:content[^>]+url="([^"]+)"[^>]*\/?>/i);
-      if (em) img = em[1];
-      articles.push({ id: hashCode(link), title, description: desc, fullContent: full, link, sourceId: source.id, sourceName: source.name, sourceCategory: source.category, sourceColor: source.color, sourceIcon: source.icon, pubDate: pub, author: auth || null, imageUrl: img });
-    }
-  } catch(e) { console.log('Parse error: ' + e.message); }
-  return articles;
+ const articles = [];
+ try {
+ const items = xmlText.match(/<item[\s\S]*?<\/item>/gi) || [];
+ for (let i = 0; i < Math.min(items.length, 20); i++) {
+ const item = items[i];
+ const title = cleanContent(getXmlText(item, 'title'));
+ const link = getXmlText(item, 'link');
+ if (!title || !link) continue;
+ const desc = cleanContent(getXmlText(item, 'description'));
+ const full = cleanContent(getXmlText(item, 'content:encoded')) || desc;
+ let pub = new Date().toISOString();
+ try { const d = new Date(getXmlText(item, 'pubDate')); if (!isNaN(d.getTime())) pub = d.toISOString(); } catch(e) {}
+ const auth = getXmlText(item, 'author') || getXmlText(item, 'dc:creator') || null;
+ let img = null;
+ let em = item.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image\/"[^>]*\/?>/i);
+ if (!em) em = item.match(/<media:content[^>]+url="([^"]+)"[^>]*\/?>/i);
+ if (em) img = em[1];
+ articles.push({ id: hashCode(link), title, description: desc, fullContent: full, link, sourceId: source.id, sourceName: source.name, sourceCategory: source.category, sourceColor: source.color, sourceIcon: source.icon, pubDate: pub, author: auth || null, imageUrl: img });
+ }
+ } catch(e) { console.log('Parse error: ' + e.message); }
+ return articles;
 }
 
 function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h &= h; } return Math.abs(h); }
 
 async function fetchSource(s) {
-  try {
-    const r = await fetch(s.url, { headers: { 'User-Agent': 'CuratedFeeds/1.0', 'Accept': 'application/rss+xml' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return parseRssXml(await r.text(), s);
-  } catch(e) { console.log('Error ' + s.name + ': ' + e.message); return []; }
+ try {
+ const r = await fetch(s.url, { headers: { 'User-Agent': 'CuratedFeeds/1.0', 'Accept': 'application/rss+xml' } });
+ if (!r.ok) throw new Error('HTTP ' + r.status);
+ return parseRssXml(await r.text(), s);
+ } catch(e) { console.log('Error ' + s.name + ': ' + e.message); return []; }
+}
+
+function parseIntOrDefault(value, defaultValue) {
+ if (!value) return defaultValue;
+ const parsed = parseInt(value, 10);
+ return isNaN(parsed) ? defaultValue : parsed;
+}
+
+function paginateItems(items, page, pageSize) {
+ const start = (page - 1) * pageSize;
+ const end = start + pageSize;
+ const paginatedItems = items.slice(start, end);
+ return {
+ items: paginatedItems,
+ total: items.length,
+ page: page,
+ pageSize: pageSize,
+ hasMore: end < items.length
+ };
 }
 
 async function handleFetch(req) {
-  const cache = caches.default;
-  const key = new URL(req.url).href;
-  try { const c = await cache.match(key); if (c) return c; } catch(e) {}
-  const res = await Promise.allSettled(RSS_SOURCES.map(s => fetchSource(s)));
-  const all = [];
-  for (const x of res) if (x.status === 'fulfilled') all.push(...x.value);
-  all.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  const resp = new Response(JSON.stringify(all), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=' + CACHE_TTL } });
-  try { await cache.put(key, resp.clone()); } catch(e) {}
-  return resp;
+ const cache = caches.default;
+ const url = new URL(req.url);
+ const key = url.href;
+
+ const page = parseIntOrDefault(url.searchParams.get('page'), 1);
+ const pageSize = Math.min(parseIntOrDefault(url.searchParams.get('pageSize'), 50), 100);
+
+ try { const c = await cache.match(key); if (c) return c; } catch(e) {}
+ const res = await Promise.allSettled(RSS_SOURCES.map(s => fetchSource(s)));
+ const all = [];
+ for (const x of res) if (x.status === 'fulfilled') all.push(...x.value);
+ all.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+ const paginated = paginateItems(all, page, pageSize);
+
+ const resp = new Response(JSON.stringify(paginated), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=' + CACHE_TTL } });
+ try { await cache.put(key, resp.clone()); } catch(e) {}
+ return resp;
 }
 
 export default {
-  async fetch(req) {
-    if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' } });
-    if (req.url.includes('/health')) return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
-    if (req.url.includes('/test')) return new Response(JSON.stringify([{ id: '1', title: 'Test', description: 'Test', sourceId: 'techcrunch', sourceName: 'TechCrunch', pubDate: new Date().toISOString() }]), { headers: { 'Content-Type': 'application/json' } });
-    return req.method === 'GET' ? handleFetch(req) : new Response('Method not allowed', { status: 405 });
-  },
+ async fetch(req) {
+ if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' } });
+ if (req.url.includes('/health')) return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
+ if (req.url.includes('/test')) return new Response(JSON.stringify([{ id: '1', title: 'Test', description: 'Test', sourceId: 'techcrunch', sourceName: 'TechCrunch', pubDate: new Date().toISOString() }]), { headers: { 'Content-Type': 'application/json' } });
+ return req.method === 'GET' ? handleFetch(req) : new Response('Method not allowed', { status: 405 });
+ },
 };
