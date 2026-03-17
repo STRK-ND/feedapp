@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/article.dart';
+import '../models/paginated_response.dart';
+import '../models/filter_params.dart';
 import '../utils/constants.dart';
 import '../utils/error_handler.dart';
 
@@ -13,13 +15,16 @@ class WorkerFeedService {
   WorkerFeedService({http.Client? httpClient})
       : _httpClient = httpClient ?? http.Client();
 
-  /// Fetch articles from the Worker API
-  Future<List<Article>> fetchArticles() async {
-    debugPrint('[Worker] Fetching articles from ${AppConfig.workerApiUrl}');
+  /// Fetch articles with pagination and filtering
+  Future<PaginatedResponse> fetchArticles({FilterParams? params}) async {
+    final filterParams = params ?? const FilterParams.defaults();
+    final url = filterParams.buildUrl(AppConfig.workerApiUrl);
+
+    debugPrint('[Worker] Fetching articles from $url');
 
     try {
       final response = await _httpClient
-          .get(Uri.parse(AppConfig.workerApiUrl))
+          .get(Uri.parse(url))
           .timeout(
             Duration(seconds: AppConfig.workerTimeoutSeconds),
             onTimeout: () {
@@ -32,10 +37,10 @@ class WorkerFeedService {
           );
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = json.decode(response.body);
-        final articles = jsonList.map((json) => _parseArticle(json)).toList();
-        debugPrint('[Worker] Fetched ${articles.length} articles');
-        return articles;
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final paginatedResponse = PaginatedResponse.fromJson(json);
+        debugPrint('[Worker] Fetched ${paginatedResponse.items.length} articles (total: ${paginatedResponse.total})');
+        return paginatedResponse;
       } else {
         ErrorHandler.logError(
           'Worker API returned ${response.statusCode}',
@@ -58,6 +63,12 @@ class WorkerFeedService {
       );
       rethrow;
     }
+  }
+
+  /// Fetch all articles as a list (backwards compatible)
+  Future<List<Article>> fetchArticlesList() async {
+    final response = await fetchArticles();
+    return response.items;
   }
 
   /// Parse a single article from Worker JSON response
@@ -109,6 +120,78 @@ class WorkerFeedService {
     } catch (e) {
       debugPrint('[Worker] Connection test failed: $e');
       return false;
+    }
+  }
+
+  /// Fetch available sources from Worker
+  Future<List<Map<String, dynamic>>> fetchSources() async {
+    final sourcesUrl = '${AppConfig.workerApiUrl}sources';
+    debugPrint('[Worker] Fetching sources from $sourcesUrl');
+
+    try {
+      final response = await _httpClient
+          .get(Uri.parse(sourcesUrl))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Sources request timeout');
+            },
+          );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final sources = (json['sources'] as List<dynamic>)
+            .map((s) => s as Map<String, dynamic>)
+            .toList();
+        debugPrint('[Worker] Fetched ${sources.length} sources');
+        return sources;
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      ErrorHandler.logError(
+        'Failed to fetch sources',
+        error: e,
+        severity: ErrorSeverity.medium,
+      );
+      rethrow;
+    }
+  }
+
+  /// Fetch full content for an article
+  Future<Map<String, dynamic>?> fetchFullContent(String articleUrl) async {
+    final encodedUrl = Uri.encodeComponent(articleUrl);
+    final contentUrl = '${AppConfig.workerApiUrl}full-content?url=$encodedUrl';
+
+    debugPrint('[Worker] Fetching full content');
+
+    try {
+      final response = await _httpClient
+          .get(Uri.parse(contentUrl))
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw Exception('Full content request timeout');
+            },
+          );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('[Worker] Fetched full content (${json['wordCount']} words)');
+        return json;
+      } else if (response.statusCode == 400) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(json['error'] ?? 'Invalid request');
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      ErrorHandler.logError(
+        'Failed to fetch full content',
+        error: e,
+        severity: ErrorSeverity.medium,
+      );
+      return null;
     }
   }
 }
