@@ -473,7 +473,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         Semantics(
                           button: true,
                           label: 'Retry loading feeds',
-                          child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+                          child: Icon(Icons.refresh_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface, size: 18),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -937,18 +937,24 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: [0.0, 0.6, 1.0],
-          colors: [
-            Color(0xFF1A1B4D),
-            Color(0xFF2D2F73),
-            Color(0xFF4A3B5C),
-          ],
-        ),
+      decoration: BoxDecoration(
+        color: isDark ? null : colorScheme.surface,
+        gradient: isDark
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                stops: [0.0, 0.6, 1.0],
+                colors: [
+                  Color(0xFF1A1B4D),
+                  Color(0xFF2D2F73),
+                  Color(0xFF4A3B5C),
+                ],
+              )
+            : null,
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
