@@ -277,7 +277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest?.withAlpha(26) ?? colorScheme.surface.withAlpha(26),
+        color: colorScheme.surfaceContainerHighest?.withAlpha(77) ?? colorScheme.surface.withAlpha(77),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.primary.withAlpha(26)),
       ),
@@ -297,7 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         result.add(Divider(
           height: 1,
           indent: 72,
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
         ));
       }
     }
@@ -329,10 +329,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: colorScheme.primary),
+        child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         title,
@@ -373,10 +373,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: colorScheme.primary),
+        child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         title,
@@ -412,10 +412,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: (iconColor ?? colorScheme.primary).withAlpha(38),
+          color: iconColor != null ? iconColor.withAlpha(38) : colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: iconColor ?? colorScheme.primary),
+        child: Icon(icon, size: 20, color: iconColor ?? colorScheme.onPrimaryContainer),
       ),
       title: Text(
         title,
@@ -448,13 +448,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           _getThemeIcon(_themeMode),
           size: 20,
-          color: colorScheme.primary,
+          color: colorScheme.onPrimaryContainer,
         ),
       ),
       title: Text(
@@ -501,10 +501,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(Icons.timer_outlined, size: 20, color: colorScheme.primary),
+        child: Icon(Icons.timer_outlined, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         'Refresh Interval',
@@ -547,10 +547,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withAlpha(26),
+          color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(Icons.format_list_numbered, size: 20, color: colorScheme.primary),
+        child: Icon(Icons.format_list_numbered, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         'Max Articles',
