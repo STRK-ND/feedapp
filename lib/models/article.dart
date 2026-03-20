@@ -58,18 +58,32 @@ class Article {
     };
   }
 
+  /// Parse pubDate from various formats (int timestamp or DateTime)
+  static DateTime _parsePubDate(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+    }
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
   factory Article.fromJson(Map<String, dynamic> json) {
+    // Handle id as either int or string (Worker API returns int, local storage uses string)
+    final dynamic rawId = json['id'];
+    final String id = rawId is int ? rawId.toString() : (rawId as String? ?? '');
+
     return Article(
-      id: json['id'] as String? ?? '',
+      id: id,
       title: json['title'] as String? ?? 'Untitled',
       description: json['description'] as String? ?? '',
       fullContent: json['fullContent'] as String? ?? '',
       link: json['link'] as String? ?? '',
       sourceId: json['sourceId'] as String? ?? '',
       sourceName: json['sourceName'] as String? ?? 'Unknown Source',
-      pubDate: json['pubDate'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['pubDate'] as int, isUtc: true)
-          : DateTime.now(),
+      pubDate: _parsePubDate(json['pubDate']),
       author: json['author'] as String?,
       imageUrl: json['imageUrl'] as String?,
       sourceCategory: json['sourceCategory'] as String?,
