@@ -1,4 +1,5 @@
 import '../models/article.dart';
+import '../models/filter_params.dart';
 import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
 import '../repositories/feed_repository.dart';
@@ -61,16 +62,33 @@ class ArticleRepository {
   }
 
   /// Fetch new articles from Worker API and merge with existing
+  /// Now fetches all pages from the paginated API
   Future<Result<List<Article>>> fetchNewArticles() async {
     try {
       ErrorHandlerExtensions.logInfo('Fetching new articles from Worker API');
 
-      // Fetch from Worker API using injected service
-      final newArticles = await _workerFeedService.fetchArticles();
+      // Fetch all pages
+      final allArticles = <Article>[];
+      int page = 1;
+      bool hasMore = true;
 
-      if (newArticles.isEmpty) {
+      while (hasMore && page <= 5) {  // Limit to 5 pages (250 articles max)
+        final response = await _workerFeedService.fetchArticles(
+          params: FilterParams(page: page, pageSize: 50),
+        );
+
+        allArticles.addAll(response.items);
+        hasMore = response.hasMore;
+        page++;
+
+        if (response.items.isEmpty) break;
+      }
+
+      if (allArticles.isEmpty) {
         return Result.success([]);
       }
+
+      final newArticles = allArticles;
 
       // Get existing articles
       final existingResult = await fetchAllArticles();
@@ -368,6 +386,63 @@ final allResult = await fetchAllArticles();
     } catch (e, stackTrace) {
       ErrorHandler.logError(
         'Failed to get unread count',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return Result.failure(ErrorHandler.getUserMessage(e));
+    }
+  }
+
+  /// Fetch articles with specific filter parameters
+  Future<Result<List<Article>>> fetchArticlesWithFilters(FilterParams params) async {
+    try {
+      ErrorHandlerExtensions.logInfo('Fetching articles with filters');
+
+      final response = await _workerFeedService.fetchArticles(params: params);
+
+      return Result.success(response.items);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+        'Failed to fetch articles with filters',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return Result.failure(ErrorHandler.getUserMessage(e));
+    }
+  }
+
+  /// Fetch available sources from Worker
+  Future<Result<List<Map<String, dynamic>>>> fetchAvailableSources() async {
+    try {
+      ErrorHandlerExtensions.logInfo('Fetching available sources');
+
+      final sources = await _workerFeedService.fetchSources();
+      return Result.success(sources);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+        'Failed to fetch sources',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return Result.failure(ErrorHandler.getUserMessage(e));
+    }
+  }
+
+  /// Fetch full article content
+  Future<Result<Map<String, dynamic>?>> fetchArticleFullContent(String articleUrl) async {
+    try {
+      ErrorHandlerExtensions.logInfo('Fetching full content for article');
+
+      final content = await _workerFeedService.fetchFullContent(articleUrl);
+
+      if (content == null) {
+        return Result.failure('Failed to fetch full content');
+      }
+
+      return Result.success(content);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+        'Failed to fetch full content',
         error: e,
         stackTrace: stackTrace,
       );
