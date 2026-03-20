@@ -21,7 +21,6 @@ class StitchActionButtons extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Skip button
           _ActionButton(
             icon: Icons.close,
             label: 'Skip',
@@ -30,9 +29,7 @@ class StitchActionButtons extends StatelessWidget {
             onTap: onSkip,
             size: 56,
           ),
-          // Save button (larger with glow)
           _SaveButton(onTap: onSave),
-          // Share button
           _ActionButton(
             icon: Icons.share_outlined,
             label: 'Share',

@@ -15,26 +15,14 @@ import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
 
 Future<void> main() async {
-  // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase
   await Firebase.initializeApp();
-
-  // Initialize services
   await setupServiceLocator();
-
-  // Initialize notification service
   await NotificationService().initialize();
-
-  // Initialize FeedProvider (prevents frame drops)
   final articleRepository = getIt<ArticleRepository>();
   final feedProvider = FeedProvider(articleRepository: articleRepository);
   await feedProvider.init();
-
-  // Log app open event
   await AnalyticsService.logAppOpen();
-
   runApp(CuratedFeedsApp(feedProvider: feedProvider));
 }
 
@@ -47,12 +35,9 @@ class CuratedFeedsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Provide settings service
         Provider<SettingsService>(
           create: (_) => SettingsService(),
         ),
-
-        // Provide theme provider
         ChangeNotifierProvider<ThemeProvider>(
           create: (context) {
             final provider = ThemeProvider(SettingsService());
@@ -60,8 +45,6 @@ class CuratedFeedsApp extends StatelessWidget {
             return provider;
           },
         ),
-
-        // Provide feed provider (already initialized)
         ChangeNotifierProvider<FeedProvider>.value(
           value: feedProvider,
         ),
@@ -82,7 +65,7 @@ class CuratedFeedsApp extends StatelessWidget {
   }
 }
 
-/// Main navigation with bottom tabs
+/// Main navigation with Stitch-style bottom tabs
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -108,56 +91,44 @@ class _MainNavigationState extends State<MainNavigation> {
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF12122A).withValues(alpha: 0.95)
-                : Colors.white.withValues(alpha: 0.95),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? AppColors.primary.withValues(alpha: 0.3)
-                    : Colors.black.withValues(alpha: 0.08),
-                blurRadius: 30,
-                offset: const Offset(0, -8),
-                spreadRadius: -2,
-              ),
-            ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.backgroundDark,
+          border: Border(
+            top: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              width: 1,
+            ),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(
-                    index: 0,
-                    icon: Icons.article_outlined,
-                    selectedIcon: Icons.article,
-                    label: 'Feed',
-                    isDark: isDark,
-                  ),
-                  _buildNavItem(
-                    index: 1,
-                    icon: Icons.bookmark_outline_rounded,
-                    selectedIcon: Icons.bookmark_rounded,
-                    label: 'Saved',
-                    isDark: isDark,
-                  ),
-                  _buildNavItem(
-                    index: 2,
-                    icon: Icons.settings_outlined,
-                    selectedIcon: Icons.settings,
-                    label: 'Settings',
-                    isDark: isDark,
-                  ),
-                ],
-              ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  icon: Icons.article_outlined,
+                  selectedIcon: Icons.article,
+                  label: 'Feed',
+                  isDark: isDark,
+                ),
+                _buildNavItem(
+                  index: 1,
+                  icon: Icons.bookmark_outline_rounded,
+                  selectedIcon: Icons.bookmark_rounded,
+                  label: 'Saved',
+                  isDark: isDark,
+                ),
+                _buildNavItem(
+                  index: 2,
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings,
+                  label: 'Settings',
+                  isDark: isDark,
+                ),
+              ],
             ),
           ),
         ),
@@ -173,8 +144,8 @@ class _MainNavigationState extends State<MainNavigation> {
     required bool isDark,
   }) {
     final isSelected = _selectedIndex == index;
-    final selectedColor = AppColors.primary; // Stitch purple for both themes
-    final unselectedColor = isDark ? Colors.white38 : AppColors.textTertiary;
+    final selectedColor = AppColors.primary;
+    final unselectedColor = AppColors.textSecondary;
     final color = isSelected ? selectedColor : unselectedColor;
 
     return GestureDetector(
@@ -185,59 +156,34 @@ class _MainNavigationState extends State<MainNavigation> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? selectedColor.withValues(alpha: 0.15)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: isSelected
-              ? Border.all(color: selectedColor.withValues(alpha: 0.3), width: 1.5)
-              : null,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedScale(
-              scale: isSelected ? 1.15 : 1.0,
+              scale: isSelected ? 1.1 : 1.0,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOutBack,
               child: Icon(
                 isSelected ? selectedIcon : icon,
                 color: color,
-                size: 26,
+                size: 24,
               ),
-            ),
-            const SizedBox(height: 6),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 250),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
-                letterSpacing: 0.3,
-              ),
-              child: Text(label),
             ),
             const SizedBox(height: 4),
-            // Animated pill indicator
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              width: isSelected ? 20 : 0,
-              height: 3,
-              decoration: BoxDecoration(
-                color: selectedColor,
-                borderRadius: BorderRadius.circular(2),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: selectedColor.withValues(alpha: 0.5),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -247,7 +193,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-/// Saved articles screen - shows saved/b bookmarked articles
+/// Saved articles screen
 class SavedArticlesScreen extends StatelessWidget {
   const SavedArticlesScreen({super.key});
 
