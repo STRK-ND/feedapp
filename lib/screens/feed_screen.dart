@@ -1020,12 +1020,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   child: IconButton(
                     onPressed: _isLoading ? null : _refreshFeeds,
                     icon: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
                             ),
                           )
                         : Icon(Icons.refresh_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
@@ -1361,126 +1361,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               )
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: _buildBottomAppBar(),
-              ),
-    );
-  }
 
-  Widget _buildBottomAppBar() {
-    return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:  0.15),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.rss_feed_rounded,
-                  label: 'Feeds',
-                  index: 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.bookmark_rounded,
-                  label: 'Saved',
-                  index: 1,
-                ),
-                _buildNavItem(
-                  icon: Icons.settings_rounded,
-                  label: 'Settings',
-                  index: 2,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isSelected = _selectedTab == index;
-    return Expanded(
-      child: Semantics(
-        button: true,
-        label: label,
-        selected: isSelected,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _selectedTab = index;
-              if (index == 1) {
-                _displayedArticles = List.from(_savedArticles);
-              } else if (index == 0) {
-                _displayedArticles = _getFilteredArticles();
-              }
-              // Settings tab (index 2) doesn't need displayed articles
-            });
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary.withValues(alpha:  0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: SizedBox(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          icon,
-                          color: isSelected ? AppColors.primary : AppColors.textTertiary,
-                          size: 22,
-                        ),
-                        if (isSelected) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              label,
-                              style: GoogleFonts.dmSans(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                letterSpacing: 0.1,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

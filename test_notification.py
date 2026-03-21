@@ -14,6 +14,7 @@ you need a service account token which is more complex.
 
 import requests
 import json
+from datetime import datetime
 
 # Firebase project info
 FCM_URL = "https://fcm.googleapis.com/fcm/send"
@@ -71,8 +72,6 @@ def send_to_topic(title, body, topic="all"):
     return response.json()
 
 if __name__ == "__main__":
-    import sys
-    from datetime import datetime
 
     print("=" * 50)
     print("Firebase Cloud Messaging Test Script")

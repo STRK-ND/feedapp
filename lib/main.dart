@@ -53,15 +53,16 @@ class CuratedFeedsApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
-          return InAppNotificationOverlay(
-            child: MaterialApp(
-              title: AppConfig.appName,
-              debugShowCheckedModeBanner: false,
-              theme: themeProvider.lightTheme,
-              darkTheme: themeProvider.darkTheme,
-              themeMode: themeProvider.themeMode,
-              home: const MainNavigation(),
-            ),
+          return MaterialApp(
+            title: AppConfig.appName,
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.lightTheme,
+            darkTheme: themeProvider.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: const MainNavigation(),
+            builder: (context, child) {
+              return InAppNotificationOverlay(child: child!);
+            },
           );
         },
       ),
@@ -97,7 +98,7 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: AppColors.backgroundDark,
+          color: isDark ? AppColors.backgroundDark : Colors.white,
           border: Border(
             top: BorderSide(
               color: AppColors.primary.withValues(alpha: 0.1),

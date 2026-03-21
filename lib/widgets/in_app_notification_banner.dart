@@ -21,6 +21,7 @@ class InAppNotificationBanner extends StatefulWidget {
 class _InAppNotificationBannerState extends State<InAppNotificationBanner>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _progressController;
   late Animation<double> _fadeAnimation;
   Timer? _dismissTimer;
   bool _isHovering = false;
@@ -30,6 +31,11 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
     super.initState();
     _controller = AnimationController(
       duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
+
+    _progressController = AnimationController(
+      duration: const Duration(seconds: 4),
       vsync: this,
     );
 
@@ -46,6 +52,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
 
   void _startDismissTimer() {
     _dismissTimer?.cancel();
+    _progressController.forward(from: 0);
     _dismissTimer = Timer(const Duration(seconds: 4), () {
       if (!_isHovering && mounted) {
         _dismiss();
@@ -55,7 +62,12 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
 
   void _dismiss() async {
     _dismissTimer?.cancel();
-    await _controller.reverse();
+    _progressController.stop();
+    try {
+      await _controller.reverse();
+    } catch (e) {
+      // Ignore TickerCanceled or other animation errors
+    }
     if (mounted) {
       widget.onDismissed();
     }
@@ -69,6 +81,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
   @override
   void dispose() {
     _controller.dispose();
+    _progressController.dispose();
     _dismissTimer?.cancel();
     super.dispose();
   }
@@ -95,7 +108,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
               onTap: _onTap,
               onHorizontalDragEnd: (details) {
                 if (details.primaryVelocity != null &&
-                    details.primaryVelocity! > 100) {
+                    details.primaryVelocity!.abs() > 100) {
                   _dismiss();
                 }
               },
@@ -103,6 +116,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                 onEnter: (_) {
                   setState(() => _isHovering = true);
                   _dismissTimer?.cancel();
+                  _progressController.stop();
                 },
                 onExit: (_) {
                   setState(() => _isHovering = false);
@@ -140,27 +154,20 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Progress bar
-                        if (!_isHovering)
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 1.0, end: 0.0),
-                            duration: const Duration(seconds: 4),
-                            builder: (context, value, child) {
-                              return LinearProgressIndicator(
-                                value: value,
-                                backgroundColor: Colors.transparent,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  type.backgroundColor.withValues(alpha:0.6),
-                                ),
-                                minHeight: 3,
-                              );
-                            },
-                          )
-                        else
-                          Container(
-                            height: 3,
-                            color: type.backgroundColor.withValues(alpha:0.3),
-                          ),
+                        // Progress bar - synchronized with dismiss timer
+                        AnimatedBuilder(
+                          animation: _progressController,
+                          builder: (context, child) {
+                            return LinearProgressIndicator(
+                              value: _isHovering ? null : _progressController.value,
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                type.backgroundColor.withValues(alpha:0.6),
+                              ),
+                              minHeight: 3,
+                            );
+                          },
+                        ),
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
@@ -296,10 +303,8 @@ class _InAppNotificationOverlayState extends State<InAppNotificationOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Stack(
-        children: [
+    return Stack(
+      children: [
         widget.child,
         // Notification banners positioned at top
         Positioned(
@@ -322,8 +327,7 @@ class _InAppNotificationOverlayState extends State<InAppNotificationOverlay> {
             ),
           ),
         ),
-        ],
-      ),
+      ],
     );
   }
 }

@@ -51,11 +51,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final articles = await _storageService.loadArticles();
     final savedArticlesList = await _storageService.loadSavedArticles();
     final themeMode = await _settingsService.getThemeMode();
+    final inAppNotifs = await _settingsService.getInAppNotificationsEnabled();
 
     setState(() {
       _themeMode = themeMode;
       _notificationsEnabled = true;
       _newArticleNotifs = true;
+      _inAppNotifsEnabled = inAppNotifs;
       _autoRefresh = true;
       _refreshInterval = 30;
       _maxArticles = 500;
@@ -197,6 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   setState(() => _inAppNotifsEnabled = value);
                   InAppNotificationManager().setEnabled(value);
+                await _settingsService.setInAppNotificationsEnabled(value);
                 },
                 indented: true,
               ),

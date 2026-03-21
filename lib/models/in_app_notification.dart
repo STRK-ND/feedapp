@@ -30,13 +30,14 @@ class InAppNotification {
     NotificationType type = NotificationType.info,
     VoidCallback? onTap,
   }) {
+    final now = DateTime.now();
     return InAppNotification(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: '${now.microsecondsSinceEpoch}_${now.millisecondsSinceEpoch % 1000}',
       title: title,
       body: body,
       imageUrl: imageUrl,
       payload: payload,
-      timestamp: DateTime.now(),
+      timestamp: now,
       type: type,
       onTap: onTap,
     );

@@ -12,7 +12,7 @@ class NotificationService {
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-  
+
   bool _isInitialized = false;
   String? _fcmToken;
 
@@ -61,7 +61,7 @@ class NotificationService {
       provisional: false,
       sound: true,
     );
-    
+
     print('[Notification] iOS Permission status: ${iosSettings.authorizationStatus}');
 
     // Android 13+ permissions
@@ -78,7 +78,7 @@ class NotificationService {
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    
+
     const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
@@ -105,18 +105,12 @@ class NotificationService {
     final title = message.notification?.title ?? 'New Article';
     final body = message.notification?.body ?? 'Check out the latest articles!';
 
-    // Show local notification for foreground messages
-    await _showLocalNotification(
-      title: title,
-      body: body,
-      payload: message.data.toString(),
-    );
-
-    // Show in-app notification banner
+    // When app is in foreground, only show in-app notification (not both)
+    // This avoids duplicate UX - local notifications are for background/minimized state
     _showInAppNotification(
       title: title,
       body: body,
-      payload: message.data.toString(),
+      data: message.data,
     );
   }
 
@@ -171,16 +165,18 @@ class NotificationService {
   void _showInAppNotification({
     required String title,
     required String body,
-    String? payload,
+    Map<String, dynamic>? data,
   }) {
-    final notificationType = payload?.contains('breaking') ?? false
+    // Read notification type from message data map
+    final typeValue = data?['type'] ?? data?['notification_type'];
+    final notificationType = typeValue == 'breaking' || typeValue == 'breakingNews'
         ? NotificationType.breakingNews
         : NotificationType.newArticle;
 
     InAppNotificationManager().showFirebaseNotification(
       title: title,
       body: body,
-      payload: payload,
+      payload: data?.toString(),
       type: notificationType,
     );
   }
