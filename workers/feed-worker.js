@@ -443,8 +443,9 @@ function parseRssXml(xmlText, source) {
       try { const d = new Date(getXmlText(item, 'pubDate')); if (!isNaN(d.getTime())) pub = d.toISOString(); } catch(e) {}
       const auth = getXmlText(item, 'author') || getXmlText(item, 'dc:creator') || null;
       let img = null;
-      let em = item.match(/<enclosure[^>]+url="([^"]+)"[^>]+type="image\/"[^>]*\/?>/i);
+      let em = item.match(/<enclosure[^>]+url="([^"]+)"[^>]*type="image\/[^"]*"[^>]*\/?>/i);
       if (!em) em = item.match(/<media:content[^>]+url="([^"]+)"[^>]*\/?>/i);
+    if (!em) em = item.match(/<media:thumbnail[^>]+url="([^"]+)"[^>]*\/?>/i);
       if (em) img = em[1];
       articles.push({ id: hashCode(link), title, description: desc, fullContent: full, link, sourceId: source.id, sourceName: source.name, sourceCategory: source.category, sourceColor: source.color, sourceIcon: source.icon, pubDate: pub, author: auth || null, imageUrl: img });
     }
