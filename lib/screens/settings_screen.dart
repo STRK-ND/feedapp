@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../providers/theme_provider.dart';
 import '../services/storage_service.dart';
+import '../services/in_app_notification_manager.dart';
+import '../services/notification_service.dart';
+import '../models/in_app_notification.dart';
 import '../utils/constants.dart';
 import '../widgets/stitch/stitch_widgets.dart';
 
@@ -25,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ThemeMode _themeMode = ThemeMode.system;
   bool _notificationsEnabled = true;
   bool _newArticleNotifs = true;
+  bool _inAppNotifsEnabled = true;
   bool _autoRefresh = true;
   int _refreshInterval = 30;
   int _maxArticles = 500;
@@ -183,6 +187,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   await _settingsService.setNewArticleNotifications(value);
                 },
                 indented: true,
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                icon: Icons.notifications_active_outlined,
+                title: 'In-App Notifications',
+                subtitle: 'Show notification banners inside the app',
+                value: _inAppNotifsEnabled,
+                onChanged: (value) async {
+                  setState(() => _inAppNotifsEnabled = value);
+                  InAppNotificationManager().setEnabled(value);
+                },
+                indented: true,
+              ),
+              _buildDivider(),
+              _buildActionTile(
+                icon: Icons.send_outlined,
+                title: 'Test Notification',
+                subtitle: 'Send a test notification to verify setup',
+                onTap: () {
+                  NotificationService().sendTestNotification();
+                  InAppNotificationManager().showFirebaseNotification(
+                    title: 'Test Notification',
+                    body: 'In-app notifications are working! 🎉',
+                    type: NotificationType.success,
+                  );
+                },
               ),
             ],
           ]),

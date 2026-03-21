@@ -86,14 +86,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
   }
 
-  void _openInBrowser() async {
-    final uri = Uri.parse(widget.article.link);
-    if (await canLaunchUrl(uri)) {
-      await AnalyticsService.logArticleLinkOpen(articleId: widget.article.id);
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   void _shareArticle() {
     AnalyticsService.logArticleShare(articleId: widget.article.id);
     Share.share('${widget.article.title}\n\n${widget.article.link}');
@@ -270,8 +262,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   const SizedBox(height: 40),
 
                   // Action buttons
-                  _buildActionButtons(),
-                  const SizedBox(height: 40),
+                                    const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -318,77 +309,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           ),
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary5,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildActionButton(
-            Icons.open_in_browser_rounded,
-            'Open',
-            _openInBrowser,
-          ),
-          Container(
-            width: 1,
-            height: 30,
-            color: AppColors.primary.withOpacity(0.2),
-          ),
-          _buildActionButton(
-            Icons.share_outlined,
-            'Share',
-            _shareArticle,
-          ),
-          Container(
-            width: 1,
-            height: 30,
-            color: AppColors.primary.withOpacity(0.2),
-          ),
-          _buildActionButton(
-            _isSaved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-            _isSaved ? 'Saved' : 'Save',
-            _toggleSave,
-            isActive: _isSaved,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    IconData icon,
-    String label,
-    VoidCallback onTap, {
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isActive ? AppColors.primary : Colors.white.withOpacity(0.7),
-            size: 24,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: GoogleFonts.lexend(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isActive ? AppColors.primary : Colors.white.withOpacity(0.7),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

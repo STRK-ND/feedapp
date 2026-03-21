@@ -481,7 +481,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           style: GoogleFonts.dmSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : colorScheme.onSurface,
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                             letterSpacing: 0.3,
                           ),
                         ),
@@ -971,7 +971,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             style: GoogleFonts.playfairDisplay(
               fontSize: 28,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : colorScheme.onSurface,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
@@ -1004,7 +1004,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       style: GoogleFonts.dmSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : colorScheme.onSurface,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -1025,10 +1025,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(isDark ? Colors.white : colorScheme.onSurface),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : Icon(Icons.refresh_rounded, color: isDark ? Colors.white : colorScheme.onSurface),
+                        : Icon(Icons.refresh_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
                   ),
                 ),
               ),
@@ -1049,7 +1049,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   },
                   icon: Icon(
                     _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
-                    color: isDark ? Colors.white : colorScheme.onSurface,
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1060,7 +1060,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: isDark ? Colors.white : colorScheme.onSurface),
+                  icon: Icon(Icons.more_vert, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
                   color: AppColors.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1154,7 +1154,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               button: true,
                               label: 'Clear search',
                               child: IconButton(
-                                icon: Icon(Icons.clear_rounded, color: isDark ? Colors.white : colorScheme.onSurface),
+                                icon: Icon(Icons.clear_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
                                 onPressed: () {
                                   setState(() {
                                     _searchQuery = '';
@@ -1166,7 +1166,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           : null,
                     ),
                     style: GoogleFonts.dmSans(
-                      color: isDark ? Colors.white : colorScheme.onSurface,
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                     ),
                     onChanged: (value) {
@@ -1228,7 +1228,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               child: Text(
                                 category,
                                 style: GoogleFonts.dmSans(
-                                  color: isDark ? Colors.white : colorScheme.onSurface,
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.w500,
@@ -1361,6 +1361,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               )
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      bottomNavigationBar: _buildBottomAppBar(),
               ),
     );
   }

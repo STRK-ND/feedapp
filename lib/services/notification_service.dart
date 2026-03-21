@@ -1,5 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
+import 'in_app_notification_manager.dart';
+import '../models/in_app_notification.dart';
 
 /// Service for handling push notifications
 class NotificationService {
@@ -99,10 +102,20 @@ class NotificationService {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     print('[Notification] Foreground message: ${message.notification?.title}');
 
+    final title = message.notification?.title ?? 'New Article';
+    final body = message.notification?.body ?? 'Check out the latest articles!';
+
     // Show local notification for foreground messages
     await _showLocalNotification(
-      title: message.notification?.title ?? 'New Article',
-      body: message.notification?.body ?? 'Check out the latest articles!',
+      title: title,
+      body: body,
+      payload: message.data.toString(),
+    );
+
+    // Show in-app notification banner
+    _showInAppNotification(
+      title: title,
+      body: body,
       payload: message.data.toString(),
     );
   }
@@ -151,6 +164,24 @@ class NotificationService {
       body,
       details,
       payload: payload,
+    );
+  }
+
+  /// Show in-app notification banner
+  void _showInAppNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) {
+    final notificationType = payload?.contains('breaking') ?? false
+        ? NotificationType.breakingNews
+        : NotificationType.newArticle;
+
+    InAppNotificationManager().showFirebaseNotification(
+      title: title,
+      body: body,
+      payload: payload,
+      type: notificationType,
     );
   }
 

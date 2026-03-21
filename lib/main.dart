@@ -13,6 +13,8 @@ import 'repositories/article_repository.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
+import 'services/in_app_notification_manager.dart';
+import 'widgets/in_app_notification_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,13 +53,15 @@ class CuratedFeedsApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: AppConfig.appName,
-            debugShowCheckedModeBanner: false,
-            theme: themeProvider.lightTheme,
-            darkTheme: themeProvider.darkTheme,
-            themeMode: themeProvider.themeMode,
-            home: const MainNavigation(),
+          return InAppNotificationOverlay(
+            child: MaterialApp(
+              title: AppConfig.appName,
+              debugShowCheckedModeBanner: false,
+              theme: themeProvider.lightTheme,
+              darkTheme: themeProvider.darkTheme,
+              themeMode: themeProvider.themeMode,
+              home: const MainNavigation(),
+            ),
           );
         },
       ),
