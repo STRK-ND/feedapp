@@ -105,19 +105,7 @@ class _SwipeableCardState extends State<SwipeableCard>
     });
 
     _controller.reset();
-    _controller.forward().then((_) {
-      final direction = _position.dx > 0 ? 'right' : 'left';
-      if (direction == 'right') {
-        widget.onSwipeRight();
-      } else {
-        widget.onSwipeLeft();
-      }
-      setState(() {
-        _position = Offset.zero;
-        _rotation = 0.0;
-        _isAnimatingOut = false;
-      });
-    });
+    _controller.forward();
   }
 
   void _animateBack() {
@@ -159,13 +147,14 @@ class _SwipeableCardState extends State<SwipeableCard>
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Article card. Swipe right to save, swipe left to dismiss, or tap to view details.',
+      label:
+          'Article card. Swipe right to save, swipe left to dismiss, or tap to view details.',
       onTap: widget.onTap,
-child: GestureDetector(
-    onPanUpdate: _handlePanUpdate,
-    onPanEnd: _handlePanEnd,
-    onTapDown: (_) => HapticFeedback.selectionClick(),
-    onTap: widget.onTap,
+      child: GestureDetector(
+        onPanUpdate: _handlePanUpdate,
+        onPanEnd: _handlePanEnd,
+        onTapDown: (_) => HapticFeedback.selectionClick(),
+        onTap: widget.onTap,
         child: Stack(
           children: [
             // Left swipe background (dismiss)
@@ -174,10 +163,9 @@ child: GestureDetector(
                 return Container(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
-                  color: AppColors.textSecondary
-                      .withValues(alpha:  _position.dx < 0
-                          ? _position.dx.abs() / 600
-                          : 0),
+                  color: AppColors.textSecondary.withValues(
+                    alpha: _position.dx < 0 ? _position.dx.abs() / 600 : 0,
+                  ),
                   child: _position.dx < -50
                       ? Center(
                           child: Semantics(
@@ -188,7 +176,9 @@ child: GestureDetector(
                                 Icons.close_rounded,
                                 size: 80,
                                 color: AppColors.textSecondary.withValues(
-                                  alpha: _position.dx.abs().clamp(50.0, 500.0) / 500.0,
+                                  alpha:
+                                      _position.dx.abs().clamp(50.0, 500.0) /
+                                      500.0,
                                 ),
                               ),
                             ),
@@ -205,10 +195,9 @@ child: GestureDetector(
                 return Container(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
-                  color: AppColors.success
-                      .withValues(alpha:  _position.dx > 0
-                          ? (_position.dx / 600) * 0.15
-                          : 0),
+                  color: AppColors.success.withValues(
+                    alpha: _position.dx > 0 ? (_position.dx / 600) * 0.15 : 0,
+                  ),
                   child: _position.dx > 50
                       ? Center(
                           child: Semantics(
@@ -219,7 +208,8 @@ child: GestureDetector(
                                 Icons.favorite_rounded,
                                 size: 80,
                                 color: AppColors.accent.withValues(
-                                  alpha: _position.dx.clamp(50.0, 500.0) / 500.0,
+                                  alpha:
+                                      _position.dx.clamp(50.0, 500.0) / 500.0,
                                 ),
                               ),
                             ),
@@ -235,10 +225,7 @@ child: GestureDetector(
                 offset: _position,
                 child: Transform.rotate(
                   angle: _rotation,
-                  child: Semantics(
-                    container: true,
-                    child: widget.child,
-                  ),
+                  child: Semantics(container: true, child: widget.child),
                 ),
               ),
             ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../di/service_locator.dart';
 import '../models/article.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
@@ -50,9 +50,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   Future<void> _fetchFullContent() async {
     setState(() => _isLoadingContent = true);
     try {
-      final result = await getIt<ArticleContentService>().fetchArticleContentWithImages(
-        widget.article.link,
-      );
+      final result = await getIt<ArticleContentService>()
+          .fetchArticleContentWithImages(widget.article.link);
       setState(() {
         _fullContent = result.text;
         _isLoadingContent = false;
@@ -88,13 +87,16 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   void _shareArticle() {
     AnalyticsService.logArticleShare(articleId: widget.article.id);
-    Share.share('${widget.article.title}\n\n${widget.article.link}');
+    SharePlus.instance.share(
+      ShareParams(text: '${widget.article.title}\n\n${widget.article.link}'),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final source = getIt<RssFeedService>().getSourceById(widget.article.sourceId) ??
-        getIt<RssFeedService>().predefinedSources.first;
+    final source =
+        getIt<RssFeedService>().getSourceById(widget.article.sourceId) ??
+        RssFeedService.predefinedSources.first;
     final screenHeight = MediaQuery.of(context).size.height;
     final imageHeight = screenHeight * 0.5;
 
@@ -131,7 +133,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         end: Alignment.topCenter,
                         colors: [
                           AppColors.backgroundDark,
-                          AppColors.backgroundDark.withOpacity(0.4),
+                          AppColors.backgroundDark.withValues(alpha: 0.4),
                           Colors.transparent,
                         ],
                         stops: const [0.0, 0.4, 1.0],
@@ -153,9 +155,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           Row(
                             children: [
                               _buildIconButton(
-                                _isSaved ? Icons.favorite : Icons.favorite_border,
+                                _isSaved
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
                                 _toggleSave,
-                                color: _isSaved ? AppColors.primary : Colors.white,
+                                color: _isSaved
+                                    ? AppColors.primary
+                                    : Colors.white,
                               ),
                               const SizedBox(width: 12),
                               _buildIconButton(
@@ -254,7 +260,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       widget.article.description,
                       style: GoogleFonts.lexend(
                         fontSize: 16,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         height: 1.6,
                       ),
                     ),
@@ -262,7 +268,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   const SizedBox(height: 40),
 
                   // Action buttons
-                                    const SizedBox(height: 40),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -279,20 +285,19 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.4),
+          color: Colors.black.withValues(alpha: 0.4),
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          icon,
-          color: color ?? Colors.white,
-          size: 24,
-        ),
+        child: Icon(icon, color: color ?? Colors.white, size: 24),
       ),
     );
   }
 
   Widget _buildContent(String content) {
-    final paragraphs = content.split('\n\n').where((p) => p.trim().isNotEmpty).toList();
+    final paragraphs = content
+        .split('\n\n')
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +308,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             paragraph.trim(),
             style: GoogleFonts.lexend(
               fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               height: 1.7,
             ),
           ),

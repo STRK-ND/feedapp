@@ -74,7 +74,7 @@ class FeedProvider extends ChangeNotifier {
   FeedState _state = const FeedState();
 
   FeedProvider({required ArticleRepository articleRepository})
-      : _articleRepository = articleRepository;
+    : _articleRepository = articleRepository;
 
   /// Current feed state
   FeedState get state => _state;
@@ -127,13 +127,11 @@ class FeedProvider extends ChangeNotifier {
         _articleRepository.fetchAllArticles(),
       ]);
 
-      final savedResult = results[0] as Result<List<Article>>;
-      final allResult = results[1] as Result<List<Article>>;
+      final savedResult = results[0];
+      final allResult = results[1];
 
       if (savedResult.isSuccess) {
-        _state = _state.copyWith(
-          savedArticles: savedResult.data ?? [],
-        );
+        _state = _state.copyWith(savedArticles: savedResult.data ?? []);
       }
 
       if (allResult.isSuccess) {
@@ -275,13 +273,16 @@ class FeedProvider extends ChangeNotifier {
         _state = _state.copyWith(
           articles: updatedArticles,
           savedArticles: updatedSavedArticles,
-          displayedArticles: _state.selectedCategory == 'All' || _state.isSearchActive
+          displayedArticles:
+              _state.selectedCategory == 'All' || _state.isSearchActive
               ? _filterArticles(updatedArticles)
               : _state.displayedArticles,
         );
         notifyListeners();
       } else {
-        _state = _state.copyWith(errorMessage: result.error ?? 'Failed to save article');
+        _state = _state.copyWith(
+          errorMessage: result.error ?? 'Failed to save article',
+        );
         notifyListeners();
       }
     } catch (e) {
@@ -334,14 +335,19 @@ class FeedProvider extends ChangeNotifier {
 
   /// Filter articles based on current category/search state
   List<Article> _filterArticles(List<Article> articles) {
-    if (_state.isSearchActive && _state.searchQuery != null && _state.searchQuery!.isNotEmpty) {
+    if (_state.isSearchActive &&
+        _state.searchQuery != null &&
+        _state.searchQuery!.isNotEmpty) {
       return _filterBySearchQuery(articles, _state.searchQuery!);
     }
     return _filterArticlesByCategory(articles, _state.selectedCategory);
   }
 
-/// Filter articles by category
-  List<Article> _filterArticlesByCategory(List<Article> articles, String category) {
+  /// Filter articles by category
+  List<Article> _filterArticlesByCategory(
+    List<Article> articles,
+    String category,
+  ) {
     return Helpers.filterArticlesByCategory(articles, category);
   }
 
@@ -354,7 +360,7 @@ class FeedProvider extends ChangeNotifier {
     );
   }
 
-/// Search articles by query
+  /// Search articles by query
   List<Article> _filterBySearchQuery(List<Article> articles, String query) {
     return Helpers.filterArticlesByQuery(articles, query);
   }

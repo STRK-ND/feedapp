@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../models/article.dart';
 import '../repositories/article_repository.dart';
 import '../services/storage_service.dart';
+import '../services/settings_service.dart';
 import '../services/update_service.dart';
 import '../providers/version_provider.dart';
+import '../providers/settings_notifier.dart';
 import '../services/analytics_service.dart';
 import '../widgets/card_stack.dart';
 import '../widgets/expanded_article_card.dart';
@@ -45,6 +48,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   bool _isSearchActive = false;
   String _searchQuery = '';
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _autoRefreshTimer;
 
   late AnimationController _fabController;
   late AnimationController _staggerController;
@@ -52,6 +56,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   final List<String> _categories = AppConfig.categories;
   final StorageService _storage = StorageService();
   final ArticleRepository _articleRepository = ArticleRepository();
+  final SettingsService _settingsService = SettingsService();
 
   int get _unreadCount => _articles.where((a) => !a.isRead).length;
 
@@ -76,6 +81,24 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final settings = context.read<SettingsNotifier>();
+    _setupAutoRefresh(settings);
+  }
+
+  void _setupAutoRefresh(SettingsNotifier settings) {
+    _autoRefreshTimer?.cancel();
+    if (settings.autoRefresh && settings.refreshInterval > 0) {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = Timer.periodic(
+        Duration(minutes: settings.refreshInterval),
+        (_) => _refreshFeeds(),
+      );
+    }
+  }
+
+  @override
   void didUpdateWidget(RssFeedScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Only reload if transitioning TO saved view (was not saved view before)
@@ -97,6 +120,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   void dispose() {
     // Memory leak fix: Cancel subscription explicitly
     _connectivitySubscription?.cancel();
+    _autoRefreshTimer?.cancel();
     _fabController.dispose();
     _staggerController.dispose();
     super.dispose();
@@ -108,7 +132,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       _isOnline = connectivityResult.contains(ConnectivityResult.none) == false;
     });
 
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       setState(() {
         _isOnline = results.contains(ConnectivityResult.none) == false;
       });
@@ -122,13 +148,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Future<void> _loadData() async {
     try {
+      final maxArticles = await _settingsService.getMaxArticles();
       final articles = await _storage.loadArticles();
       final savedArticles = await _storage.loadSavedArticles();
       final lastRefresh = await _storage.loadLastRefreshTime();
 
       if (mounted) {
         setState(() {
-          _articles = articles;
+          _articles = articles.take(maxArticles).toList();
           _displayedArticles = List.from(_articles);
           _savedArticles = savedArticles;
           _lastRefreshTime = lastRefresh;
@@ -136,7 +163,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       }
 
       _staggerController.forward();
-      _refreshFeeds();
+      await _refreshFeeds();
     } catch (e) {
       ErrorHandler.logError('Failed to load data', error: e);
       // Continue with empty state
@@ -173,7 +200,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     if (mounted && updateInfo != null) {
       if (context.mounted) {
-        showUpdateDialog(context: context, updateInfo: updateInfo);
+        await showUpdateDialog(context: context, updateInfo: updateInfo);
       }
     }
   }
@@ -190,7 +217,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Future<void> _refreshFeeds() async {
     debugPrint('[Feed] Starting refresh...');
-  await AnalyticsService.logFeedRefresh();
+    await AnalyticsService.logFeedRefresh();
 
     // Check if offline
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -213,10 +240,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     try {
       final result = await _articleRepository.fetchNewArticles();
+      final maxArticles = await _settingsService.getMaxArticles();
 
       if (result.isSuccess) {
-        final newArticles = result.data ?? [];
-        debugPrint('[Feed] Repository returned ${newArticles.length} new articles');
+        final newArticles = (result.data ?? []).take(maxArticles).toList();
+        debugPrint(
+          '[Feed] Repository returned ${newArticles.length} new articles (max: $maxArticles)',
+        );
 
         setState(() {
           _articles = newArticles;
@@ -225,7 +255,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _isLoading = false;
         });
 
-        debugPrint('[Feed] Refresh complete. Total articles: ${_articles.length}');
+        debugPrint(
+          '[Feed] Refresh complete. Total articles: ${_articles.length}',
+        );
       } else {
         debugPrint('[Feed] ERROR: ${result.error}');
         setState(() {
@@ -309,7 +341,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _savedArticles = [article, ..._savedArticles];
         }
       } else {
-        _savedArticles = _savedArticles.where((a) => a.id != article.id).toList();
+        _savedArticles = _savedArticles
+            .where((a) => a.id != article.id)
+            .toList();
       }
     });
 
@@ -335,7 +369,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       print('Warning: Article not found in main list: ${article.id}');
       return;
     }
-    AnalyticsService.logArticleOpen(articleId: article.id, title: article.title);
+    AnalyticsService.logArticleOpen(
+      articleId: article.id,
+      title: article.title,
+    );
 
     if (articleIndex >= _articles.length) {
       print('Warning: Article index out of bounds: $articleIndex');
@@ -362,7 +399,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   List<Article> _getFilteredArticles() {
-    var articles = _selectedTab == 0 ? _articles.where((a) => !a.isRead).toList() : _savedArticles;
+    var articles = _selectedTab == 0
+        ? _articles.where((a) => !a.isRead).toList()
+        : _savedArticles;
 
     if (_selectedFilter != 'All' && _selectedTab == 0) {
       articles = articles.where((a) {
@@ -374,11 +413,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      articles = articles.where((a) =>
-        a.title.toLowerCase().contains(query) ||
-        a.description.toLowerCase().contains(query) ||
-        a.sourceName.toLowerCase().contains(query)
-      ).toList();
+      articles = articles
+          .where(
+            (a) =>
+                a.title.toLowerCase().contains(query) ||
+                a.description.toLowerCase().contains(query) ||
+                a.sourceName.toLowerCase().contains(query),
+          )
+          .toList();
     }
 
     return articles;
@@ -400,10 +442,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: color.withValues(alpha:  0.2),
-            width: 1,
-          ),
+          side: BorderSide(color: color.withValues(alpha: 0.2), width: 1),
         ),
         elevation: 8,
         duration: const Duration(milliseconds: 2000),
@@ -413,7 +452,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Widget _buildEmptyState() {
     final icon = _selectedTab == 0
-        ? (_viewMode == ViewMode.cards ? Icons.style_outlined : Icons.inbox_outlined)
+        ? (_viewMode == ViewMode.cards
+              ? Icons.style_outlined
+              : Icons.inbox_outlined)
         : Icons.bookmark_outline_rounded;
 
     final title = _selectedTab == 0
@@ -430,17 +471,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppColors.divider.withValues(alpha:  0.3),
+                color: AppColors.divider.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
             child: Semantics(
               label: title,
-              child: Icon(
-                icon,
-                size: 72,
-                color: AppColors.textTertiary,
-              ),
+              child: Icon(icon, size: 72, color: AppColors.textTertiary),
             ),
           ),
           const SizedBox(height: 24),
@@ -466,14 +503,24 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   onTap: _refreshFeeds,
                   borderRadius: BorderRadius.circular(16),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Semantics(
                           button: true,
                           label: 'Retry loading feeds',
-                          child: Icon(Icons.refresh_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface, size: 18),
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                            size: 18,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -481,7 +528,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           style: GoogleFonts.dmSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
                             letterSpacing: 0.3,
                           ),
                         ),
@@ -561,7 +611,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       itemCount: _displayedArticles.length,
       itemBuilder: (context, index) {
         final article = _displayedArticles[index];
-        final source = getIt<RssFeedService>().getSourceById(article.sourceId) ??
+        final source =
+            getIt<RssFeedService>().getSourceById(article.sourceId) ??
             RssFeedService.predefinedSources.first;
         final sourceColor = source.color;
 
@@ -591,7 +642,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           },
           child: Semantics(
             button: true,
-            label: '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
+            label:
+                '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
             child: GestureDetector(
               onTap: () => _onTapCard(index),
               child: Container(
@@ -601,12 +653,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: sourceColor.withValues(alpha:  0.08),
+                      color: sourceColor.withValues(alpha: 0.08),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:  0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -617,7 +669,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.divider.withValues(alpha:  0.5),
+                      color: AppColors.divider.withValues(alpha: 0.5),
                       width: 1,
                     ),
                   ),
@@ -628,7 +680,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: sourceColor.withValues(alpha:  0.08),
+                            color: sourceColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -640,7 +692,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             children: [
                               Semantics(
                                 label: source.name,
-                                child: Icon(source.icon, size: 14, color: sourceColor),
+                                child: Icon(
+                                  source.icon,
+                                  size: 14,
+                                  color: sourceColor,
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -688,9 +744,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               Row(
                                 children: [
                                   Semantics(
-                                    label: 'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                                    child: Icon(Icons.schedule_outlined,
-                                        size: 12, color: AppColors.textTertiary),
+                                    label:
+                                        'Published ${Helpers.formatTimeAgo(article.pubDate)}',
+                                    child: Icon(
+                                      Icons.schedule_outlined,
+                                      size: 12,
+                                      color: AppColors.textTertiary,
+                                    ),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -742,7 +802,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   void _onTapSavedArticle(int index) {
     if (index >= _savedArticles.length) return;
     final article = _savedArticles[index];
-    AnalyticsService.logArticleOpen(articleId: article.id, title: article.title);
+    AnalyticsService.logArticleOpen(
+      articleId: article.id,
+      title: article.title,
+    );
     setState(() {
       article.isRead = true;
     });
@@ -762,7 +825,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     );
   }
 
-
   Widget _buildSettingsView() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -781,9 +843,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _buildSettingsItem(
             icon: Icons.view_column_outlined,
             title: 'View Mode',
-            subtitle: Text(_viewMode == ViewMode.cards ? 'Card View' : 'List View'),
+            subtitle: Text(
+              _viewMode == ViewMode.cards ? 'Card View' : 'List View',
+            ),
             trailing: Icon(
-              _viewMode == ViewMode.cards ? Icons.style_outlined : Icons.list_outlined,
+              _viewMode == ViewMode.cards
+                  ? Icons.style_outlined
+                  : Icons.list_outlined,
               color: AppColors.textTertiary,
             ),
             onTap: () {
@@ -842,7 +908,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha:  0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 4),
               ),
@@ -873,14 +939,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.divider.withValues(alpha:  0.3),
+                  color: AppColors.divider.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: AppColors.primary,
-                ),
+                child: Icon(icon, size: 20, color: AppColors.primary),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -910,10 +972,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               ),
               if (trailing != null) trailing,
               if (onTap != null) ...[
-                if (trailing == null) const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textTertiary,
-                ),
+                if (trailing == null)
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textTertiary,
+                  ),
               ],
             ],
           ),
@@ -966,12 +1029,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             _selectedTab == 0
                 ? 'Curated Feeds'
                 : _selectedTab == 1
-                    ? 'Saved'
-                    : 'Settings',
+                ? 'Saved'
+                : 'Settings',
             style: GoogleFonts.playfairDisplay(
               fontSize: 28,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface,
               letterSpacing: -0.5,
             ),
           ),
@@ -979,12 +1044,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             if (_selectedTab == 0 && _articles.isNotEmpty)
               Container(
                 margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha:  0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha:  0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),
@@ -995,7 +1063,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       child: Icon(
                         Icons.article_outlined,
                         size: 18,
-                        color: Colors.white.withValues(alpha:  0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1004,7 +1072,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       style: GoogleFonts.dmSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -1025,10 +1095,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.onSurface,
+                              ),
                             ),
                           )
-                        : Icon(Icons.refresh_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
+                        : Icon(
+                            Icons.refresh_rounded,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
                   ),
                 ),
               ),
@@ -1048,8 +1126,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     });
                   },
                   icon: Icon(
-                    _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
-                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                    _isSearchActive
+                        ? Icons.close_rounded
+                        : Icons.search_rounded,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1060,28 +1142,44 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
                   color: AppColors.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   onSelected: (value) async {
                     if (value == 'check_updates') {
-                      final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+                      final updateInfo = await UpdateService.checkForUpdates(
+                        forceCheck: true,
+                      );
                       if (context.mounted) {
                         if (updateInfo != null) {
-                          showUpdateDialog(context: context, updateInfo: updateInfo);
+                          await showUpdateDialog(
+                            context: context,
+                            updateInfo: updateInfo,
+                          );
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('You\'re using the latest version!')),
+                            const SnackBar(
+                              content: Text(
+                                'You\'re using the latest version!',
+                              ),
+                            ),
                           );
                         }
                       }
                     } else if (value == 'toggle_view') {
                       setState(() {
-                        _viewMode = _viewMode == ViewMode.cards ? ViewMode.list : ViewMode.cards;
+                        _viewMode = _viewMode == ViewMode.cards
+                            ? ViewMode.list
+                            : ViewMode.cards;
                       });
-                      _saveViewMode();
+                      await _saveViewMode();
                     }
                   },
                   itemBuilder: (context) => [
@@ -1099,9 +1197,17 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       value: 'toggle_view',
                       child: Row(
                         children: [
-                          Icon(_viewMode == ViewMode.cards ? Icons.view_list : Icons.grid_view),
+                          Icon(
+                            _viewMode == ViewMode.cards
+                                ? Icons.view_list
+                                : Icons.grid_view,
+                          ),
                           const SizedBox(width: 12),
-                          Text(_viewMode == ViewMode.cards ? 'Switch to List View' : 'Switch to Card View'),
+                          Text(
+                            _viewMode == ViewMode.cards
+                                ? 'Switch to List View'
+                                : 'Switch to Card View',
+                          ),
                         ],
                       ),
                     ),
@@ -1117,28 +1223,31 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // Search bar
               if (_isSearchActive)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: TextField(
                     autofocus: true,
                     decoration: InputDecoration(
                       hintText: 'Search articles, sources, or content...',
                       hintStyle: GoogleFonts.dmSans(
-                        color: Colors.white.withValues(alpha:  0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 15,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha:  0.1),
+                      fillColor: Colors.white.withValues(alpha: 0.1),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha:  0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha:  0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -1154,7 +1263,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               button: true,
                               label: 'Clear search',
                               child: IconButton(
-                                icon: Icon(Icons.clear_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface),
+                                icon: Icon(
+                                  Icons.clear_rounded,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
                                 onPressed: () {
                                   setState(() {
                                     _searchQuery = '';
@@ -1166,7 +1282,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           : null,
                     ),
                     style: GoogleFonts.dmSans(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                     ),
                     onChanged: (value) {
@@ -1179,7 +1297,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 ),
 
               // Category filter chips for feeds tab (hidden when search is active)
-              if (_selectedTab == 0 && !_isSearchActive && (_articles.isNotEmpty || _isLoading == false)) ...[
+              if (_selectedTab == 0 &&
+                  !_isSearchActive &&
+                  (_articles.isNotEmpty || _isLoading == false)) ...[
                 Container(
                   height: 50,
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1208,7 +1328,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               });
                             },
                             borderRadius: BorderRadius.circular(20),
-                            splashColor: Colors.white.withValues(alpha:  0.1),
+                            splashColor: Colors.white.withValues(alpha: 0.1),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               padding: const EdgeInsets.symmetric(
@@ -1216,19 +1336,25 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: isSelected ? color : Colors.white.withValues(alpha:  0.1),
+                                color: isSelected
+                                    ? color
+                                    : Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isSelected
                                       ? color
-                                      : Colors.white.withValues(alpha:  0.2),
+                                      : Colors.white.withValues(alpha: 0.2),
                                   width: 1,
                                 ),
                               ),
                               child: Text(
                                 category,
                                 style: GoogleFonts.dmSans(
-                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurface,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.w500,
@@ -1249,15 +1375,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // Search results indicator
               if (_isSearchActive && _searchQuery.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.search_rounded, size: 16, color: Colors.white.withValues(alpha:  0.7)),
+                      Icon(
+                        Icons.search_rounded,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
                         style: GoogleFonts.dmSans(
-                          color: Colors.white.withValues(alpha:  0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 13,
                         ),
                       ),
@@ -1269,18 +1402,25 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               if (!_isOnline && _selectedTab == 0)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha:  0.2),
+                    color: Colors.orange.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha:  0.3),
+                      color: Colors.orange.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud_off_rounded, size: 16, color: Colors.orange),
+                      Icon(
+                        Icons.cloud_off_rounded,
+                        size: 16,
+                        color: Colors.orange,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1306,16 +1446,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         color: AppColors.accent,
                         backgroundColor: AppColors.surface,
                         strokeWidth: 2.5,
-                        onRefresh: _isLoading ? () async {} : () async {
-                          await _refreshFeeds();
-                        },
+                        onRefresh: _isLoading
+                            ? () async {}
+                            : () async {
+                                await _refreshFeeds();
+                              },
                         child: _selectedTab == 0
                             ? (_viewMode == ViewMode.cards
-                                ? _buildCardView()
-                                : _buildListView())
+                                  ? _buildCardView()
+                                  : _buildListView())
                             : _selectedTab == 1
-                                ? _buildSavedArticlesView()
-                                : _buildSettingsView(),
+                            ? _buildSavedArticlesView()
+                            : _buildSettingsView(),
                       ),
               ),
             ],
@@ -1328,7 +1470,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:  0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -1336,7 +1478,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 ),
                 child: Semantics(
                   button: true,
-                  label: _viewMode == ViewMode.cards ? 'Switch to list view' : 'Switch to card view',
+                  label: _viewMode == ViewMode.cards
+                      ? 'Switch to list view'
+                      : 'Switch to card view',
                   child: FloatingActionButton.small(
                     heroTag: 'view_mode',
                     onPressed: () {
@@ -1361,7 +1505,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               )
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-
       ),
     );
   }

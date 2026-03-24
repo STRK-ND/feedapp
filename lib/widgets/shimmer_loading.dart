@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import '../utils/constants.dart';
 
 /// Shimmer effect widget for loading states
@@ -7,11 +6,7 @@ class ShimmerLoading extends StatefulWidget {
   final Widget child;
   final bool isLoading;
 
-  const ShimmerLoading({
-    super.key,
-    required this.child,
-    this.isLoading = true,
-  });
+  const ShimmerLoading({super.key, required this.child, this.isLoading = true});
 
   @override
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
@@ -43,16 +38,14 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
 
   @override
   Widget build(BuildContext context) {
-    // Check for reduced motion preference
-    final brightness =
-        SchedulerBinding.instance.platformDispatcher.platformBrightness;
     final mediaQuery = MediaQuery.maybeOf(context);
-    // Check for reduced motion - desktop platforms don't typically have motion settings
-    final isDesktop = Theme.of(context).platform == TargetPlatform.windows ||
+    final isDesktop =
+        Theme.of(context).platform == TargetPlatform.windows ||
         Theme.of(context).platform == TargetPlatform.macOS ||
         Theme.of(context).platform == TargetPlatform.linux;
-    final prefersReducedMotion =
-        isDesktop ? false : mediaQuery?.disableAnimations ?? false;
+    final prefersReducedMotion = isDesktop
+        ? false
+        : mediaQuery?.disableAnimations ?? false;
 
     if (prefersReducedMotion || !widget.isLoading) {
       return widget.child;
@@ -71,11 +64,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
                 Color(0xFFF3F4F6),
                 Color(0xFFE5E7EB),
               ],
-              stops: [
-                0.0,
-                _animation.value.clamp(0.0, 1.0),
-                1.0,
-              ],
+              stops: [0.0, _animation.value.clamp(0.0, 1.0), 1.0],
               transform: _SlidingGradientTransform(_animation.value),
             ).createShader(bounds);
           },
@@ -129,10 +118,7 @@ class SkeletonBox extends StatelessWidget {
 class ArticleCardSkeleton extends StatelessWidget {
   final bool isExpanded;
 
-  const ArticleCardSkeleton({
-    super.key,
-    this.isExpanded = false,
-  });
+  const ArticleCardSkeleton({super.key, this.isExpanded = false});
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +130,7 @@ class ArticleCardSkeleton extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:  0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -159,9 +145,7 @@ class ArticleCardSkeleton extends StatelessWidget {
                 height: 220,
                 decoration: const BoxDecoration(
                   color: AppColors.divider,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
               )
             else
@@ -169,9 +153,7 @@ class ArticleCardSkeleton extends StatelessWidget {
                 height: 180,
                 decoration: const BoxDecoration(
                   color: AppColors.divider,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
               ),
 
@@ -183,31 +165,59 @@ class ArticleCardSkeleton extends StatelessWidget {
                   // Source row
                   Row(
                     children: [
-                      const SkeletonBox(width: 80, height: 24, borderRadius: 12),
+                      const SkeletonBox(
+                        width: 80,
+                        height: 24,
+                        borderRadius: 12,
+                      ),
                       const SizedBox(width: 12),
-                      const SkeletonBox(width: 60, height: 20, borderRadius: 10),
+                      const SkeletonBox(
+                        width: 60,
+                        height: 20,
+                        borderRadius: 10,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
                   // Title lines
-                  const SkeletonBox(width: double.infinity, height: 20, borderRadius: 4),
+                  const SkeletonBox(
+                    width: double.infinity,
+                    height: 20,
+                    borderRadius: 4,
+                  ),
                   const SizedBox(height: 8),
                   const SkeletonBox(width: 200, height: 20, borderRadius: 4),
                   const SizedBox(height: 16),
 
                   // Description lines
-                  const SkeletonBox(width: double.infinity, height: 14, borderRadius: 4),
+                  const SkeletonBox(
+                    width: double.infinity,
+                    height: 14,
+                    borderRadius: 4,
+                  ),
                   const SizedBox(height: 6),
-                  const SkeletonBox(width: double.infinity, height: 14, borderRadius: 4),
+                  const SkeletonBox(
+                    width: double.infinity,
+                    height: 14,
+                    borderRadius: 4,
+                  ),
                   const SizedBox(height: 6),
                   const SkeletonBox(width: 150, height: 14, borderRadius: 4),
 
                   if (isExpanded) ...[
                     const SizedBox(height: 16),
-                    const SkeletonBox(width: double.infinity, height: 14, borderRadius: 4),
+                    const SkeletonBox(
+                      width: double.infinity,
+                      height: 14,
+                      borderRadius: 4,
+                    ),
                     const SizedBox(height: 6),
-                    const SkeletonBox(width: double.infinity, height: 14, borderRadius: 4),
+                    const SkeletonBox(
+                      width: double.infinity,
+                      height: 14,
+                      borderRadius: 4,
+                    ),
                     const SizedBox(height: 6),
                     const SkeletonBox(width: 180, height: 14, borderRadius: 4),
                   ],
@@ -225,10 +235,7 @@ class ArticleCardSkeleton extends StatelessWidget {
 class CardStackSkeleton extends StatelessWidget {
   final int count;
 
-  const CardStackSkeleton({
-    super.key,
-    this.count = 3,
-  });
+  const CardStackSkeleton({super.key, this.count = 3});
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +279,11 @@ class ListItemSkeleton extends StatelessWidget {
                 children: [
                   const SkeletonBox(width: 60, height: 18, borderRadius: 8),
                   const SizedBox(height: 8),
-                  const SkeletonBox(width: double.infinity, height: 16, borderRadius: 4),
+                  const SkeletonBox(
+                    width: double.infinity,
+                    height: 16,
+                    borderRadius: 4,
+                  ),
                   const SizedBox(height: 6),
                   const SkeletonBox(width: 150, height: 14, borderRadius: 4),
                   const SizedBox(height: 8),
@@ -297,21 +308,15 @@ class ListItemSkeleton extends StatelessWidget {
 class FeedLoadingSkeleton extends StatelessWidget {
   final int itemCount;
 
-  const FeedLoadingSkeleton({
-    super.key,
-    this.itemCount = 5,
-  });
+  const FeedLoadingSkeleton({super.key, this.itemCount = 5});
 
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: itemCount,
-      separatorBuilder: (_, __) => const Divider(
-        height: 1,
-        indent: 116,
-        color: AppColors.divider,
-      ),
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, indent: 116, color: AppColors.divider),
       itemBuilder: (_, __) => const ListItemSkeleton(),
     );
   }

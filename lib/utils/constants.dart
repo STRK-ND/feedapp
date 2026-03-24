@@ -15,7 +15,9 @@ class AppColors {
   static const Color accent = Color(0xFFBF83FC); // Same as primary
   static const Color background = Color(0xFF190F23); // Deep purple (dark mode)
   static const Color backgroundLight = Color(0xFFF7F5F8); // Light mode bg
-  static const Color backgroundDark = Color(0xFF190F23); // Stitch dark background
+  static const Color backgroundDark = Color(
+    0xFF190F23,
+  ); // Stitch dark background
   static const Color surface = Color(0xFFFFFFFF); // Pure white
 
   // Text colors
@@ -63,7 +65,8 @@ class AppConfig {
   static const int appBuildNumber = 1;
 
   // Worker API settings
-  static const String workerApiUrl = 'https://curated-feeds-worker.raj15400881.workers.dev/';
+  static const String workerApiUrl =
+      'https://curated-feeds-worker.raj15400881.workers.dev/';
   static const int workerTimeoutSeconds = 15;
 
   // RSS feed settings (deprecated - using Worker API instead)
@@ -152,13 +155,13 @@ class AppCardStyles {
   /// Standard card shadow (with colored accent)
   static List<BoxShadow> cardShadow(Color sourceColor) => [
     BoxShadow(
-      color: sourceColor.withOpacity( 0.12),
+      color: sourceColor.withValues(alpha: 0.12),
       blurRadius: 40,
       offset: const Offset(0, 20),
       spreadRadius: -8,
     ),
     BoxShadow(
-      color: Colors.black.withOpacity( 0.04),
+      color: Colors.black.withValues(alpha: 0.04),
       blurRadius: 15,
       offset: const Offset(0, 8),
     ),
@@ -167,7 +170,7 @@ class AppCardStyles {
   /// Pressed state shadow (reduced depth)
   static List<BoxShadow> pressedShadow(Color sourceColor) => [
     BoxShadow(
-      color: sourceColor.withOpacity( 0.2),
+      color: sourceColor.withValues(alpha: 0.2),
       blurRadius: 20,
       offset: const Offset(0, 8),
     ),
@@ -180,20 +183,20 @@ class AppCardStyles {
     double borderOpacity = 0.3,
   }) {
     return BoxDecoration(
-      color: Colors.white.withOpacity( opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity( borderOpacity),
+        color: Colors.white.withValues(alpha: borderOpacity),
         width: 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity( 0.08),
+          color: Colors.black.withValues(alpha: 0.08),
           blurRadius: 20,
           offset: const Offset(0, 10),
         ),
         BoxShadow(
-          color: Colors.white.withOpacity( 0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           blurRadius: 5,
           offset: const Offset(0, -2),
         ),
@@ -208,15 +211,15 @@ class AppCardStyles {
     double borderOpacity = 0.1,
   }) {
     return BoxDecoration(
-      color: const Color(0xFF1A1B2E).withOpacity( opacity),
+      color: const Color(0xFF1A1B2E).withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity( borderOpacity),
+        color: Colors.white.withValues(alpha: borderOpacity),
         width: 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity( 0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           blurRadius: 20,
           offset: const Offset(0, 10),
         ),
@@ -227,25 +230,20 @@ class AppCardStyles {
   /// Category chip glass effect
   static BoxDecoration chipDecoration(Color color) {
     return BoxDecoration(
-      color: color.withOpacity( 0.15),
+      color: color.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(badgeRadius),
-      border: Border.all(
-        color: color.withOpacity( 0.3),
-        width: 1,
-      ),
+      border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
     );
   }
 
   /// Bottom sheet glass effect
-  static BoxDecoration bottomSheetDecoration() {
+  static BoxDecoration bottomSheetDecoration(ColorScheme colorScheme) {
     return BoxDecoration(
-      color: Colors.white.withOpacity( 0.95),
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(28),
-      ),
+      color: colorScheme.surface.withValues(alpha: 0.95),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity( 0.15),
+          color: Colors.black.withValues(alpha: 0.15),
           blurRadius: 40,
           offset: const Offset(0, -20),
         ),

@@ -12,7 +12,8 @@ class NotificationKeys {
   static const String notificationsEnabled = 'notifications_enabled';
   static const String newArticleNotifs = 'new_article_notifs';
   static const String savedArticleNotifs = 'saved_article_notifs';
-  static const String inAppNotificationsEnabled = 'in_app_notifications_enabled';
+  static const String inAppNotificationsEnabled =
+      'in_app_notifications_enabled';
 }
 
 /// App settings keys
@@ -90,7 +91,7 @@ class SettingsService {
     await init();
     await _prefs.setString(
       ThemeKeys.primaryColor,
-      '#${color.value.toRadixString(16).substring(2)}',
+      '#${color.toARGB32().toRadixString(16).substring(2)}',
     );
   }
 
@@ -107,7 +108,10 @@ class SettingsService {
   /// Set notifications enabled
   Future<void> setNotificationsEnabled(bool enabled) async {
     await init();
-    await _prefs.setString(NotificationKeys.notificationsEnabled, enabled.toString());
+    await _prefs.setString(
+      NotificationKeys.notificationsEnabled,
+      enabled.toString(),
+    );
   }
 
   /// Get new article notifications
@@ -119,7 +123,10 @@ class SettingsService {
   /// Set new article notifications
   Future<void> setNewArticleNotifications(bool enabled) async {
     await init();
-    await _prefs.setString(NotificationKeys.newArticleNotifs, enabled.toString());
+    await _prefs.setString(
+      NotificationKeys.newArticleNotifs,
+      enabled.toString(),
+    );
   }
 
   /// Get saved article notifications
@@ -131,19 +138,26 @@ class SettingsService {
   /// Set saved article notifications
   Future<void> setSavedArticleNotifications(bool enabled) async {
     await init();
-    await _prefs.setString(NotificationKeys.savedArticleNotifs, enabled.toString());
+    await _prefs.setString(
+      NotificationKeys.savedArticleNotifs,
+      enabled.toString(),
+    );
   }
 
   /// Get in-app notifications enabled
   Future<bool> getInAppNotificationsEnabled() async {
     await init();
-    return _prefs.getString(NotificationKeys.inAppNotificationsEnabled) != 'false';
+    return _prefs.getString(NotificationKeys.inAppNotificationsEnabled) !=
+        'false';
   }
 
   /// Set in-app notifications enabled
   Future<void> setInAppNotificationsEnabled(bool enabled) async {
     await init();
-    await _prefs.setString(NotificationKeys.inAppNotificationsEnabled, enabled.toString());
+    await _prefs.setString(
+      NotificationKeys.inAppNotificationsEnabled,
+      enabled.toString(),
+    );
   }
 
   // ============================================

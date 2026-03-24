@@ -4,12 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
 import '../services/notification_service.dart';
 import '../models/in_app_notification.dart';
 import '../utils/constants.dart';
-import '../widgets/stitch/stitch_widgets.dart';
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -20,7 +20,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late SettingsService _settingsService;
   late StorageService _storageService;
   bool _isLoading = true;
 
@@ -29,51 +28,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _newArticleNotifs = true;
   bool _inAppNotifsEnabled = true;
-  bool _autoRefresh = true;
-  int _refreshInterval = 30;
-  int _maxArticles = 500;
-  bool _showImages = true;
-  bool _dataSaverMode = false;
   int _cachedArticles = 0;
   int _savedArticles = 0;
 
   @override
   void initState() {
     super.initState();
-    _settingsService = SettingsService();
     _storageService = StorageService();
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
-    await _settingsService.initializeDefaults();
+    await SettingsService().initializeDefaults();
 
     final articles = await _storageService.loadArticles();
     final savedArticlesList = await _storageService.loadSavedArticles();
-    final themeMode = await _settingsService.getThemeMode();
-    final inAppNotifs = await _settingsService.getInAppNotificationsEnabled();
+    final themeMode = await SettingsService().getThemeMode();
+    final inAppNotifs = await SettingsService().getInAppNotificationsEnabled();
+    final notificationsEnabled = await SettingsService()
+        .getNotificationsEnabled();
+    final newArticleNotifs = await SettingsService()
+        .getNewArticleNotifications();
 
-    setState(() {
-      _themeMode = themeMode;
-      _notificationsEnabled = true;
-      _newArticleNotifs = true;
-      _inAppNotifsEnabled = inAppNotifs;
-      _autoRefresh = true;
-      _refreshInterval = 30;
-      _maxArticles = 500;
-      _showImages = true;
-      _dataSaverMode = false;
-      _cachedArticles = articles.length;
-      _savedArticles = savedArticlesList.length;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _themeMode = themeMode;
+        _notificationsEnabled = notificationsEnabled;
+        _newArticleNotifs = newArticleNotifs;
+        _inAppNotifsEnabled = inAppNotifs;
+        _cachedArticles = articles.length;
+        _savedArticles = savedArticlesList.length;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _saveThemeMode(ThemeMode mode) async {
+    if (!mounted) return;
     setState(() => _themeMode = mode);
-    await _settingsService.setThemeMode(mode);
+    final themeProvider = context.read<ThemeProvider>();
+    await SettingsService().setThemeMode(mode);
     if (mounted) {
-      context.read<ThemeProvider>().setThemeMode(mode);
+      await themeProvider.setThemeMode(mode);
     }
   }
 
@@ -82,7 +78,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear Cache'),
-        content: Text('This will delete $_cachedArticles cached articles. This action cannot be undone.'),
+        content: Text(
+          'This will delete $_cachedArticles cached articles. This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -98,26 +96,81 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
       await _storageService.clearAll();
+      if (!mounted) return;
       setState(() {
         _cachedArticles = 0;
         _savedArticles = 0;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Cache cleared successfully')),
       );
     }
   }
 
+  Widget _buildIntervalSelector() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Consumer<SettingsNotifier>(
+      builder: (context, settings, _) => ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.timer_outlined,
+            size: 20,
+            color: colorScheme.onPrimaryContainer,
+          ),
+        ),
+        title: Text(
+          'Refresh Interval',
+          style: GoogleFonts.lexend(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+          ),
+        ),
+        trailing: DropdownButton<int>(
+          value: [15, 30, 60, 120].contains(settings.refreshInterval)
+              ? settings.refreshInterval
+              : 30,
+          dropdownColor: colorScheme.surface,
+          underline: const SizedBox.shrink(),
+          icon: Icon(Icons.expand_more, color: colorScheme.primary),
+          items: [15, 30, 60, 120].map((interval) {
+            return DropdownMenuItem(
+              value: interval,
+              child: Text(
+                '$interval min',
+                style: GoogleFonts.lexend(
+                  color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                  fontSize: 14,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) async {
+            if (value != null) {
+              await settings.setRefreshInterval(value);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -142,26 +195,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSettingsCard([
             _buildThemeSelector(),
             _buildDivider(),
-            _buildSwitchTile(
-              icon: Icons.image_outlined,
-              title: 'Show Images',
-              subtitle: 'Display article images in feed',
-              value: _showImages,
-              onChanged: (value) async {
-                setState(() => _showImages = value);
-                await _settingsService.setShowImages(value);
-              },
+            Consumer<SettingsNotifier>(
+              builder: (context, settings, _) => _buildSwitchTile(
+                icon: Icons.image_outlined,
+                title: 'Show Images',
+                subtitle: 'Display article images in feed',
+                value: settings.showImages,
+                onChanged: (value) async {
+                  await settings.setShowImages(value);
+                },
+              ),
             ),
             _buildDivider(),
-            _buildSwitchTile(
-              icon: Icons.data_saver_off_outlined,
-              title: 'Data Saver',
-              subtitle: 'Reduce data usage by limiting image quality',
-              value: _dataSaverMode,
-              onChanged: (value) async {
-                setState(() => _dataSaverMode = value);
-                await _settingsService.setDataSaverMode(value);
-              },
+            Consumer<SettingsNotifier>(
+              builder: (context, settings, _) => _buildSwitchTile(
+                icon: Icons.data_saver_off_outlined,
+                title: 'Data Saver',
+                subtitle: 'Reduce data usage by limiting image quality',
+                value: settings.dataSaverMode,
+                onChanged: (value) async {
+                  await settings.setDataSaverMode(value);
+                },
+              ),
             ),
           ]),
           const SizedBox(height: 24),
@@ -174,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _notificationsEnabled,
               onChanged: (value) async {
                 setState(() => _notificationsEnabled = value);
-                await _settingsService.setNotificationsEnabled(value);
+                await SettingsService().setNotificationsEnabled(value);
               },
             ),
             if (_notificationsEnabled) ...[
@@ -186,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: _newArticleNotifs,
                 onChanged: (value) async {
                   setState(() => _newArticleNotifs = value);
-                  await _settingsService.setNewArticleNotifications(value);
+                  await SettingsService().setNewArticleNotifications(value);
                 },
                 indented: true,
               ),
@@ -199,45 +254,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   setState(() => _inAppNotifsEnabled = value);
                   InAppNotificationManager().setEnabled(value);
-                await _settingsService.setInAppNotificationsEnabled(value);
+                  await SettingsService().setInAppNotificationsEnabled(value);
                 },
                 indented: true,
-              ),
-              _buildDivider(),
-              _buildActionTile(
-                icon: Icons.send_outlined,
-                title: 'Test Notification',
-                subtitle: 'Send a test notification to verify setup',
-                onTap: () {
-                  NotificationService().sendTestNotification();
-                  InAppNotificationManager().showFirebaseNotification(
-                    title: 'Test Notification',
-                    body: 'In-app notifications are working! 🎉',
-                    type: NotificationType.success,
-                  );
-                },
               ),
             ],
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Feed Settings'),
           _buildSettingsCard([
-            _buildSwitchTile(
-              icon: Icons.refresh_outlined,
-              title: 'Auto Refresh',
-              subtitle: 'Automatically refresh feeds in background',
-              value: _autoRefresh,
-              onChanged: (value) async {
-                setState(() => _autoRefresh = value);
-                await _settingsService.setAutoRefresh(value);
+            Consumer<SettingsNotifier>(
+              builder: (context, settings, _) => _buildSwitchTile(
+                icon: Icons.refresh_outlined,
+                title: 'Auto Refresh',
+                subtitle: 'Automatically refresh feeds in background',
+                value: settings.autoRefresh,
+                onChanged: (value) async {
+                  await settings.setAutoRefresh(value);
+                },
+              ),
+            ),
+            Consumer<SettingsNotifier>(
+              builder: (context, settings, _) {
+                if (!settings.autoRefresh) return const SizedBox.shrink();
+                return Column(
+                  children: [
+                    _buildDivider(),
+                    _buildIntervalSelector(),
+                    _buildDivider(),
+                    _buildMaxArticlesSelector(),
+                  ],
+                );
               },
             ),
-            if (_autoRefresh) ...[
-              _buildDivider(),
-              _buildIntervalSelector(),
-              _buildDivider(),
-              _buildMaxArticlesSelector(),
-            ],
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Storage & Data'),
@@ -310,7 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest?.withAlpha(77) ?? colorScheme.surface.withAlpha(77),
+        color: colorScheme.surfaceContainerHighest.withAlpha(77),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.primary.withAlpha(26)),
       ),
@@ -327,11 +376,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     for (var i = 0; i < tiles.length; i++) {
       result.add(tiles[i]);
       if (i < tiles.length - 1) {
-        result.add(Divider(
-          height: 1,
-          indent: 72,
-          color: colorScheme.primaryContainer,
-        ));
+        result.add(
+          Divider(height: 1, indent: 72, color: colorScheme.primaryContainer),
+        );
       }
     }
     return result;
@@ -384,7 +431,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Switch(
         value: value,
-        activeColor: colorScheme.primary,
+        activeThumbColor: colorScheme.primary,
         onChanged: (newValue) {
           HapticFeedback.selectionClick();
           onChanged(newValue);
@@ -421,10 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Text(
         value,
-        style: GoogleFonts.lexend(
-          fontSize: 14,
-          color: colorScheme.primary,
-        ),
+        style: GoogleFonts.lexend(fontSize: 14, color: colorScheme.primary),
       ),
     );
   }
@@ -445,10 +489,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: iconColor != null ? iconColor.withAlpha(38) : colorScheme.primaryContainer,
+          color: iconColor != null
+              ? iconColor.withAlpha(38)
+              : colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: iconColor ?? colorScheme.onPrimaryContainer),
+        child: Icon(
+          icon,
+          size: 20,
+          color: iconColor ?? colorScheme.onPrimaryContainer,
+        ),
       ),
       title: Text(
         title,
@@ -507,15 +557,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         items: [
           DropdownMenuItem(
             value: ThemeMode.system,
-            child: Text('System', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
+            child: Text(
+              'System',
+              style: GoogleFonts.lexend(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+              ),
+            ),
           ),
           DropdownMenuItem(
             value: ThemeMode.light,
-            child: Text('Light', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
+            child: Text(
+              'Light',
+              style: GoogleFonts.lexend(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+              ),
+            ),
           ),
           DropdownMenuItem(
             value: ThemeMode.dark,
-            child: Text('Dark', style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface)),
+            child: Text(
+              'Dark',
+              style: GoogleFonts.lexend(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+              ),
+            ),
           ),
         ],
         onChanged: (mode) {
@@ -525,94 +590,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildIntervalSelector() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(Icons.timer_outlined, size: 20, color: colorScheme.onPrimaryContainer),
-      ),
-      title: Text(
-        'Refresh Interval',
-        style: GoogleFonts.lexend(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-        ),
-      ),
-      trailing: DropdownButton<int>(
-        value: _refreshInterval,
-        dropdownColor: colorScheme.surface,
-        underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: colorScheme.primary),
-        items: [15, 30, 60, 120].map((interval) {
-          return DropdownMenuItem(
-            value: interval,
-            child: Text(
-              '$interval min',
-              style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface, fontSize: 14),
-            ),
-          );
-        }).toList(),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() => _refreshInterval = value);
-            _settingsService.setRefreshInterval(value);
-          }
-        },
-      ),
-    );
-  }
-
   Widget _buildMaxArticlesSelector() {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+    return Consumer<SettingsNotifier>(
+      builder: (context, settings, _) => ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            Icons.format_list_numbered,
+            size: 20,
+            color: colorScheme.onPrimaryContainer,
+          ),
         ),
-        child: Icon(Icons.format_list_numbered, size: 20, color: colorScheme.onPrimaryContainer),
-      ),
-      title: Text(
-        'Max Articles',
-        style: GoogleFonts.lexend(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+        title: Text(
+          'Max Articles',
+          style: GoogleFonts.lexend(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+          ),
         ),
-      ),
-      trailing: DropdownButton<int>(
-        value: _maxArticles,
-        dropdownColor: colorScheme.surface,
-        underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: colorScheme.primary),
-        items: [100, 250, 500, 1000, 2000].map((max) {
-          return DropdownMenuItem(
-            value: max,
-            child: Text(
-              '$max',
-              style: GoogleFonts.lexend(color: textTheme.bodyLarge?.color ?? colorScheme.onSurface, fontSize: 14),
-            ),
-          );
-        }).toList(),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() => _maxArticles = value);
-            _settingsService.setMaxArticles(value);
-          }
-        },
+        trailing: DropdownButton<int>(
+          value: [100, 250, 500, 1000, 2000].contains(settings.maxArticles)
+              ? settings.maxArticles
+              : 500,
+          dropdownColor: colorScheme.surface,
+          underline: const SizedBox.shrink(),
+          icon: Icon(Icons.expand_more, color: colorScheme.primary),
+          items: [100, 250, 500, 1000, 2000].map((max) {
+            return DropdownMenuItem(
+              value: max,
+              child: Text(
+                '$max',
+                style: GoogleFonts.lexend(
+                  color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                  fontSize: 14,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) async {
+            if (value != null) {
+              await settings.setMaxArticles(value);
+            }
+          },
+        ),
       ),
     );
   }

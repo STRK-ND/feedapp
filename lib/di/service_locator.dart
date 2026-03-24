@@ -16,6 +16,11 @@ final GetIt getIt = GetIt.instance;
 /// Setup all service dependencies
 /// This should be called before runApp in main()
 Future<void> setupServiceLocator() async {
+  // Allow re-registration in tests by resetting first
+  if (getIt.isRegistered<http.Client>()) {
+    return; // Already initialized
+  }
+
   // Register HTTP client for dependency injection
   getIt.registerLazySingleton<http.Client>(() => http.Client());
 
@@ -44,7 +49,6 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<ArticleRepository>(
     () => ArticleRepository(
       storageService: getIt<StorageService>(),
-      feedRepository: getIt<FeedRepository>(),
       workerFeedService: getIt<WorkerFeedService>(),
     ),
   );

@@ -13,7 +13,7 @@ class WorkerFeedService {
   final http.Client _httpClient;
 
   WorkerFeedService({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client();
 
   /// Fetch articles with pagination and filtering
   Future<PaginatedResponse> fetchArticles({FilterParams? params}) async {
@@ -39,7 +39,9 @@ class WorkerFeedService {
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         final paginatedResponse = PaginatedResponse.fromJson(json);
-        debugPrint('[Worker] Fetched ${paginatedResponse.items.length} articles (total: ${paginatedResponse.total})');
+        debugPrint(
+          '[Worker] Fetched ${paginatedResponse.items.length} articles (total: ${paginatedResponse.total})',
+        );
         return paginatedResponse;
       } else {
         ErrorHandler.logError(
@@ -69,44 +71,6 @@ class WorkerFeedService {
   Future<List<Article>> fetchArticlesList() async {
     final response = await fetchArticles();
     return response.items;
-  }
-
-  /// Parse a single article from Worker JSON response
-  Article _parseArticle(Map<String, dynamic> json) {
-    return Article(
-      id: json['id']?.toString() ?? '',
-      title: json['title'] as String? ?? 'Untitled',
-      description: json['description'] as String? ?? '',
-      fullContent: json['fullContent'] as String? ?? '',
-      link: json['link'] as String? ?? '',
-      sourceId: json['sourceId'] as String? ?? '',
-      sourceName: json['sourceName'] as String? ?? 'Unknown Source',
-      pubDate: _parseDate(json['pubDate']),
-      author: json['author'] as String?,
-      imageUrl: json['imageUrl'] as String?,
-      sourceCategory: json['sourceCategory'] as String?,
-      sourceColor: json['sourceColor'] as String?,
-      sourceIcon: json['sourceIcon'] as String?,
-    );
-  }
-
-  /// Parse date from ISO string or epoch milliseconds
-  DateTime _parseDate(dynamic dateValue) {
-    if (dateValue == null) return DateTime.now();
-
-    if (dateValue is int) {
-      return DateTime.fromMillisecondsSinceEpoch(dateValue, isUtc: true);
-    }
-
-    if (dateValue is String) {
-      try {
-        return DateTime.parse(dateValue);
-      } catch (e) {
-        return DateTime.now();
-      }
-    }
-
-    return DateTime.now();
   }
 
   /// Test the Worker API connection
@@ -177,7 +141,9 @@ class WorkerFeedService {
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        debugPrint('[Worker] Fetched full content (${json['wordCount']} words)');
+        debugPrint(
+          '[Worker] Fetched full content (${json['wordCount']} words)',
+        );
         return json;
       } else if (response.statusCode == 400) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;

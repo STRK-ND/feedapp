@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
-import '../di/service_locator.dart';
 import '../models/article.dart';
-import '../services/rss_feed_service.dart';
 import '../services/cache_manager.dart';
-import '../utils/constants.dart';
-import '../utils/helpers.dart';
+import '../providers/settings_notifier.dart';
 import 'swipeable_card.dart';
 import 'stitch/stitch_widgets.dart';
 import '../utils/read_time_calculator.dart';
@@ -39,7 +35,6 @@ class CardStack extends StatefulWidget {
 
 class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   late AnimationController _cardEntranceController;
-  int? _pressedCardIndex;
 
   @override
   void initState() {
@@ -53,7 +48,6 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Check for reduced motion preference (must be in didChangeDependencies)
     final mediaQuery = MediaQuery.of(context);
     if (mediaQuery.disableAnimations) {
       _cardEntranceController.value = 1.0;
@@ -82,87 +76,17 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildGlassImage(String? imageUrl, Article article) {
-    if (imageUrl == null) return const SizedBox.shrink();
-
-    return Semantics(
-      image: true,
-      label: '${article.title} image',
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
-        child: Stack(
-          children: [
-            CachedNetworkImage(
-              imageUrl: imageUrl,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              cacheManager: AppCacheManager(),
-              placeholder: (context, url) => _buildImagePlaceholder(),
-              errorWidget: (context, url, error) => _buildImageError(),
-            ),
-            // Travel-style gradient overlay
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                    AppColors.backgroundDark,                    AppColors.backgroundDark.withValues(alpha: 0.4),                    Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.6, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePlaceholder() {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 32,
-          color: AppColors.textTertiary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageError() {
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppCardStyles.imageRadius),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.broken_image_outlined,
-          size: 32,
-          color: AppColors.textTertiary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildArticleCard(Article article, int index, bool isFront) {
-    final sourceName = article.sourceName.isNotEmpty
-        ? article.sourceName
-        : (getIt<RssFeedService>().getSourceById(article.sourceId)?.name ?? 'Unknown');
+  Widget _buildArticleCard(
+    Article article,
+    int index,
+    bool isFront,
+    bool showImages,
+    int imageMaxWidth,
+  ) {
     final sourceCategory = article.sourceCategory ?? 'Technology';
     final readTime = ReadTimeCalculator.calculateReadTime(article.description);
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () {
@@ -174,9 +98,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
+          color: colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.15),
+              color: colorScheme.primary.withValues(alpha: 0.15),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -190,14 +115,16 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
               fit: StackFit.expand,
               children: [
                 // Background image
-                if (article.imageUrl != null)
+                if (article.imageUrl != null && showImages)
                   CachedNetworkImage(
                     imageUrl: article.imageUrl!,
+                    width: imageMaxWidth.toDouble(),
                     fit: BoxFit.cover,
                     cacheManager: AppCacheManager(),
+                    memCacheWidth: imageMaxWidth,
                   )
                 else
-                  Container(color: AppColors.primary10),
+                  Container(color: colorScheme.surfaceContainerHighest),
 
                 // Gradient overlay
                 Container(
@@ -206,8 +133,8 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
-                        AppColors.backgroundDark,
-                        AppColors.backgroundDark.withOpacity(0.6),
+                        colorScheme.surface,
+                        colorScheme.surface.withValues(alpha: 0.6),
                         Colors.transparent,
                       ],
                       stops: const [0.0, 0.4, 0.8],
@@ -239,8 +166,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         // Title
                         Text(
                           article.title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.white
+                                : colorScheme.onSurface,
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
                             height: 1.2,
@@ -254,7 +183,9 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         Text(
                           article.description,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
+                            color:
+                                (isDark ? Colors.white : colorScheme.onSurface)
+                                    .withValues(alpha: 0.8),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             height: 1.5,
@@ -268,9 +199,12 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         GestureDetector(
                           onTap: () => widget.onTap(index),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppColors.primary10,
+                              color: colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -279,13 +213,17 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                                 Text(
                                   'Read Full Story',
                                   style: TextStyle(
-                                    color: AppColors.primary,
+                                    color: colorScheme.primary,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.arrow_forward, size: 16, color: AppColors.primary),
+                                Icon(
+                                  Icons.arrow_forward,
+                                  size: 16,
+                                  color: colorScheme.primary,
+                                ),
                               ],
                             ),
                           ),
@@ -304,19 +242,29 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.articles.isEmpty) {
-      return widget.emptyState;
-    }
+    return Consumer<SettingsNotifier>(
+      builder: (context, settings, _) {
+        if (widget.articles.isEmpty) {
+          return widget.emptyState;
+        }
 
-    // Show only ONE card at a time - no overlapping stack effect
-    final article = widget.articles.first;
+        final article = widget.articles.first;
+        final imageMaxWidth = settings.dataSaverMode ? 400 : 800;
 
-    return SwipeableCard(
-      key: ValueKey('card_${article.id}'),
-      child: _buildArticleCard(article, 0, true),
-      onSwipeRight: () => widget.onSwipeRight(0),
-      onSwipeLeft: () => widget.onSwipeLeft(0),
-      onTap: () => widget.onTap(0),
+        return SwipeableCard(
+          key: ValueKey('card_${article.id}'),
+          child: _buildArticleCard(
+            article,
+            0,
+            true,
+            settings.showImages,
+            imageMaxWidth,
+          ),
+          onSwipeRight: () => widget.onSwipeRight(0),
+          onSwipeLeft: () => widget.onSwipeLeft(0),
+          onTap: () => widget.onTap(0),
+        );
+      },
     );
   }
 }

@@ -2,7 +2,6 @@ import '../models/article.dart';
 import '../models/filter_params.dart';
 import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
-import '../repositories/feed_repository.dart';
 import '../utils/error_handler.dart';
 import '../utils/helpers.dart';
 import '../di/service_locator.dart';
@@ -11,16 +10,13 @@ import '../di/service_locator.dart';
 /// Uses dependency injection for testability
 class ArticleRepository {
   final StorageService _storageService;
-  final FeedRepository _feedRepository;
   final WorkerFeedService _workerFeedService;
 
   ArticleRepository({
     StorageService? storageService,
-    FeedRepository? feedRepository,
     WorkerFeedService? workerFeedService,
-  })  : _storageService = storageService ?? getIt<StorageService>(),
-        _feedRepository = feedRepository ?? getIt<FeedRepository>(),
-        _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
+  }) : _storageService = storageService ?? getIt<StorageService>(),
+       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
 
   // Cache for articles to avoid repeated storage reads
   List<Article>? _cachedArticles;
@@ -33,7 +29,9 @@ class ArticleRepository {
   }
 
   /// Fetch all articles from storage
-  Future<Result<List<Article>>> fetchAllArticles({bool forceRefresh = false}) async {
+  Future<Result<List<Article>>> fetchAllArticles({
+    bool forceRefresh = false,
+  }) async {
     try {
       ErrorHandlerExtensions.logInfo('Fetching all articles');
 
@@ -72,7 +70,8 @@ class ArticleRepository {
       int page = 1;
       bool hasMore = true;
 
-      while (hasMore && page <= 5) {  // Limit to 5 pages (250 articles max)
+      while (hasMore && page <= 5) {
+        // Limit to 5 pages (250 articles max)
         final response = await _workerFeedService.fetchArticles(
           params: FilterParams(page: page, pageSize: 50),
         );
@@ -100,7 +99,9 @@ class ArticleRepository {
       final existingIds = existingArticles.map((a) => a.id).toSet();
 
       // Filter out duplicates
-      final articlesToAdd = newArticles.where((a) => !existingIds.contains(a.id)).toList();
+      final articlesToAdd = newArticles
+          .where((a) => !existingIds.contains(a.id))
+          .toList();
 
       if (articlesToAdd.isEmpty) {
         ErrorHandler.logError(
@@ -137,7 +138,9 @@ class ArticleRepository {
   /// Fetch articles from a specific source
   Future<Result<List<Article>>> fetchArticlesFromSource(String sourceId) async {
     try {
-      ErrorHandlerExtensions.logInfo('Fetching articles from source: $sourceId');
+      ErrorHandlerExtensions.logInfo(
+        'Fetching articles from source: $sourceId',
+      );
 
       final allResult = await fetchAllArticles();
       if (allResult.isFailure) {
@@ -145,7 +148,9 @@ class ArticleRepository {
       }
 
       final articles = allResult.data ?? [];
-      final filteredArticles = articles.where((a) => a.sourceId == sourceId).toList();
+      final filteredArticles = articles
+          .where((a) => a.sourceId == sourceId)
+          .toList();
 
       return Result.success(filteredArticles);
     } catch (e, stackTrace) {
@@ -191,7 +196,7 @@ class ArticleRepository {
 
       ErrorHandlerExtensions.logInfo('Searching articles with query: $query');
 
-final allResult = await fetchAllArticles();
+      final allResult = await fetchAllArticles();
       if (allResult.isFailure) {
         return allResult;
       }
@@ -217,7 +222,9 @@ final allResult = await fetchAllArticles();
         return await fetchAllArticles();
       }
 
-      ErrorHandlerExtensions.logInfo('Filtering articles by category: $category');
+      ErrorHandlerExtensions.logInfo(
+        'Filtering articles by category: $category',
+      );
 
       // Get all articles
       final allResult = await fetchAllArticles();
@@ -227,7 +234,9 @@ final allResult = await fetchAllArticles();
 
       final articles = allResult.data ?? [];
       // Filter by sourceCategory from article metadata (provided by Worker)
-      final filteredArticles = articles.where((a) => a.sourceCategory == category).toList();
+      final filteredArticles = articles
+          .where((a) => a.sourceCategory == category)
+          .toList();
 
       return Result.success(filteredArticles);
     } catch (e, stackTrace) {
@@ -302,7 +311,10 @@ final allResult = await fetchAllArticles();
   }
 
   /// Toggle save status for an article
-  Future<Result<void>> toggleSave(Article article, {bool isSaved = false}) async {
+  Future<Result<void>> toggleSave(
+    Article article, {
+    bool isSaved = false,
+  }) async {
     try {
       // Create updated article with new save state
       final updatedArticle = article.copyWith(isSaved: isSaved);
@@ -358,7 +370,9 @@ final allResult = await fetchAllArticles();
       }
 
       final articles = allResult.data ?? [];
-      final remainingArticles = articles.where((a) => a.id != articleId).toList();
+      final remainingArticles = articles
+          .where((a) => a.id != articleId)
+          .toList();
 
       _cachedArticles = remainingArticles;
       await _storageService.saveArticles(remainingArticles);
@@ -379,7 +393,9 @@ final allResult = await fetchAllArticles();
     try {
       final unreadResult = await filterUnread();
       if (unreadResult.isFailure) {
-        return Result.failure(unreadResult.error ?? 'Failed to get unread articles');
+        return Result.failure(
+          unreadResult.error ?? 'Failed to get unread articles',
+        );
       }
 
       return Result.success(unreadResult.data?.length ?? 0);
@@ -394,7 +410,9 @@ final allResult = await fetchAllArticles();
   }
 
   /// Fetch articles with specific filter parameters
-  Future<Result<List<Article>>> fetchArticlesWithFilters(FilterParams params) async {
+  Future<Result<List<Article>>> fetchArticlesWithFilters(
+    FilterParams params,
+  ) async {
     try {
       ErrorHandlerExtensions.logInfo('Fetching articles with filters');
 
@@ -429,7 +447,9 @@ final allResult = await fetchAllArticles();
   }
 
   /// Fetch full article content
-  Future<Result<Map<String, dynamic>?>> fetchArticleFullContent(String articleUrl) async {
+  Future<Result<Map<String, dynamic>?>> fetchArticleFullContent(
+    String articleUrl,
+  ) async {
     try {
       ErrorHandlerExtensions.logInfo('Fetching full content for article');
 
@@ -455,17 +475,11 @@ final allResult = await fetchAllArticles();
 extension ErrorHandlerExtensions on ErrorHandler {
   /// Log info message
   static void logInfo(String message) {
-    ErrorHandler.logError(
-      message,
-      severity: ErrorSeverity.low,
-    );
+    ErrorHandler.logError(message, severity: ErrorSeverity.low);
   }
 
   /// Log warning message
   static void logWarning(String message) {
-    ErrorHandler.logError(
-      message,
-      severity: ErrorSeverity.medium,
-    );
+    ErrorHandler.logError(message, severity: ErrorSeverity.medium);
   }
 }

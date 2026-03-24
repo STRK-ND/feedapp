@@ -13,9 +13,10 @@ class ReadTimeBadge extends StatelessWidget {
     super.key,
   });
 
-  @override
+@override
   Widget build(BuildContext context) {
-    final readTime = ReadTimeCalculator.calculateReadTime(article);
+    final readTimeMinutes = ReadTimeCalculator.calculateReadTime(article.description);
+    final readTime = '$readTimeMinutes min read';
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -23,8 +24,8 @@ class ReadTimeBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isDark
-          ? Colors.white.withValues(alpha: 0.2) // glass effect for dark
-          : AppColors.primary.withValues(alpha: 0.8), // solid primary for light
+            ? Colors.white.withValues(alpha: 0.2) // glass effect for dark
+            : AppColors.primary.withValues(alpha: 0.8), // solid primary for light
         borderRadius: BorderRadius.circular(999), // pill shape
         border: isDark ? Border.all(
           color: Colors.white.withValues(alpha: 0.3),

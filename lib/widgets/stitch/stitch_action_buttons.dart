@@ -76,7 +76,7 @@ class _ActionButton extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -120,17 +120,13 @@ class _SaveButton extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.4),
+                  color: AppColors.primary.withValues(alpha: 0.4),
                   blurRadius: 20,
                   spreadRadius: 4,
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.favorite,
-              color: Colors.white,
-              size: 32,
-            ),
+            child: const Icon(Icons.favorite, color: Colors.white, size: 32),
           ),
         ),
         const SizedBox(height: 8),

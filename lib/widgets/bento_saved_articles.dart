@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../models/article.dart';
 import '../services/rss_feed_service.dart';
 import '../services/cache_manager.dart';
+import '../providers/settings_notifier.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../di/service_locator.dart';
@@ -35,6 +37,7 @@ class BentoSavedArticlesGrid extends StatefulWidget {
 class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     with SingleTickerProviderStateMixin {
   late AnimationController _entranceController;
+  late ColorScheme _colorScheme;
 
   @override
   void initState() {
@@ -44,6 +47,12 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
       duration: const Duration(milliseconds: 600),
     );
     _entranceController.forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _colorScheme = Theme.of(context).colorScheme;
   }
 
   @override
@@ -63,31 +72,54 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isEmpty || widget.articles.isEmpty) {
-      return _buildEmptyState();
-    }
+    return Consumer<SettingsNotifier>(
+      builder: (context, settings, _) {
+        if (widget.isEmpty || widget.articles.isEmpty) {
+          return _buildEmptyState();
+        }
 
-    return GridView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: BentoGridConfig.crossAxisCount,
-        mainAxisSpacing: BentoGridConfig.mainAxisSpacing,
-        crossAxisSpacing: BentoGridConfig.crossAxisSpacing,
-        childAspectRatio: BentoGridConfig.standardRatio,
-      ),
-      itemCount: widget.articles.length,
-      itemBuilder: (context, index) {
-        final span = BentoGridConfig.getSpanForArticle(index, widget.articles.length);
-        return _buildBentoCard(index, span);
+        final imageMaxWidth = settings.dataSaverMode ? 400 : 800;
+
+        return GridView.builder(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: BentoGridConfig.crossAxisCount,
+            mainAxisSpacing: BentoGridConfig.mainAxisSpacing,
+            crossAxisSpacing: BentoGridConfig.crossAxisSpacing,
+            childAspectRatio: BentoGridConfig.standardRatio,
+          ),
+          itemCount: widget.articles.length,
+          itemBuilder: (context, index) {
+            final span = BentoGridConfig.getSpanForArticle(
+              index,
+              widget.articles.length,
+            );
+            return _buildBentoCard(
+              index,
+              span,
+              settings.showImages,
+              imageMaxWidth,
+            );
+          },
+        );
       },
     );
   }
 
-  Widget _buildBentoCard(int index, int span) {
+  Widget _buildBentoCard(
+    int index,
+    int span,
+    bool showImages,
+    int imageMaxWidth,
+  ) {
     final article = widget.articles[index];
-    final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(article);
-    final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(article);
+    final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(
+      article,
+    );
+    final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(
+      article,
+    );
 
     // Entrance animation with stagger
     final Animation<double> animation = CurvedAnimation(
@@ -100,9 +132,25 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     );
 
     if (span == 2) {
-      return _buildFeaturedCard(article, sourceName, sourceColor, index, animation);
+      return _buildFeaturedCard(
+        article,
+        sourceName,
+        sourceColor,
+        index,
+        animation,
+        showImages,
+        imageMaxWidth,
+      );
     }
-    return _buildStandardCard(article, sourceName, sourceColor, index, animation);
+    return _buildStandardCard(
+      article,
+      sourceName,
+      sourceColor,
+      index,
+      animation,
+      showImages,
+      imageMaxWidth,
+    );
   }
 
   Widget _buildFeaturedCard(
@@ -111,16 +159,15 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     Color sourceColor,
     int index,
     Animation<double> animation,
+    bool showImages,
+    int imageMaxWidth,
   ) {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
         return Transform.translate(
           offset: Offset(0, 20.0 * (1.0 - animation.value)),
-          child: FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
+          child: FadeTransition(opacity: animation, child: child),
         );
       },
       child: AspectRatio(
@@ -134,10 +181,10 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
           },
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.backgroundDark,
+              color: _colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.primary.withOpacity(0.1),
+                color: _colorScheme.primary.withValues(alpha: 0.1),
               ),
             ),
             child: ClipRRect(
@@ -146,22 +193,20 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                 fit: StackFit.expand,
                 children: [
                   // Background image
-                  if (article.imageUrl != null)
+                  if (article.imageUrl != null && showImages)
                     CachedNetworkImage(
                       imageUrl: article.imageUrl!,
+                      width: imageMaxWidth.toDouble(),
                       fit: BoxFit.cover,
                       cacheManager: AppCacheManager(),
-                      placeholder: (context, url) => Container(
-                        color: AppColors.background,
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: sourceColor.withOpacity(0.1),
-                      ),
+                      memCacheWidth: imageMaxWidth,
+                      placeholder: (context, url) =>
+                          Container(color: _colorScheme.surface),
+                      errorWidget: (context, url, error) =>
+                          Container(color: sourceColor.withValues(alpha: 0.1)),
                     )
                   else
-                    Container(
-                      color: sourceColor.withOpacity(0.1),
-                    ),
+                    Container(color: sourceColor.withValues(alpha: 0.1)),
 
                   // Gradient overlay
                   Container(
@@ -171,7 +216,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          AppColors.backgroundDark.withOpacity(0.9),
+                          _colorScheme.surface.withValues(alpha: 0.9),
                         ],
                         stops: const [0.4, 1.0],
                       ),
@@ -191,7 +236,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.2),
+                            color: _colorScheme.primary.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -199,7 +244,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                             style: GoogleFonts.lexend(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
+                              color: _colorScheme.primary,
                             ),
                           ),
                         ),
@@ -220,7 +265,9 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                           Helpers.formatTimeAgo(article.pubDate),
                           style: GoogleFonts.lexend(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: _colorScheme.onSurface.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                         ),
                       ],
@@ -241,16 +288,15 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     Color sourceColor,
     int index,
     Animation<double> animation,
+    bool showImages,
+    int imageMaxWidth,
   ) {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
         return Transform.translate(
           offset: Offset(0, 20.0 * (1.0 - animation.value)),
-          child: FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
+          child: FadeTransition(opacity: animation, child: child),
         );
       },
       child: GestureDetector(
@@ -262,10 +308,10 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
         },
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.backgroundDark,
+            color: _colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.primary.withOpacity(0.1),
+              color: _colorScheme.primary.withValues(alpha: 0.1),
             ),
           ),
           child: ClipRRect(
@@ -274,22 +320,20 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
               fit: StackFit.expand,
               children: [
                 // Background image
-                if (article.imageUrl != null)
+                if (article.imageUrl != null && showImages)
                   CachedNetworkImage(
                     imageUrl: article.imageUrl!,
+                    width: imageMaxWidth.toDouble(),
                     fit: BoxFit.cover,
                     cacheManager: AppCacheManager(),
-                    placeholder: (context, url) => Container(
-                      color: AppColors.background,
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: sourceColor.withOpacity(0.1),
-                    ),
+                    memCacheWidth: imageMaxWidth,
+                    placeholder: (context, url) =>
+                        Container(color: _colorScheme.surface),
+                    errorWidget: (context, url, error) =>
+                        Container(color: sourceColor.withValues(alpha: 0.1)),
                   )
                 else
-                  Container(
-                    color: sourceColor.withOpacity(0.1),
-                  ),
+                  Container(color: sourceColor.withValues(alpha: 0.1)),
 
                 // Gradient overlay
                 Container(
@@ -299,7 +343,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        AppColors.backgroundDark.withOpacity(0.95),
+                        _colorScheme.surface.withValues(alpha: 0.95),
                       ],
                       stops: const [0.5, 1.0],
                     ),
@@ -319,7 +363,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.2),
+                          color: _colorScheme.primary.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -327,7 +371,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                           style: GoogleFonts.lexend(
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                            color: _colorScheme.primary,
                           ),
                         ),
                       ),
@@ -348,7 +392,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                         Helpers.formatTimeAgo(article.pubDate),
                         style: GoogleFonts.lexend(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: _colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -370,13 +414,13 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: _colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.bookmark_outline_rounded,
               size: 48,
-              color: AppColors.primary,
+              color: _colorScheme.primary,
             ),
           ),
           const SizedBox(height: 16),
@@ -393,7 +437,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
             'Swipe right on articles to save them',
             style: GoogleFonts.lexend(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: _colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ],

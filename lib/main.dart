@@ -8,12 +8,12 @@ import 'utils/constants.dart';
 import 'screens/feed_screen.dart';
 import 'screens/settings_screen.dart';
 import 'providers/theme_provider.dart';
+import 'providers/settings_notifier.dart';
 import 'providers/feed_provider.dart';
 import 'repositories/article_repository.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
-import 'services/in_app_notification_manager.dart';
 import 'widgets/in_app_notification_banner.dart';
 
 Future<void> main() async {
@@ -37,9 +37,7 @@ class CuratedFeedsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SettingsService>(
-          create: (_) => SettingsService(),
-        ),
+        Provider<SettingsService>(create: (_) => SettingsService()),
         ChangeNotifierProvider<ThemeProvider>(
           create: (context) {
             final provider = ThemeProvider(SettingsService());
@@ -47,9 +45,14 @@ class CuratedFeedsApp extends StatelessWidget {
             return provider;
           },
         ),
-        ChangeNotifierProvider<FeedProvider>.value(
-          value: feedProvider,
+        ChangeNotifierProvider<SettingsNotifier>(
+          create: (context) {
+            final provider = SettingsNotifier(SettingsService());
+            provider.loadSettings();
+            return provider;
+          },
         ),
+        ChangeNotifierProvider<FeedProvider>.value(value: feedProvider),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -92,10 +95,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.backgroundDark : Colors.white,

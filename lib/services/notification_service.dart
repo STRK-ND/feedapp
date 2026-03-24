@@ -1,6 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/material.dart';
 import 'in_app_notification_manager.dart';
 import '../models/in_app_notification.dart';
 
@@ -11,7 +10,8 @@ class NotificationService {
   NotificationService._internal();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
   String? _fcmToken;
@@ -37,11 +37,10 @@ class NotificationService {
     FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
 
     // Handle notification tap when app is in terminated state
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        _handleNotificationTap(message);
-      }
-    });
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationTap(initialMessage);
+    }
 
     // Handle notification tap when app is in background
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
@@ -62,17 +61,23 @@ class NotificationService {
       sound: true,
     );
 
-    print('[Notification] iOS Permission status: ${iosSettings.authorizationStatus}');
+    print(
+      '[Notification] iOS Permission status: ${iosSettings.authorizationStatus}',
+    );
 
     // Android 13+ permissions
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
   }
 
   /// Initialize local notifications
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -107,11 +112,7 @@ class NotificationService {
 
     // When app is in foreground, only show in-app notification (not both)
     // This avoids duplicate UX - local notifications are for background/minimized state
-    _showInAppNotification(
-      title: title,
-      body: body,
-      data: message.data,
-    );
+    _showInAppNotification(title: title, body: body, data: message.data);
   }
 
   /// Handle background message (must be top-level function)
@@ -169,7 +170,8 @@ class NotificationService {
   }) {
     // Read notification type from message data map
     final typeValue = data?['type'] ?? data?['notification_type'];
-    final notificationType = typeValue == 'breaking' || typeValue == 'breakingNews'
+    final notificationType =
+        typeValue == 'breaking' || typeValue == 'breakingNews'
         ? NotificationType.breakingNews
         : NotificationType.newArticle;
 

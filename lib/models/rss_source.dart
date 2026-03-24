@@ -24,7 +24,7 @@ class RssSource {
       'name': name,
       'url': url,
       'category': category,
-      'color': color.value,
+      'color': color.toARGB32(),
       'icon': icon.codePoint,
     };
   }
@@ -36,7 +36,10 @@ class RssSource {
       url: json['url'] as String? ?? '',
       category: json['category'] as String? ?? 'General',
       color: Color(json['color'] as int? ?? 0xFF000000),
-      icon: IconData(json['icon'] as int? ?? 0xE000, fontFamily: 'MaterialIcons'),
+      icon: IconData(
+        json['icon'] as int? ?? 0xE000,
+        fontFamily: 'MaterialIcons',
+      ),
     );
   }
 

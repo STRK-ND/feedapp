@@ -10,11 +10,7 @@ class StorageService {
   factory StorageService() => _instance;
   StorageService._internal();
 
-  final _secureStorage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
-  );
+  final _secureStorage = const FlutterSecureStorage(aOptions: AndroidOptions());
 
   /// Save articles list (public data)
   Future<void> saveArticles(List<Article> articles) async {
@@ -22,7 +18,9 @@ class StorageService {
       // Enforce article limit
       final limitedArticles = _enforceArticleLimit(articles);
 
-      final jsonData = json.encode(limitedArticles.map((a) => a.toJson()).toList());
+      final jsonData = json.encode(
+        limitedArticles.map((a) => a.toJson()).toList(),
+      );
       await _secureStorage.write(key: 'articles', value: jsonData);
     } catch (e) {
       ErrorHandler.logError('Failed to save articles', error: e);

@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
 import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/repositories/article_repository.dart';
@@ -8,8 +10,12 @@ void main() {
   group('ArticleRepository', () {
     late ArticleRepository repository;
 
+    setUpAll(() {
+      // Reset GetIt once before all tests to avoid "already registered" errors
+      GetIt.instance.reset();
+    });
+
     setUp(() async {
-      // Ensure service locator is set up for testing
       await setupServiceLocator();
       repository = ArticleRepository();
     });
