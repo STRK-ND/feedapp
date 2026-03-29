@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:sentry/sentry.dart';
 
 /// App error severity levels
 enum ErrorSeverity {
@@ -12,13 +13,14 @@ enum ErrorSeverity {
 class ErrorHandler {
   ErrorHandler._();
 
-  /// Log an error with severity level
-  static void logError(
+  /// Log an error with severity level and send to Sentry
+  static Future<void> logError(
     String message, {
     Object? error,
     StackTrace? stackTrace,
     ErrorSeverity severity = ErrorSeverity.medium,
-  }) {
+    Map<String, dynamic>? extra,
+  }) async {
     final severityTag = _getSeverityTag(severity);
     final logMessage = '[$severityTag] $message';
 
@@ -31,9 +33,94 @@ class ErrorHandler {
       debugPrint(logMessage);
     }
 
-    // In production, you would send to a crash reporting service
-    if (kReleaseMode && severity == ErrorSeverity.critical) {
-      // TODO: Send to crash reporting service (e.g., Sentry, Firebase Crashlytics)
+    // Send to Sentry in release mode for medium+ severity
+    if (kReleaseMode) {
+      await _sendToSentry(
+        message: logMessage,
+        error: error,
+        stackTrace: stackTrace,
+        severity: severity,
+      );
+    }
+    // Always send critical errors to Sentry in debug too
+    else if (severity == ErrorSeverity.critical && error != null) {
+      await _sendToSentry(
+        message: logMessage,
+        error: error,
+        stackTrace: stackTrace,
+        severity: severity,
+      );
+    }
+  }
+
+  /// Send error to Sentry
+  static Future<void> _sendToSentry({
+    required String message,
+    Object? error,
+    StackTrace? stackTrace,
+    ErrorSeverity severity = ErrorSeverity.medium,
+  }) async {
+    try {
+      final sentryLevel = _getSentryLevel(severity);
+
+      if (error != null) {
+        // Capture as exception
+        await Sentry.captureException(error, stackTrace: stackTrace);
+      } else {
+        // Capture as message
+        await Sentry.captureMessage(message, level: sentryLevel);
+      }
+    } catch (e) {
+      debugPrint('Failed to send to Sentry: $e');
+    }
+  }
+
+  /// Capture a specific exception to Sentry
+  static Future<void> captureException(
+    Object error, {
+    StackTrace? stackTrace,
+    String? reason,
+  }) async {
+    try {
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    } catch (e) {
+      debugPrint('Failed to capture exception to Sentry: $e');
+    }
+  }
+
+  /// Capture a message to Sentry
+  static Future<void> captureMessage(
+    String message, {
+    SentryLevel level = SentryLevel.info,
+  }) async {
+    try {
+      await Sentry.captureMessage(message, level: level);
+    } catch (e) {
+      debugPrint('Failed to capture message to Sentry: $e');
+    }
+  }
+
+  /// Add a breadcrumb for user actions
+  static void addBreadcrumb(String message, {String? category}) {
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        message: message,
+        category: category,
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+
+  static SentryLevel _getSentryLevel(ErrorSeverity severity) {
+    switch (severity) {
+      case ErrorSeverity.low:
+        return SentryLevel.debug;
+      case ErrorSeverity.medium:
+        return SentryLevel.warning;
+      case ErrorSeverity.high:
+        return SentryLevel.error;
+      case ErrorSeverity.critical:
+        return SentryLevel.fatal;
     }
   }
 

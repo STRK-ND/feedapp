@@ -163,10 +163,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       }
 
       _staggerController.forward();
-      await _refreshFeeds();
+      _refreshFeeds();
     } catch (e) {
       ErrorHandler.logError('Failed to load data', error: e);
-      // Continue with empty state
       if (mounted) {
         setState(() {
           _articles = [];

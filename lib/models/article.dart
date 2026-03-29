@@ -1,4 +1,6 @@
 /// Article Model
+import '../utils/helpers.dart';
+
 class Article {
   final String id;
   final String title;
@@ -73,7 +75,15 @@ class Article {
   factory Article.fromJson(Map<String, dynamic> json) {
     // Handle id as either int or string (Worker API returns int, local storage uses string)
     final dynamic rawId = json['id'];
-    final String id = rawId is int ? rawId.toString() : (rawId as String? ?? '');
+    final String id = rawId is int
+        ? rawId.toString()
+        : (rawId as String? ?? '');
+
+    // Validate image URL
+    String? imageUrl = json['imageUrl'] as String?;
+    if (imageUrl != null && !Helpers.isValidImageUrl(imageUrl)) {
+      imageUrl = null;
+    }
 
     return Article(
       id: id,

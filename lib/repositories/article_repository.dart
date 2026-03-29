@@ -70,7 +70,7 @@ class ArticleRepository {
       int page = 1;
       bool hasMore = true;
 
-      while (hasMore && page <= 5) {
+      while (hasMore && page <= 1) {
         // Limit to 5 pages (250 articles max)
         final response = await _workerFeedService.fetchArticles(
           params: FilterParams(page: page, pageSize: 50),

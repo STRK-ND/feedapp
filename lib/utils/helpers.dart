@@ -45,10 +45,30 @@ class Helpers {
 
     final lowerUrl = url.toLowerCase();
 
+    // Block URLs that require authentication or have expired signatures
+    const blockedPatterns = [
+      'o.aolcdn.com', // AOL images require authentication
+      'media.m半岛日报.com',
+      'dims?image_uri',
+    ];
+    for (final pattern in blockedPatterns) {
+      if (lowerUrl.contains(pattern.toLowerCase())) return false;
+    }
+
     // Check for common image file extensions
     const validExtensions = [
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.avif',
-      '.heic', '.ico', '.tif', '.tiff'
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.webp',
+      '.svg',
+      '.avif',
+      '.heic',
+      '.ico',
+      '.tif',
+      '.tiff',
     ];
     for (final ext in validExtensions) {
       if (lowerUrl.contains(ext)) return true;
@@ -86,25 +106,25 @@ class Helpers {
     }
 
     // Accept URLs that look like they might be images based on parameters
-    if (lowerUrl.contains('image')
-        || lowerUrl.contains('photo')
-        || lowerUrl.contains('picture')) {
+    if (lowerUrl.contains('image') ||
+        lowerUrl.contains('photo') ||
+        lowerUrl.contains('picture')) {
       return true;
     }
 
     // Accept URLs that have dimensions (often image thumbnails)
-    if (lowerUrl.contains('&width=')
-        || lowerUrl.contains('&height=')
-        || lowerUrl.contains('?width=')
-        || lowerUrl.contains('?height=')
-        || lowerUrl.contains('w=')
-        || lowerUrl.contains('h=')) {
+    if (lowerUrl.contains('&width=') ||
+        lowerUrl.contains('&height=') ||
+        lowerUrl.contains('?width=') ||
+        lowerUrl.contains('?height=') ||
+        lowerUrl.contains('w=') ||
+        lowerUrl.contains('h=')) {
       return true;
     }
 
     // Accept URLs that look like content delivery
-    if (lowerUrl.contains('content')
-        && (lowerUrl.contains('cdn') || lowerUrl.contains('media'))) {
+    if (lowerUrl.contains('content') &&
+        (lowerUrl.contains('cdn') || lowerUrl.contains('media'))) {
       return true;
     }
 
@@ -114,8 +134,18 @@ class Helpers {
   /// Parse a custom date format (e.g., "15 Jan 2024")
   static DateTime parseCustomDate(String dateStr) {
     final months = {
-      'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-      'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
     };
 
     final parts = dateStr.split(' ');
@@ -175,7 +205,10 @@ class Helpers {
   }
 
   /// Filter articles by search query across title, description, and source name
-  static List<Article> filterArticlesByQuery(List<Article> articles, String query) {
+  static List<Article> filterArticlesByQuery(
+    List<Article> articles,
+    String query,
+  ) {
     if (query.isEmpty) return articles;
 
     final lowerQuery = query.toLowerCase();
@@ -187,7 +220,10 @@ class Helpers {
   }
 
   /// Filter articles by category
-  static List<Article> filterArticlesByCategory(List<Article> articles, String category) {
+  static List<Article> filterArticlesByCategory(
+    List<Article> articles,
+    String category,
+  ) {
     if (category == 'All' || category.isEmpty) {
       return articles;
     }

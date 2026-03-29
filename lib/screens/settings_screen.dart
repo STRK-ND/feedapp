@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
@@ -333,7 +334,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
           ]),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+          _buildSectionHeader('Support'),
+          _buildSettingsCard([
+            _buildActionTile(
+              icon: Icons.bug_report_outlined,
+              title: 'Report bug / Join Community',
+              subtitle: 'Join our WhatsApp group',
+              onTap: () async {
+                final uri = Uri.parse(
+                  'https://chat.whatsapp.com/BoABgXqa64BEtcgNDYaCIt',
+                );
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ]),
+          const SizedBox(height: 24),
         ],
       ),
     );

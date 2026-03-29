@@ -67,7 +67,7 @@ class AppConfig {
   // Worker API settings
   static const String workerApiUrl =
       'https://curated-feeds-worker.raj15400881.workers.dev/';
-  static const int workerTimeoutSeconds = 15;
+  static const int workerTimeoutSeconds = 8;
 
   // RSS feed settings (deprecated - using Worker API instead)
   static const int rssTimeoutSeconds = 8;

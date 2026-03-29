@@ -69,6 +69,10 @@ dependencies:
   
   # Notifications
   flutter_local_notifications: ^18.0.1
+  sentry: ^9.16.0
+
+# Error Tracking
+sentry_flutter: ^8.9.0
 
 dev_dependencies:
   flutter_test:
