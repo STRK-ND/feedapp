@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
+import '../utils/constants.dart';
 import 'swipeable_card.dart';
 import 'stitch/stitch_widgets.dart';
 import '../utils/read_time_calculator.dart';
@@ -35,6 +36,7 @@ class CardStack extends StatefulWidget {
 
 class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   late AnimationController _cardEntranceController;
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -43,6 +45,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+    // Prefetch initial images
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefetchNextCardImage();
+    });
   }
 
   @override
@@ -53,6 +59,19 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
       _cardEntranceController.value = 1.0;
     } else if (_cardEntranceController.value == 0) {
       _cardEntranceController.forward();
+    }
+  }
+
+  void _prefetchNextCardImage() {
+    // Prefetch image for the card at index 1 (next card after current front card)
+    if (widget.articles.length > 1) {
+      final nextArticle = widget.articles[1];
+      if (nextArticle.imageUrl != null) {
+        precacheImage(
+          CachedNetworkImageProvider(nextArticle.imageUrl!),
+          context,
+        );
+      }
     }
   }
 
@@ -73,6 +92,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
       } else {
         _cardEntranceController.forward();
       }
+      // Prefetch the new next card's image after a swipe
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _prefetchNextCardImage();
+      });
     }
   }
 
@@ -114,35 +137,21 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Background image
-                if (article.imageUrl != null && showImages)
-                  CachedNetworkImage(
-                    imageUrl: article.imageUrl!,
-                    width: imageMaxWidth.toDouble(),
-                    fit: BoxFit.cover,
-                    cacheManager: AppCacheManager(),
-                    memCacheWidth: imageMaxWidth,
-                  )
-                else
-                  Container(color: colorScheme.surfaceContainerHighest),
+ // Background image with Hero transition
+ Hero(
+ tag: getArticleHeroTag(article.id),
+ child: showImages && article.imageUrl != null
+ ? CachedNetworkImage(
+ imageUrl: article.imageUrl!,
+ width: imageMaxWidth.toDouble(),
+ fit: BoxFit.cover,
+ cacheManager: AppCacheManager(),
+ memCacheWidth: imageMaxWidth,
+ )
+ : Container(color: colorScheme.surfaceContainerHighest),
+ ),
 
-                // Gradient overlay
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        colorScheme.surface,
-                        colorScheme.surface.withValues(alpha: 0.6),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.4, 0.8],
-                    ),
-                  ),
-                ),
-
-                // Content
+ // Content
                 Positioned(
                   bottom: 0,
                   left: 0,

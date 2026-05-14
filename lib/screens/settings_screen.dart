@@ -8,8 +8,6 @@ import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
-import '../services/notification_service.dart';
-import '../models/in_app_notification.dart';
 import '../utils/constants.dart';
 
 /// Settings screen with Stitch design system

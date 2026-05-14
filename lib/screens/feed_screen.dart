@@ -21,6 +21,7 @@ import '../utils/helpers.dart';
 import '../utils/error_handler.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
+import 'settings_screen.dart';
 
 /// Main RSS Feed Screen
 /// [showSavedArticles] - when true, displays saved articles instead of feed
@@ -71,11 +72,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     _fabController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: AppCardStyles.emphasisDuration,
     );
     _staggerController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: AppCardStyles.staggerDuration,
     );
     _fabController.forward();
   }
@@ -84,13 +85,23 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final settings = context.read<SettingsNotifier>();
-    _setupAutoRefresh(settings);
+    // Only set up timer once initially or when settings actually change
+    final shouldRefresh = _autoRefreshTimer == null ||
+        settings.autoRefresh != _lastAutoRefresh ||
+        settings.refreshInterval != _lastRefreshInterval;
+    if (shouldRefresh) {
+      _setupAutoRefresh(settings);
+    }
   }
+
+  bool _lastAutoRefresh = false;
+  int _lastRefreshInterval = 0;
 
   void _setupAutoRefresh(SettingsNotifier settings) {
     _autoRefreshTimer?.cancel();
+    _lastAutoRefresh = settings.autoRefresh;
+    _lastRefreshInterval = settings.refreshInterval;
     if (settings.autoRefresh && settings.refreshInterval > 0) {
-      _autoRefreshTimer?.cancel();
       _autoRefreshTimer = Timer.periodic(
         Duration(minutes: settings.refreshInterval),
         (_) => _refreshFeeds(),
@@ -121,6 +132,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     // Memory leak fix: Cancel subscription explicitly
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
+    _saveDebounceTimer?.cancel();
     _fabController.dispose();
     _staggerController.dispose();
     super.dispose();
@@ -132,15 +144,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       _isOnline = connectivityResult.contains(ConnectivityResult.none) == false;
     });
 
+    await _connectivitySubscription?.cancel();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
-    ) {
+    ) async {
+      final wasOffline = !_isOnline;
       setState(() {
         _isOnline = results.contains(ConnectivityResult.none) == false;
       });
 
       // Automatically refresh when coming back online
       if (_isOnline && _articles.isNotEmpty) {
+        // Replay any pending offline mutations before refreshing
+        if (wasOffline) {
+          await _articleRepository.replayOutbox();
+        }
         _refreshFeeds();
       }
     });
@@ -331,7 +349,17 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _showSnackBar('Article marked as read', AppColors.textSecondary);
   }
 
+  Timer? _saveDebounceTimer;
+
   void _onToggleSave(Article article) {
+    // Debounce rapid save operations (300ms)
+    if (_saveDebounceTimer?.isActive ?? false) {
+      return;
+    }
+    _saveDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _saveArticles();
+    });
+
     setState(() {
       article.isSaved = !article.isSaved;
 
@@ -345,8 +373,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             .toList();
       }
     });
-
-    _saveArticles();
+  }
 
     setState(() {
       if (_selectedTab == 1) {
@@ -569,7 +596,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           Semantics(
             label: 'Loading feeds',
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               strokeWidth: 3,
             ),
           ),
@@ -604,176 +631,184 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       return _buildEmptyState();
     }
 
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-      itemCount: _displayedArticles.length,
-      itemBuilder: (context, index) {
-        final article = _displayedArticles[index];
-        final source =
-            getIt<RssFeedService>().getSourceById(article.sourceId) ??
-            RssFeedService.predefinedSources.first;
-        final sourceColor = source.color;
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: AppColors.surface,
+      strokeWidth: 2.5,
+      onRefresh: _isLoading ? () async {} : () async {
+        await _refreshFeeds();
+      },
+      child: ListView.builder(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+        itemCount: _displayedArticles.length,
+        itemBuilder: (context, index) {
+          final article = _displayedArticles[index];
+          final source =
+              getIt<RssFeedService>().getSourceById(article.sourceId) ??
+              RssFeedService.predefinedSources.first;
+          final sourceColor = source.color;
 
-        return AnimatedBuilder(
-          animation: _staggerController,
-          builder: (context, child) {
-            final delay = index * 0.04;
-            final animation = CurvedAnimation(
-              parent: _staggerController,
-              curve: Interval(
-                delay.clamp(0.0, 0.8),
-                (delay + 0.15).clamp(0.1, 1.0),
-                curve: Curves.easeOutQuart,
-              ),
-            );
-
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.2),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-          child: Semantics(
-            button: true,
-            label:
-                '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
-            child: GestureDetector(
-              onTap: () => _onTapCard(index),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: sourceColor.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+          return AnimatedBuilder(
+            animation: _staggerController,
+            builder: (context, child) {
+              final delay = index * 0.04;
+              final animation = CurvedAnimation(
+                parent: _staggerController,
+                curve: Interval(
+                  delay.clamp(0.0, 0.8),
+                  (delay + 0.15).clamp(0.1, 1.0),
+                  curve: Curves.easeOutQuart,
                 ),
+              );
+
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.2),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Semantics(
+              button: true,
+              label:
+                  '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
+              child: GestureDetector(
+                onTap: () => _onTapCard(index),
                 child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.divider.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: sourceColor.withValues(alpha: 0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: sourceColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Semantics(
-                                label: source.name,
-                                child: Icon(
-                                  source.icon,
-                                  size: 14,
-                                  color: sourceColor,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                source.name,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: sourceColor,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                article.title,
-                                style: GoogleFonts.playfairDisplay(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                  height: 1.3,
-                                  letterSpacing: -0.2,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                article.description,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
-                                  height: 1.5,
-                                  letterSpacing: 0.05,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Semantics(
-                                    label:
-                                        'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                                    child: Icon(
-                                      Icons.schedule_outlined,
-                                      size: 12,
-                                      color: AppColors.textTertiary,
-                                    ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.divider.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: sourceColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Semantics(
+                                  label: source.name,
+                                  child: Icon(
+                                    source.icon,
+                                    size: 14,
+                                    color: sourceColor,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    Helpers.formatTimeAgo(article.pubDate),
-                                    style: GoogleFonts.dmSans(
-                                      fontSize: 12,
-                                      color: AppColors.textTertiary,
-                                      letterSpacing: 0.1,
-                                    ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  source.name,
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: sourceColor,
+                                    letterSpacing: 0.2,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  article.title,
+                                  style: GoogleFonts.playfairDisplay(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                    height: 1.3,
+                                    letterSpacing: -0.2,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  article.description,
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    height: 1.5,
+                                    letterSpacing: 0.05,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Semantics(
+                                      label:
+                                          'Published ${Helpers.formatTimeAgo(article.pubDate)}',
+                                      child: Icon(
+                                        Icons.schedule_outlined,
+                                        size: 12,
+                                        color: AppColors.textTertiary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      Helpers.formatTimeAgo(article.pubDate),
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 12,
+                                        color: AppColors.textTertiary,
+                                        letterSpacing: 0.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1179,6 +1214,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             : ViewMode.cards;
                       });
                       await _saveViewMode();
+                    } else if (value == 'settings') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
                     }
                   },
                   itemBuilder: (context) => [
@@ -1189,6 +1231,16 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           Icon(Icons.system_update),
                           SizedBox(width: 12),
                           Text('Check for updates'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Icon(Icons.settings),
+                          SizedBox(width: 12),
+                          Text('Settings'),
                         ],
                       ),
                     ),
@@ -1253,7 +1305,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(
-                          color: AppColors.accent,
+                          color: AppColors.primary,
                           width: 2,
                         ),
                       ),
@@ -1329,7 +1381,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             borderRadius: BorderRadius.circular(20),
                             splashColor: Colors.white.withValues(alpha: 0.1),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
+                              duration: AppCardStyles.quickDuration,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
                                 vertical: 12,
@@ -1442,7 +1494,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 child: _isLoading
                     ? _buildLoadingState()
                     : RefreshIndicator(
-                        color: AppColors.accent,
+                        color: AppColors.primary,
                         backgroundColor: AppColors.surface,
                         strokeWidth: 2.5,
                         onRefresh: _isLoading

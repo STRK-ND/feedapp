@@ -102,25 +102,4 @@ class FeedRepository {
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
-
-  /// Get feed health status (placeholder for future enhancement)
-  Future<Result<Map<String, bool>>> getFeedHealth() async {
-    try {
-      // In future: actually ping each feed to check health
-      // For now, return all as healthy
-      final health = {
-        for (var source in RssFeedService.predefinedSources)
-          source.id: true
-      };
-
-      return Result.success(health.cast<String, bool>());
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to get feed health',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
 }

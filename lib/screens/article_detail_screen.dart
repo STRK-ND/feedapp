@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../di/service_locator.dart';
 import '../models/article.dart';
+import '../models/rss_source.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../services/analytics_service.dart';
@@ -27,10 +28,25 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   String? _fullContent;
   bool _isSaved = false;
 
+  // Cached source to avoid recalculation on rebuild
+  late final RssFeedService _rssFeedService;
+
+  // Pre-bound callbacks to avoid recreation on each build
+  late final VoidCallback _toggleSaveCallback;
+  late final VoidCallback _shareArticleCallback;
+  late final VoidCallback _backCallback;
+
   @override
   void initState() {
     super.initState();
     _isSaved = widget.article.isSaved;
+    _rssFeedService = getIt<RssFeedService>();
+
+    // Initialize callbacks once in initState
+    _toggleSaveCallback = _toggleSave;
+    _shareArticleCallback = _shareArticle;
+    _backCallback = () => Navigator.pop(context);
+
     _initContent();
   }
 
@@ -66,15 +82,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   void _toggleSave() {
+    final newSavedState = !_isSaved;
+    // Update state without triggering full rebuild - just update the specific field
     setState(() {
-      _isSaved = !_isSaved;
-      widget.article.isSaved = _isSaved;
+      _isSaved = newSavedState;
+      widget.article.isSaved = newSavedState;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _isSaved ? 'Article saved' : 'Article removed',
+          newSavedState ? 'Article saved' : 'Article removed',
           style: GoogleFonts.lexend(color: Colors.white),
         ),
         backgroundColor: AppColors.backgroundDark,
@@ -92,13 +110,21 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
   }
 
+  // Cached source computation - only recomputed if sourceId changes
+  RssSource get _source {
+    return _rssFeedService.getSourceById(widget.article.sourceId) ??
+        RssFeedService.predefinedSources.first;
+  }
+
+  // Image height constant to avoid recalculation
+  static const double _kImageHeightFactor = 0.5;
+  static const double _kHorizontalPadding = 20.0;
+  static const double _kContentPadding = 24.0;
+
   @override
   Widget build(BuildContext context) {
-    final source =
-        getIt<RssFeedService>().getSourceById(widget.article.sourceId) ??
-        RssFeedService.predefinedSources.first;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final imageHeight = screenHeight * 0.5;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final imageHeight = screenHeight * _kImageHeightFactor;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -116,14 +142,18 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Main image
-                  if (widget.article.imageUrl != null)
-                    CachedNetworkImage(
-                      imageUrl: widget.article.imageUrl!,
-                      fit: BoxFit.cover,
-                    )
-                  else
-                    Container(color: AppColors.primary10),
+                  // Main image with Hero transition
+                  Hero(
+                    tag: getArticleHeroTag(widget.article.id),
+                    child: widget.article.imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: widget.article.imageUrl!,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 800,
+                            maxWidthDiskCache: 1200,
+                          )
+                        : Container(color: AppColors.primary10),
+                  ),
 
                   // Gradient overlay (bottom to top for readability)
                   Container(
@@ -141,32 +171,28 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ),
                   ),
 
-                  // Top bar
+                  // Top bar with pre-bound callbacks
                   SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: _kHorizontalPadding),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildIconButton(
                             Icons.arrow_back_rounded,
-                            () => Navigator.pop(context),
+                            _backCallback,
                           ),
                           Row(
                             children: [
                               _buildIconButton(
-                                _isSaved
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                _toggleSave,
-                                color: _isSaved
-                                    ? AppColors.primary
-                                    : Colors.white,
+                                _isSaved ? Icons.favorite : Icons.favorite_border,
+                                _toggleSaveCallback,
+                                color: _isSaved ? AppColors.primary : Colors.white,
                               ),
                               const SizedBox(width: 12),
                               _buildIconButton(
                                 Icons.share_outlined,
-                                _shareArticle,
+                                _shareArticleCallback,
                               ),
                             ],
                           ),
@@ -180,7 +206,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     left: 24,
                     bottom: 24,
                     child: CategoryBadge(
-                      category: source.name,
+                      category: _source.category,
                       backgroundColor: AppColors.primary,
                       textColor: Colors.white,
                     ),
@@ -192,45 +218,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
           // Content Section
           SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(_kContentPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Author and date row
-                  Row(
-                    children: [
-                      if (widget.article.author != null) ...[
-                        Icon(
-                          Icons.person_outline,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          widget.article.author!,
-                          style: GoogleFonts.lexend(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        Helpers.formatDate(widget.article.pubDate),
-                        style: GoogleFonts.lexend(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildMetadataRow(),
                   const SizedBox(height: 24),
 
                   // Title
@@ -245,9 +239,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Content
+                  // Content with const loading indicator
                   if (_isLoadingContent)
-                    Center(
+                    const Center(
                       child: CircularProgressIndicator(
                         color: AppColors.primary,
                         strokeWidth: 2,
@@ -266,15 +260,55 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ),
 
                   const SizedBox(height: 40),
-
-                  // Action buttons
-                  const SizedBox(height: 40),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Builds metadata row (author/date) - extracted to prevent rebuilds of title/content
+  Widget _buildMetadataRow() {
+    final article = widget.article;
+    final hasAuthor = article.author != null;
+
+    return Row(
+      children: [
+        if (hasAuthor) ...[
+          Icon(
+            Icons.person_outline,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              article.author!,
+              style: GoogleFonts.lexend(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+        Icon(
+          Icons.access_time,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          Helpers.formatDate(article.pubDate),
+          style: GoogleFonts.lexend(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 
@@ -294,10 +328,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Widget _buildContent(String content) {
-    final paragraphs = content
-        .split('\n\n')
-        .where((p) => p.trim().isNotEmpty)
-        .toList();
+    final paragraphs = content.split('\n\n').where((p) => p.trim().isNotEmpty).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

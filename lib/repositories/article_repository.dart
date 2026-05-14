@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../models/filter_params.dart';
+import '../models/outbox_mutation.dart';
 import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
+import '../services/outbox_service.dart';
 import '../utils/error_handler.dart';
 import '../utils/helpers.dart';
 import '../di/service_locator.dart';
@@ -11,12 +14,15 @@ import '../di/service_locator.dart';
 class ArticleRepository {
   final StorageService _storageService;
   final WorkerFeedService _workerFeedService;
+  final OutboxService _outboxService;
 
   ArticleRepository({
     StorageService? storageService,
     WorkerFeedService? workerFeedService,
+    OutboxService? outboxService,
   }) : _storageService = storageService ?? getIt<StorageService>(),
-       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
+       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>(),
+       _outboxService = outboxService ?? getIt<OutboxService>();
 
   // Cache for articles to avoid repeated storage reads
   List<Article>? _cachedArticles;
@@ -43,10 +49,8 @@ class ArticleRepository {
       final articles = await _storageService.loadArticles();
       _cachedArticles = articles;
 
-      ErrorHandler.logError(
-        'Retrieved ${articles.length} articles from storage',
-        severity: ErrorSeverity.low,
-      );
+      // Use debugPrint for success/info messages — ErrorHandler is for actual errors
+      debugPrint('[Repository] Retrieved ${articles.length} articles from storage');
 
       return Result.success(articles);
     } catch (e, stackTrace) {
@@ -70,7 +74,7 @@ class ArticleRepository {
       int page = 1;
       bool hasMore = true;
 
-      while (hasMore && page <= 1) {
+      while (hasMore && page <= 5) {
         // Limit to 5 pages (250 articles max)
         final response = await _workerFeedService.fetchArticles(
           params: FilterParams(page: page, pageSize: 50),
@@ -104,10 +108,7 @@ class ArticleRepository {
           .toList();
 
       if (articlesToAdd.isEmpty) {
-        ErrorHandler.logError(
-          'No new articles found',
-          severity: ErrorSeverity.low,
-        );
+        debugPrint('[Repository] No new articles found');
         return Result.success(existingArticles);
       }
 
@@ -119,10 +120,7 @@ class ArticleRepository {
       _cachedArticles = mergedArticles;
       await _storageService.saveArticles(mergedArticles);
 
-      ErrorHandler.logError(
-        'Added ${articlesToAdd.length} new articles. Total: ${mergedArticles.length}',
-        severity: ErrorSeverity.low,
-      );
+      debugPrint('[Repository] Added ${articlesToAdd.length} new articles. Total: ${mergedArticles.length}');
 
       return Result.success(mergedArticles);
     } catch (e, stackTrace) {
@@ -468,6 +466,57 @@ class ArticleRepository {
       );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
+  }
+
+  /// Replay pending mutations from outbox when coming back online
+  Future<void> replayOutbox() async {
+    final pending = await _outboxService.getPendingMutations();
+
+    for (final mutation in pending) {
+      try {
+        await _replayMutation(mutation);
+        await _outboxService.dequeue(mutation.id);
+      } catch (e) {
+        await _outboxService.incrementRetry(mutation.id);
+        ErrorHandler.logError(
+          'Failed to replay mutation ${mutation.id}',
+          error: e,
+          severity: ErrorSeverity.low,
+        );
+      }
+    }
+  }
+
+  Future<void> _replayMutation(OutboxMutation mutation) async {
+    // Find the article in cache or storage
+    final articles = _cachedArticles ?? await _storageService.loadArticles();
+    final articleIndex = articles.indexWhere((a) => a.id == mutation.articleId);
+
+    if (articleIndex == -1) return;
+
+    switch (mutation.type) {
+      case OutboxMutationType.markRead:
+        articles[articleIndex].isRead = true;
+        break;
+      case OutboxMutationType.markUnread:
+        articles[articleIndex].isRead = false;
+        break;
+      case OutboxMutationType.saveArticle:
+        articles[articleIndex].isSaved = true;
+        break;
+      case OutboxMutationType.unsaveArticle:
+        articles[articleIndex].isSaved = false;
+        break;
+      case OutboxMutationType.toggleRead:
+        articles[articleIndex].isRead = !articles[articleIndex].isRead;
+        break;
+      case OutboxMutationType.toggleSave:
+        articles[articleIndex].isSaved = !articles[articleIndex].isSaved;
+        break;
+    }
+
+    await _storageService.saveArticles(articles);
+    _cachedArticles = articles;
   }
 }
 

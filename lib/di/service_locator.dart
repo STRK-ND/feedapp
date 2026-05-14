@@ -7,30 +7,25 @@ import '../services/settings_service.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../services/worker_feed_service.dart';
+import '../services/outbox_service.dart';
 import 'package:http/http.dart' as http;
 
-/// Global service locator instance
-/// Uses GetIt for dependency injection to manage service lifecycles
 final GetIt getIt = GetIt.instance;
 
-/// Setup all service dependencies
-/// This should be called before runApp in main()
 Future<void> setupServiceLocator() async {
-  // Allow re-registration in tests by resetting first
   if (getIt.isRegistered<http.Client>()) {
-    return; // Already initialized
+    return;
   }
 
-  // Register HTTP client for dependency injection
   getIt.registerLazySingleton<http.Client>(() => http.Client());
 
-  // Register singleton services
+  // Services
   getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<AppCacheManager>(() => AppCacheManager());
   getIt.registerLazySingleton<ApkCacheManager>(() => ApkCacheManager());
   getIt.registerLazySingleton<SettingsService>(() => SettingsService());
+  getIt.registerLazySingleton<OutboxService>(() => OutboxService());
 
-  // Register RSS and content services as singletons
   getIt.registerLazySingleton<RssFeedService>(
     () => RssFeedService(httpClient: getIt<http.Client>()),
   );
@@ -41,7 +36,6 @@ Future<void> setupServiceLocator() async {
     () => WorkerFeedService(httpClient: getIt<http.Client>()),
   );
 
-  // Register repositories
   getIt.registerLazySingleton<FeedRepository>(
     () => FeedRepository(rssFeedService: getIt<RssFeedService>()),
   );
@@ -50,6 +44,7 @@ Future<void> setupServiceLocator() async {
     () => ArticleRepository(
       storageService: getIt<StorageService>(),
       workerFeedService: getIt<WorkerFeedService>(),
+      outboxService: getIt<OutboxService>(),
     ),
   );
 }

@@ -8,14 +8,17 @@ Future<void> main() async {
 
   await Sentry.init(
     (d) => d
-      // DSN from Sentry project
-      ..dsn = 'https://5a81b0922d1df36c77c139171ad66f18@o4511126921674752.ingest.de.sentry.io/4511126925344848'
+      // DSN from environment config (set via --dart-define=SENTRY_DSN=...)
+      ..dsn = const String.fromEnvironment('SENTRY_DSN',
+          defaultValue: 'https://5a81b0922d1df36c77c139171ad66f18@o4511126921674752.ingest.de.sentry.io/4511126925344848')
       // Performance monitoring - sample 100% in debug, 25% in release
       ..tracesSampleRate = 1.0
-      // Set environment
-      ..environment = 'production'
-      // Set release version for tracking
-      ..release = 'com.curatedfeeds@1.0.1'
+      // Set environment from environment config
+      ..environment = const String.fromEnvironment('FLUTTER_ENV',
+          defaultValue: 'production')
+      // Set release version for tracking (set via --dart-define=RELEASE_VERSION=...)
+      ..release = const String.fromEnvironment('RELEASE_VERSION',
+          defaultValue: 'com.curatedfeeds@1.0.1')
       // Enable breadcrumb tracking for user actions
       ..maxBreadcrumbs = 100
       // Sample rate for errors (25% in production)

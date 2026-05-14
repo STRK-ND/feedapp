@@ -139,7 +139,11 @@ class ErrorHandler {
     }
 
     if (errorString.contains('401') || errorString.contains('unauthorized')) {
-      return 'Authentication failed. Please log in again.';
+      return 'Access denied. Please try again.';
+    }
+
+    if (errorString.contains('429') || errorString.contains('rate limit')) {
+      return 'Too many requests. Please try again in a moment.';
     }
 
     if (errorString.contains('404') || errorString.contains('not found')) {

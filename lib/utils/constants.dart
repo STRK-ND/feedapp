@@ -12,11 +12,10 @@ class AppColors {
   static const Color primary = Color(0xFFBF83FC); // Purple (Stitch primary)
   static const Color primary10 = Color(0x1ABF83FC); // 10% opacity
   static const Color primary5 = Color(0x0DBF83FC); // 5% opacity
-  static const Color accent = Color(0xFFBF83FC); // Same as primary
-  static const Color background = Color(0xFF190F23); // Deep purple (dark mode)
+  static const Color background = Color(0xFF1A1423); // Deep purple (dark mode)
   static const Color backgroundLight = Color(0xFFF7F5F8); // Light mode bg
   static const Color backgroundDark = Color(
-    0xFF190F23,
+    0xFF1A1423,
   ); // Stitch dark background
   static const Color surface = Color(0xFFFFFFFF); // Pure white
 
@@ -65,11 +64,11 @@ class AppConfig {
   static const int appBuildNumber = 1;
 
   // Worker API settings
-  static const String workerApiUrl =
-      'https://curated-feeds-worker.raj15400881.workers.dev/';
+  static String get workerApiUrl =>
+      const String.fromEnvironment('WORKER_API_URL',
+          defaultValue: 'https://curated-feeds-worker.raj15400881.workers.dev/');
   static const int workerTimeoutSeconds = 8;
 
-  // RSS feed settings (deprecated - using Worker API instead)
   static const int rssTimeoutSeconds = 8;
   static const int maxArticlesPerSource = 20;
 
@@ -133,6 +132,13 @@ IconData getCategoryIcon(String category) {
 }
 
 // ============================================================================
+// Hero Tag Helpers
+// ============================================================================
+
+/// Get article image hero tag for shared element transitions
+String getArticleHeroTag(String articleId) => 'article-hero-$articleId';
+
+// ============================================================================
 // Card Design Styles - Glassmorphism & Dimensional
 // ============================================================================
 
@@ -146,10 +152,19 @@ class AppCardStyles {
   static const double badgeRadius = 16.0;
   static const double buttonRadius = 999.0; // Full circular
 
-  // Animation durations
-  static const Duration pressDuration = Duration(milliseconds: 150);
-  static const Duration fadeInDuration = Duration(milliseconds: 300);
-  static const Duration bounceDuration = Duration(milliseconds: 400);
+  // Animation durations - Standardized
+  static const Duration microDuration = Duration(milliseconds: 150);    // Haptic feedback, instant
+  static const Duration quickDuration = Duration(milliseconds: 250);    // Button states
+  static const Duration pressDuration = Duration(milliseconds: 150);    // Press feedback
+  static const Duration standardDuration = Duration(milliseconds: 300); // Default UI transitions
+  static const Duration fadeInDuration = Duration(milliseconds: 300);   // Image fade
+  static const Duration emphasisDuration = Duration(milliseconds: 400); // FAB, bounce
+  static const Duration bounceDuration = Duration(milliseconds: 400);   // Bounce effect
+  static const Duration emphasisSlowDuration = Duration(milliseconds: 500); // Card entrances
+  static const Duration slowDuration = Duration(milliseconds: 600);     // Stagger animations
+  static const Duration staggerDuration = Duration(milliseconds: 700);  // Feed stagger
+  static const Duration shimmerDuration = Duration(milliseconds: 1500); // Loading shimmer
+  static const Duration splashDuration = Duration(milliseconds: 800);   // Splash animation
   static const Curve bounceCurve = Curves.easeOutBack;
 
   /// Standard card shadow (with colored accent)
