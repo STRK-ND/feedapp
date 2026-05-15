@@ -89,6 +89,8 @@ class _SwipeableCardState extends State<SwipeableCard>
     if (_isAnimatingOut) return;
 
     if (_position.dx.abs() > widget.swipeThreshold) {
+    // Haptic feedback when swipe threshold is crossed
+    HapticFeedback.lightImpact();
       _animateOut();
     } else {
       _animateBack();
@@ -207,7 +209,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                               child: Icon(
                                 Icons.favorite_rounded,
                                 size: 80,
-                                color: AppColors.accent.withValues(
+                                color: AppColors.primary.withValues(
                                   alpha:
                                       _position.dx.clamp(50.0, 500.0) / 500.0,
                                 ),

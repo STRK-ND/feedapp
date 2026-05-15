@@ -96,8 +96,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     String imageUrl,
     double height,
     double borderRadius,
+  String heroTag,
   ) {
-    return ClipRRect(
+  return Hero(
+    tag: heroTag,
+   child: ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: CachedNetworkImage(
         imageUrl: imageUrl,
@@ -112,7 +115,8 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         errorWidget: (context, url, error) =>
             _buildImageError(height, borderRadius),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildImagePlaceholder(double height, double borderRadius) {
@@ -322,6 +326,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   widget.article.imageUrl!,
                                   220,
                                   AppCardStyles.imageRadius,
+                                  getArticleHeroTag(widget.article.id),
                                 ),
                               ),
                             if (showImages && widget.article.imageUrl != null)

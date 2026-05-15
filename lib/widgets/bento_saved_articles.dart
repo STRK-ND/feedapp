@@ -11,6 +11,7 @@ import '../providers/settings_notifier.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../di/service_locator.dart';
+import 'empty_state_illustrations.dart';
 
 /// Bento Grid layout for saved articles - Stitch Design
 /// Features different card sizes: 1x1 (standard), 2x1 (featured)
@@ -44,7 +45,7 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     super.initState();
     _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: AppCardStyles.slowDuration,
     );
     _entranceController.forward();
   }
@@ -407,41 +408,6 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _colorScheme.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.bookmark_outline_rounded,
-              size: 48,
-              color: _colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No saved articles',
-            style: GoogleFonts.lexend(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Swipe right on articles to save them',
-            style: GoogleFonts.lexend(
-              fontSize: 14,
-              color: _colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SavedArticlesEmptyState();
   }
 }

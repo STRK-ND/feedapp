@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../utils/constants.dart';
 
 /// Stitch-style action buttons row with Skip, Save (large with glow), and Share
@@ -67,7 +68,10 @@ class _ActionButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
           child: Container(
             width: size,
             height: size,
@@ -111,7 +115,10 @@ class _SaveButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            onTap();
+          },
           child: Container(
             width: 72,
             height: 72,

@@ -145,9 +145,9 @@ void main() {
         final response = PaginatedResponse.fromJson(json);
 
         expect(response.items.length, 2);
-        expect(response.items[0].id, 'test-id-1');
+        expect(response.items[0].id, 'source-1:test-id-1');
         expect(response.items[0].title, 'Test Article 1');
-        expect(response.items[1].id, 'test-id-2');
+        expect(response.items[1].id, 'source-2:test-id-2');
         expect(response.items[1].title, 'Test Article 2');
         expect(response.total, 100);
         expect(response.page, 1);

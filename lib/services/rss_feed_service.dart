@@ -232,7 +232,7 @@ class RssFeedService {
             pubDate = Helpers.parseDate(pubDateText);
           }
 
-          final articleId = linkText.hashCode.toString();
+          final articleId = Article.makeId(source.id, linkText.hashCode.toString());
 
           articles.add(Article(
             id: articleId,
@@ -390,19 +390,23 @@ class RssFeedService {
   }
 
   /// Fetch articles from all sources
+  /// Fetches with max 3 concurrent connections to reduce battery drain
   Future<List<Article>> fetchAllArticles() async {
     debugPrint('[RSS] Fetching from ${predefinedSources.length} sources...');
     final allArticles = <Article>[];
+    const batchSize = 3;
 
-    // Fetch all sources in parallel for speed
-    final results = await Future.wait(
-      predefinedSources.map((source) => fetchArticles(source)),
-      eagerError: false, // Continue even if some sources fail
-    );
-
-    // Flatten results
-    for (final sourceArticles in results) {
-      allArticles.addAll(sourceArticles);
+    // Process in batches of 3 to limit concurrent connections
+    for (var i = 0; i < predefinedSources.length; i += batchSize) {
+      final batch = predefinedSources.skip(i).take(batchSize).toList();
+      final results = await Future.wait(
+        batch.map((source) => fetchArticles(source)),
+        eagerError: false,
+      );
+      for (final sourceArticles in results) {
+        allArticles.addAll(sourceArticles);
+      }
+      debugPrint('[RSS] Batch ${(i ~/ batchSize) + 1} done, running: ${allArticles.length} total');
     }
 
     debugPrint('[RSS] Total articles fetched: ${allArticles.length}');

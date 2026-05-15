@@ -76,7 +76,7 @@ void main() {
 
       final article = Article.fromJson(json);
 
-      expect(article.id, 'test-id-2');
+      expect(article.id, 'another-source:test-id-2');
       expect(article.title, 'Another Article');
       expect(article.description, 'Another description');
       expect(article.fullContent, 'Another content');
@@ -94,13 +94,14 @@ void main() {
     test('Should use default values for missing fields in fromJson', () {
       final json = {
         'id': 'test-id-3',
+        // Note: no sourceId to test default value
         'title': 'Minimal Article',
         'pubDate': 1705314600000,
       };
 
       final article = Article.fromJson(json);
 
-      expect(article.id, 'test-id-3');
+      expect(article.id, ':test-id-3'); // sourceId defaults to '', makeId('', 'test-id-3') = ':test-id-3'
       expect(article.title, 'Minimal Article');
       expect(article.description, ''); // default
       expect(article.fullContent, ''); // default

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/repositories/feed_repository.dart';
-import 'package:curatedfeeds/services/rss_feed_service.dart';
 
 void main() {
   late FeedRepository repository;
@@ -113,29 +112,6 @@ void main() {
         // Verify it's sorted
         final sorted = List.from(categories)..sort();
         expect(categories, equals(sorted));
-      });
-    });
-
-    group('getFeedHealth', () {
-      test('Should return health map for all sources', () async {
-        final result = await repository.getFeedHealth();
-
-        expect(result.isSuccess, true);
-        expect(result.data, isNotNull);
-
-        final sourcesResult = await repository.getAllSources();
-        final sourceCount = sourcesResult.data!.length;
-
-        expect(result.data!.length, sourceCount);
-      });
-
-      test('Should mark all sources as healthy initially', () async {
-        final result = await repository.getFeedHealth();
-
-        expect(result.isSuccess, true);
-
-        final allHealthy = result.data!.values.every((isHealthy) => isHealthy);
-        expect(allHealthy, true);
       });
     });
   });

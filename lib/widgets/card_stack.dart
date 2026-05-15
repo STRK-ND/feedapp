@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../models/article.dart';
 import '../services/cache_manager.dart';
@@ -36,7 +37,6 @@ class CardStack extends StatefulWidget {
 
 class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   late AnimationController _cardEntranceController;
-  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -63,16 +63,25 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   }
 
   void _prefetchNextCardImage() {
-    // Prefetch image for the card at index 1 (next card after current front card)
-    if (widget.articles.length > 1) {
-      final nextArticle = widget.articles[1];
-      if (nextArticle.imageUrl != null) {
-        precacheImage(
-          CachedNetworkImageProvider(nextArticle.imageUrl!),
-          context,
-        );
+    // Only prefetch on WiFi to avoid cellular data usage
+    final connectivity = Connectivity().checkConnectivity();
+    connectivity.then((results) {
+      if (!mounted) return;
+      if (!results.contains(ConnectivityResult.wifi)) {
+        debugPrint('[CardStack] Skipping prefetch — not on WiFi');
+        return;
       }
-    }
+      // Prefetch image for the card at index 1 (next card after current front card)
+      if (widget.articles.length > 1) {
+        final nextArticle = widget.articles[1];
+        if (nextArticle.imageUrl != null && mounted) {
+          precacheImage(
+            CachedNetworkImageProvider(nextArticle.imageUrl!),
+            context,
+          );
+        }
+      }
+    });
   }
 
   @override
@@ -251,7 +260,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SettingsNotifier>(
+    return Selector<SettingsNotifier, ({bool showImages, bool dataSaverMode})>(
       builder: (context, settings, _) {
         if (widget.articles.isEmpty) {
           return widget.emptyState;
@@ -274,6 +283,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
           onTap: () => widget.onTap(0),
         );
       },
+      selector: (_, settings) => (
+        showImages: settings.showImages,
+        dataSaverMode: settings.dataSaverMode,
+      ),
     );
   }
 }

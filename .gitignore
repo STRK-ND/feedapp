@@ -1,5 +1,8 @@
 # Miscellaneous
 *.class
+.env
+.env.*
+!.env.example
 google-services.json
 *.apk
 *.aab

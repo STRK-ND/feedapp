@@ -77,7 +77,7 @@ void main() {
       final article = Article.fromJson(json);
 
       // Assert
-      expect(article.id, 'test-id');
+      expect(article.id, 'test-source:test-id');
       expect(article.title, 'Test Article');
       expect(article.author, 'Test Author');
       expect(article.isRead, true);
