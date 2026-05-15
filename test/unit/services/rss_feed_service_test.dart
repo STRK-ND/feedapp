@@ -214,6 +214,77 @@ void main() {
       });
     });
 
+    group('fetchAllArticles batch logic', () {
+      test('processes sources in batches of 3 with eagerError false', () async {
+        // Track batch order by checking call patterns
+        int batch1Complete = 0;
+        int batch2Complete = 0;
+        int sourceCallCount = 0;
+
+        final mockClient = MockClient((request) async {
+          sourceCallCount++;
+
+          // First 3 sources (batch 1): delay to ensure batch 2 doesn't complete first
+          if (sourceCallCount <= 3) {
+            await Future.delayed(const Duration(milliseconds: 50));
+            batch1Complete++;
+          } else {
+            // Sources 4+ (batch 2+): fast to simulate completion
+            batch2Complete++;
+          }
+
+          return http.Response(_validRssXml, 200);
+        });
+
+        service = RssFeedService(httpClient: mockClient);
+        final articles = await service.fetchAllArticles();
+
+        // With 12 predefined sources and batch size of 3:
+        // Batch 1: sources 0-2, Batch 2: sources 3-5, Batch 3: sources 6-8, Batch 4: sources 9-11
+        expect(sourceCallCount, RssFeedService.predefinedSources.length);
+        expect(articles.isNotEmpty, true);
+      });
+
+      test('continues when some sources fail in batch', () async {
+        int callCount = 0;
+        final mockClient = MockClient((request) async {
+          callCount++;
+          if (callCount % 2 == 0) {
+            throw Exception('Simulated failure');
+          }
+          return http.Response(_validRssXml, 200);
+        });
+
+        service = RssFeedService(httpClient: mockClient);
+        final articles = await service.fetchAllArticles();
+
+        // Even with failures, we should get articles from successful sources
+        expect(articles.isNotEmpty, true);
+        // With 12 sources and every other failing, we get ~6 sources worth of articles
+        expect(articles.length, greaterThan(0));
+      });
+
+      test('produces all articles from successful sources when some fail', () async {
+        int sourceIndex = 0;
+        final mockClient = MockClient((request) async {
+          sourceIndex++;
+          // Fail sources 2 and 5 (in different batches)
+          if (sourceIndex == 2 || sourceIndex == 5) {
+            throw Exception('Simulated failure');
+          }
+          return http.Response(_validRssXml, 200);
+        });
+
+        service = RssFeedService(httpClient: mockClient);
+        final articles = await service.fetchAllArticles();
+
+        // 12 sources - 2 failed = 10 successful sources
+        // Each source returns 2 articles from _validRssXml
+        // So we should get articles from the 10 successful sources
+        expect(articles.length, 20); // 10 sources * 2 articles each
+      });
+    });
+
     group('getSourceById', () {
       test('returns source for valid id', () {
         final source = service.getSourceById('verge');

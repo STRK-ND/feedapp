@@ -118,6 +118,7 @@ class FeedProvider extends ChangeNotifier {
   /// Initialize the provider - load saved articles and existing data
   Future<void> init({bool showSavedOnly = false}) async {
     _state = _state.copyWith(isLoading: true, clearError: true);
+    notifyListeners();
 
     try {
       // Load saved articles and all articles in parallel
@@ -326,7 +327,7 @@ class FeedProvider extends ChangeNotifier {
 
   /// Clear error message
   void clearError() {
-    _state = _state.copyWith(errorMessage: null);
+    _state = _state.copyWith(clearError: true);
     notifyListeners();
   }
 
