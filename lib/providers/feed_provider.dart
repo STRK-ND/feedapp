@@ -140,12 +140,10 @@ class FeedProvider extends ChangeNotifier {
           displayedArticles: showSavedOnly
               ? (savedResult.data ?? [])
               : (allResult.data ?? []),
-          isLoading: false,
         );
       } else {
         _state = _state.copyWith(
           errorMessage: allResult.error ?? 'Failed to load articles',
-          isLoading: false,
         );
       }
 
@@ -154,11 +152,11 @@ class FeedProvider extends ChangeNotifier {
     } catch (e) {
       _state = _state.copyWith(
         errorMessage: ErrorHandler.getUserMessage(e),
-        isLoading: false,
       );
+    } finally {
+      _state = _state.copyWith(isLoading: false);
+      notifyListeners();
     }
-
-    notifyListeners();
   }
 
   /// Refresh articles from Worker API
@@ -329,7 +327,7 @@ class FeedProvider extends ChangeNotifier {
 
   /// Clear error message
   void clearError() {
-    _state = _state.copyWith(errorMessage: null);
+    _state = _state.copyWith(clearError: true);
     notifyListeners();
   }
 

@@ -22,7 +22,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: AppCardStyles.shimmerDuration,
     )..repeat();
 
     _animation = Tween<double>(begin: -2, end: 2).animate(
@@ -51,27 +51,29 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
       return widget.child;
     }
 
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: const [
-                Color(0xFFE5E7EB),
-                Color(0xFFF3F4F6),
-                Color(0xFFE5E7EB),
-              ],
-              stops: [0.0, _animation.value.clamp(0.0, 1.0), 1.0],
-              transform: _SlidingGradientTransform(_animation.value),
-            ).createShader(bounds);
-          },
-          blendMode: BlendMode.srcIn,
-          child: widget.child,
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          return ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: const [
+                  Color(0xFFE5E7EB),
+                  Color(0xFFF3F4F6),
+                  Color(0xFFE5E7EB),
+                ],
+                stops: [0.0, _animation.value.clamp(0.0, 1.0), 1.0],
+                transform: _SlidingGradientTransform(_animation.value),
+              ).createShader(bounds);
+            },
+            blendMode: BlendMode.srcIn,
+            child: widget.child,
+          );
+        },
+      ),
     );
   }
 }

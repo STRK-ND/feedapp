@@ -33,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: AppCardStyles.splashDuration,
       vsync: this,
     );
 
@@ -52,9 +52,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initializeApp() async {
-    final startTime = DateTime.now();
-    const minDuration = Duration(seconds: 5);
-
     if (!mounted) return;
 
     await Firebase.initializeApp();
@@ -68,13 +65,6 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final elapsed = DateTime.now().difference(startTime);
-    if (elapsed < minDuration) {
-      await Future.delayed(minDuration - elapsed);
-    }
-
-    if (!mounted) return;
-
     await Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
@@ -82,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
-        transitionDuration: const Duration(milliseconds: 300),
+        transitionDuration: AppCardStyles.standardDuration,
       ),
     );
   }
@@ -303,7 +293,7 @@ class _MainNavigationState extends State<MainNavigation> {
         setState(() => _selectedIndex = index);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: AppCardStyles.standardDuration,
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -317,7 +307,7 @@ class _MainNavigationState extends State<MainNavigation> {
           children: [
             AnimatedScale(
               scale: isSelected ? 1.1 : 1.0,
-              duration: const Duration(milliseconds: 250),
+              duration: AppCardStyles.quickDuration,
               curve: Curves.easeOutBack,
               child: Icon(
                 isSelected ? selectedIcon : icon,

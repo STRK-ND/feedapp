@@ -1,4 +1,7 @@
 /// Article Model
+///
+/// ID format: compound key "sourceId:originalId" to prevent collisions
+/// between Worker API (numeric IDs) and RSS feeds (link.hashCode IDs)
 import '../utils/helpers.dart';
 
 class Article {
@@ -39,6 +42,27 @@ class Article {
     this.fetchedFullContent,
   });
 
+  /// Creates a compound article ID from source and original ID
+  /// Format: "sourceId:originalId"
+  /// Examples: "worker:123", "verge:9876543"
+  static String makeId(String sourceId, String originalId) {
+    return '$sourceId:$originalId';
+  }
+
+  /// Extracts the sourceId from a compound article ID
+  /// Returns null if the ID doesn't match compound format
+  static String? extractSourceId(String articleId) {
+    final parts = articleId.split(':');
+    return parts.length == 2 ? parts[0] : null;
+  }
+
+  /// Extracts the original ID from a compound article ID
+  /// Returns the full ID if it doesn't match compound format (backwards compat)
+  static String extractOriginalId(String articleId) {
+    final parts = articleId.split(':');
+    return parts.length == 2 ? parts[1] : articleId;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -72,12 +96,25 @@ class Article {
     return DateTime.now();
   }
 
+  /// Creates an Article from JSON with compound key handling
+  /// Worker API returns int IDs → converted to "sourceId:intId" format
+  /// RSS feeds use link.hashCode → converted to "sourceId:hashCode" format
   factory Article.fromJson(Map<String, dynamic> json) {
     // Handle id as either int or string (Worker API returns int, local storage uses string)
     final dynamic rawId = json['id'];
-    final String id = rawId is int
-        ? rawId.toString()
-        : (rawId as String? ?? '');
+    final String sourceId = json['sourceId'] as String? ?? '';
+    final String id;
+
+    if (rawId is int) {
+      // Worker API: int ID → compound key
+      id = Article.makeId(sourceId, rawId.toString());
+    } else if (rawId is String && rawId.contains(':')) {
+      // Already a compound key (from local storage)
+      id = rawId;
+    } else {
+      // RSS or unknown: string ID → compound key
+      id = Article.makeId(sourceId, rawId as String? ?? '');
+    }
 
     // Validate image URL
     String? imageUrl = json['imageUrl'] as String?;
@@ -91,7 +128,7 @@ class Article {
       description: json['description'] as String? ?? '',
       fullContent: json['fullContent'] as String? ?? '',
       link: json['link'] as String? ?? '',
-      sourceId: json['sourceId'] as String? ?? '',
+      sourceId: sourceId,
       sourceName: json['sourceName'] as String? ?? 'Unknown Source',
       pubDate: _parsePubDate(json['pubDate']),
       author: json['author'] as String?,

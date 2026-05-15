@@ -35,7 +35,7 @@ class RssFeedScreen extends StatefulWidget {
 }
 
 class _RssFeedScreenState extends State<RssFeedScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   List<Article> _articles = [];
   List<Article> _savedArticles = [];
   List<Article> _displayedArticles = [];
@@ -50,6 +50,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   String _searchQuery = '';
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _autoRefreshTimer;
+  bool _inRefresh = false;
 
   late AnimationController _fabController;
   late AnimationController _staggerController;
@@ -64,6 +65,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedTab = widget.showSavedArticles ? 1 : 0;
     _loadData();
     _loadViewMode();
@@ -79,6 +81,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       duration: AppCardStyles.staggerDuration,
     );
     _fabController.forward();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _autoRefreshTimer?.cancel();
+      debugPrint('[Timer] Paused — cancelled');
+    } else if (state == AppLifecycleState.resumed) {
+      // Restore timer if auto-refresh is still enabled
+      final settings = context.read<SettingsNotifier>();
+      if (settings.autoRefresh && settings.refreshInterval > 0) {
+        _setupAutoRefresh(settings);
+        debugPrint('[Timer] Resumed — refresh in ${settings.refreshInterval}min');
+      }
+    }
   }
 
   @override
@@ -130,6 +147,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   @override
   void dispose() {
     // Memory leak fix: Cancel subscription explicitly
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
     _saveDebounceTimer?.cancel();
@@ -152,6 +170,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       setState(() {
         _isOnline = results.contains(ConnectivityResult.none) == false;
       });
+
+      // Debounce: skip refresh if one ran within 30 seconds
+      final now = DateTime.now();
+      if (_lastRefreshTime != null &&
+          now.difference(_lastRefreshTime!).inSeconds < 30) {
+        debugPrint('[Refresh] Debounced — last refresh ${now.difference(_lastRefreshTime!).inSeconds}s ago');
+        return;
+      }
 
       // Automatically refresh when coming back online
       if (_isOnline && _articles.isNotEmpty) {
@@ -236,12 +262,20 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     debugPrint('[Feed] Starting refresh...');
     await AnalyticsService.logFeedRefresh();
 
+    // Guard: skip if a refresh is already in-flight
+    if (_inRefresh) {
+      debugPrint('[Feed] Refresh already in progress, skipping');
+      return;
+    }
+    _inRefresh = true;
+
     // Check if offline
     final connectivityResult = await Connectivity().checkConnectivity();
     debugPrint('[Feed] Connectivity result: $connectivityResult');
 
     if (connectivityResult.contains(ConnectivityResult.none)) {
       debugPrint('[Feed] Device is offline!');
+      _inRefresh = false;
       setState(() {
         _isLoading = false;
         _errorMessage = 'You are offline. Showing cached content.';
@@ -259,6 +293,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       final result = await _articleRepository.fetchNewArticles();
       final maxArticles = await _settingsService.getMaxArticles();
 
+      _lastRefreshTime = DateTime.now();
+
       if (result.isSuccess) {
         final newArticles = (result.data ?? []).take(maxArticles).toList();
         debugPrint(
@@ -268,7 +304,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         setState(() {
           _articles = newArticles;
           _displayedArticles = _getFilteredArticles();
-          _lastRefreshTime = DateTime.now();
           _isLoading = false;
         });
 
@@ -289,6 +324,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _errorMessage = ErrorHandler.getUserMessage(e);
         _isLoading = false;
       });
+    } finally {
+      _inRefresh = false;
     }
   }
 
@@ -371,13 +408,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _savedArticles = _savedArticles
             .where((a) => a.id != article.id)
             .toList();
-      }
-    });
-  }
-
-    setState(() {
-      if (_selectedTab == 1) {
-        _savedArticles = _savedArticles.where((a) => a.isSaved).toList();
       }
     });
   }
