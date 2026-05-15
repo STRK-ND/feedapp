@@ -18,11 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RSS batch processing limited to 3 concurrent sources (was unlimited parallel)
 
 ### Fixed
-- FeedProvider.clearError() now properly clears error state (was preserving old error)
-- FeedProvider.init() now calls notifyListeners() when setting isLoading=true
-- SwipeableCard and StitchActionButtons now trigger HapticFeedback on threshold
+- FeedProvider.clearError() — error state now clears properly
+- FeedProvider.init() — properly notifies listeners when loading starts
+- HapticFeedback now triggers when swiping cards past the threshold
 - CardStack prefetch timer properly cancelled on pause/resume
-- WidgetsBindingObserver properly added to RssFeedScreen (fixes lifecycle handling)
+- WidgetsBindingObserver properly added to RssFeedScreen (lifecycle handling)
 
 ### Removed
 - 7 stale openspec change directories (completed/abandoned)
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UPDATE_SETUP.md (outdated)
 - Unused card_stack_temp.dart scaffold
 
-### Build
+### For contributors
 - 189 tests pass (up from 154 — 35 new tests added)
 - Dead code removed: 5,344 lines deleted, 850 lines added
 
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed static access to RssFeedService.predefinedSources
 - Fixed test infrastructure - GetIt service locator now handles re-registration properly
 
-### Build
+### For contributors
 - All 110 tests now pass
 - No blocking analysis errors
 
@@ -85,6 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RSS source filtering
 - Date formatting for local time compatibility
 
-### Build
+### For contributors
 - Debug and release build configurations
 - Shorebird build flavors configured
