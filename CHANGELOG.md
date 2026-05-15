@@ -5,6 +5,35 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.0.1] - 2026-05-16
+
+### Added
+- CLAUDE.md with project overview, skill routing, and design system reference
+- DESIGN.md with complete Stitch Design System (colors, spacing, typography, motion)
+- CI/CD workflow (`.github/workflows/ci.yml`) with Flutter build and test
+- `empty_state_illustrations.dart` with on-boarding illustrations
+
+### Changed
+- AppColors.accent migrated to AppColors.primary throughout (Stitch Design System)
+- RSS batch processing limited to 3 concurrent sources (was unlimited parallel)
+
+### Fixed
+- FeedProvider.clearError() now properly clears error state (was preserving old error)
+- FeedProvider.init() now calls notifyListeners() when setting isLoading=true
+- SwipeableCard and StitchActionButtons now trigger HapticFeedback on threshold
+- CardStack prefetch timer properly cancelled on pause/resume
+- WidgetsBindingObserver properly added to RssFeedScreen (fixes lifecycle handling)
+
+### Removed
+- 7 stale openspec change directories (completed/abandoned)
+- 4+ stale plan/design documents (superseded by current implementation)
+- UPDATE_SETUP.md (outdated)
+- Unused card_stack_temp.dart scaffold
+
+### Build
+- 189 tests pass (up from 154 — 35 new tests added)
+- Dead code removed: 5,344 lines deleted, 850 lines added
+
 ## [1.0.1] - 2026-03-23
 
 ### Fixed
