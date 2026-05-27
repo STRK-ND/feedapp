@@ -26,9 +26,9 @@ class CategoryBadge extends StatelessWidget {
         category.toUpperCase(),
         style: TextStyle(
           color: textColor ?? Colors.white,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
+          letterSpacing: 1.2,
         ),
       ),
     );
@@ -43,10 +43,13 @@ class ReadTimeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.15)
+            : Colors.black.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -55,13 +58,17 @@ class ReadTimeBadge extends StatelessWidget {
           Icon(
             Icons.schedule,
             size: 12,
-            color: Colors.white.withValues(alpha: 0.9),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.black.withValues(alpha: 0.6),
           ),
           const SizedBox(width: 4),
           Text(
             '$minutes min read',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.9)
+                  : Colors.black.withValues(alpha: 0.6),
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),

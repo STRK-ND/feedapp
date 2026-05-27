@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
@@ -36,7 +37,6 @@ class CardStack extends StatefulWidget {
 
 class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   late AnimationController _cardEntranceController;
-  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -175,12 +175,12 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         // Title
                         Text(
                           article.title,
-                          style: TextStyle(
+                          style: GoogleFonts.lexend(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
                             color: isDark
                                 ? Colors.white
                                 : colorScheme.onSurface,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
                             height: 1.2,
                           ),
                           maxLines: 3,
