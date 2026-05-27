@@ -8,7 +8,6 @@ version: 2.1
 # Triggers:
 #   - push to any branch         → lint + analyze + test
 #   - pull_request               → above + Android debug APK + iOS build
-#   - push to master/main        → lint + analyze + test + Android release
 #   - git tag v*.*.*             → test + Android release + Shorebird + GitHub Release
 # =============================================================================
 
@@ -153,7 +152,7 @@ jobs:
       FLUTTER_ENV: production
     steps:
       - checkout:
-          fetch-depth: 0  # needed for release notes generation
+          fetch-depth: 0
 
       - flutter/pubsub-cache:
           cache_version: "v2"
@@ -242,41 +241,56 @@ jobs:
 # =============================================================================
 workflows:
   # ---------------------------------------------------------------------------
-  # Workflow A: Test on every push and PR — fast feedback before review
+  # Workflow A: Test on every push and PR
   # ---------------------------------------------------------------------------
   test-all:
-    triggers:
-      - push:
-          branches:
-            ignore:
-              - gh-pages  # no CI noise for docs-only branches
-      - pull_request:
     jobs:
       - lint
       - test
-      - build-android-preview
-      - build-ios
+      - build-android-preview:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              ignore: /.*/
+      - build-ios:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              ignore: /.*/
 
   # ---------------------------------------------------------------------------
   # Workflow B: Release on every version tag
   # Validates secrets first, then builds and publishes
   # ---------------------------------------------------------------------------
   release:
-    triggers:
-      - tag:
-          # Matches v1.0.0, v1.2.3, v0.1.0-beta.1 etc.
-          pattern: v[0-9]+.[0-9]+.[0-9]+*
     jobs:
       - validate-secrets:
           context:
             - release-secrets
+          filters:
+            tags:
+              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+            branches:
+              ignore: /.*/
       - test:
           context:
             - release-secrets
+          filters:
+            tags:
+              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+            branches:
+              ignore: /.*/
           requires:
             - validate-secrets
       - build-release:
           context:
             - release-secrets
+          filters:
+            tags:
+              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+            branches:
+              ignore: /.*/
           requires:
             - test
