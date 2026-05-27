@@ -25,9 +25,6 @@ executors:
       xcode: "16.0"
     working_directory: ~/project
 
-orbs:
-  flutter: circlesaucers/flutter@2.0.2
-
 # =============================================================================
 # Commands — reusable step sequences
 # =============================================================================
@@ -68,11 +65,17 @@ jobs:
     executor: flutter-executor
     steps:
       - checkout
-      - flutter/pubsub-cache:
-          cache_version: "v2"
+      - restore_cache:
+          keys:
+            - pub-cache-v2-{{ checksum "pubspec.lock" }}
+            - pub-cache-v2-
       - run:
           name: Get dependencies
           command: flutter pub get
+      - save_cache:
+          key: pub-cache-v2-{{ checksum "pubspec.lock" }}
+          paths:
+            - ~/.pub-cache
       - run:
           name: Analyze code
           command: flutter analyze --no-fatal-infos
@@ -84,11 +87,17 @@ jobs:
     executor: flutter-executor
     steps:
       - checkout
-      - flutter/pubsub-cache:
-          cache_version: "v2"
+      - restore_cache:
+          keys:
+            - pub-cache-v2-{{ checksum "pubspec.lock" }}
+            - pub-cache-v2-
       - run:
           name: Get dependencies
           command: flutter pub get
+      - save_cache:
+          key: pub-cache-v2-{{ checksum "pubspec.lock" }}
+          paths:
+            - ~/.pub-cache
       - run:
           name: Run tests
           command: |
@@ -104,11 +113,17 @@ jobs:
     executor: flutter-executor
     steps:
       - checkout
-      - flutter/pubsub-cache:
-          cache_version: "v2"
+      - restore_cache:
+          keys:
+            - pub-cache-v2-{{ checksum "pubspec.lock" }}
+            - pub-cache-v2-
       - run:
           name: Get dependencies
           command: flutter pub get
+      - save_cache:
+          key: pub-cache-v2-{{ checksum "pubspec.lock" }}
+          paths:
+            - ~/.pub-cache
       - run:
           name: Build Android debug APK
           command: |
@@ -151,8 +166,10 @@ jobs:
       - checkout:
           fetch-depth: 0
 
-      - flutter/pubsub-cache:
-          cache_version: "v2"
+      - restore_cache:
+          keys:
+            - pub-cache-v2-{{ checksum "pubspec.lock" }}
+            - pub-cache-v2-
 
       - install-gh-cli
       - install-shorebird
@@ -160,6 +177,11 @@ jobs:
       - run:
           name: Get dependencies
           command: flutter pub get
+
+      - save_cache:
+          key: pub-cache-v2-{{ checksum "pubspec.lock" }}
+          paths:
+            - ~/.pub-cache
 
       - run:
           name: Build Android release APK
