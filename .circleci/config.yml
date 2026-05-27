@@ -1,0 +1,282 @@
+version: 2.1
+
+# =============================================================================
+# CircleCI Config for Curated Feeds (Flutter)
+# =============================================================================
+# All CI/CD is handled exclusively by CircleCI — no GitHub Actions used.
+#
+# Triggers:
+#   - push to any branch         → lint + analyze + test
+#   - pull_request               → above + Android debug APK + iOS build
+#   - push to master/main        → lint + analyze + test + Android release
+#   - git tag v*.*.*             → test + Android release + Shorebird + GitHub Release
+# =============================================================================
+
+executors:
+  flutter-executor:
+    docker:
+      - image: cimg/flutter:3.41.1
+        environment:
+          FLUTTER_ENV: CI
+          FLUTTER_VERSION: "3.41.1"
+    working_directory: ~/project
+
+  ios-executor:
+    macos:
+      xcode: "16.0"
+    working_directory: ~/project
+
+orbs:
+  flutter: circlesaucers/flutter@2.0.2
+
+# =============================================================================
+# Commands — reusable step sequences
+# =============================================================================
+commands:
+  install-gh-cli:
+    steps:
+      - run:
+          name: Install GitHub CLI for release creation
+          command: |
+            if command -v gh &>/dev/null; then
+              echo "gh already installed: $(gh --version)"
+            else
+              brew install gh
+              gh auth status || gh auth login --hostname github.com
+            fi
+
+  install-shorebird:
+    steps:
+      - run:
+          name: Install and cache Shorebird CLI
+          command: |
+            if command -v shorebird &>/dev/null; then
+              echo "shorebird already installed: $(shorebird --version)"
+            else
+              dart pub global activate shorebird
+            fi
+            export PATH="$PATH":"$HOME/.pub-cache/bin"
+            echo 'export PATH="$PATH":"$HOME/.pub-cache/bin"' >> $BASH_ENV
+
+# =============================================================================
+# Jobs
+# =============================================================================
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint & Analyze — fast feedback, no waiting for tests
+  # ---------------------------------------------------------------------------
+  lint:
+    executor: flutter-executor
+    steps:
+      - checkout
+      - flutter/pubsub-cache:
+          cache_version: "v2"
+      - run:
+          name: Get dependencies
+          command: flutter pub get
+      - run:
+          name: Analyze code
+          command: flutter analyze --no-fatal-infos
+      - store_artifacts:
+          path: /tmp/dart-analyze.txt
+          destination: analyze-output
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Test — runs all unit tests
+  # ---------------------------------------------------------------------------
+  test:
+    executor: flutter-executor
+    steps:
+      - checkout
+      - flutter/pubsub-cache:
+          cache_version: "v2"
+      - run:
+          name: Get dependencies
+          command: flutter pub get
+      - run:
+          name: Run tests (JUnit XML for CircleCI test insights)
+          command: |
+            mkdir -p test-results
+            flutter test --machine > test-results/flutter-tests.xml
+      - store_test_results:
+          path: test-results
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Build Android Debug APK — attached to PRs for review
+  # ---------------------------------------------------------------------------
+  build-android-preview:
+    executor: flutter-executor
+    steps:
+      - checkout
+      - flutter/pubsub-cache:
+          cache_version: "v2"
+      - run:
+          name: Get dependencies
+          command: flutter pub get
+      - run:
+          name: Build Android debug APK
+          command: |
+            flutter build apk --debug
+            ls -la build/app/outputs/flutter-apk/
+      - store_artifacts:
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          destination: apks/
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Build iOS — simulator build, no App Store signing needed
+  # ---------------------------------------------------------------------------
+  build-ios:
+    executor: ios-executor
+    steps:
+      - checkout
+      - run:
+          name: Get dependencies
+          command: flutter pub get
+      - run:
+          name: Precache iOS toolchain
+          command: flutter precache --ios
+      - run:
+          name: Build iOS simulator app
+          command: |
+            flutter build ios --simulator --no-codesign
+            ls -la build/ios/iphonesimulator/
+      - store_artifacts:
+          path: build/ios/iphonesimulator/
+          destination: ios-build/
+
+  # ---------------------------------------------------------------------------
+  # Job 5: Build Android Release + Shorebird + GitHub Release
+  # ---------------------------------------------------------------------------
+  build-release:
+    executor: flutter-executor
+    environment:
+      FLUTTER_ENV: production
+    steps:
+      - checkout:
+          fetch-depth: 0  # needed for release notes generation
+
+      - flutter/pubsub-cache:
+          cache_version: "v2"
+
+      - install-gh-cli
+      - install-shorebird
+
+      - run:
+          name: Get dependencies
+          command: flutter pub get
+
+      - run:
+          name: Run tests
+          command: flutter test
+
+      - run:
+          name: Analyze code
+          command: flutter analyze
+
+      - run:
+          name: Build Android release APK
+          command: |
+            flutter build apk --release
+            ls -la build/app/outputs/flutter-apk/
+
+      - run:
+          name: Authenticate with Shorebird
+          command: |
+            set -e
+            shorebird login --token ${SHOREBIRD_TOKEN}
+            echo "Shorebird login successful"
+
+      - run:
+          name: Publish to Shorebird
+          command: |
+            set -e
+            shorebird release android \
+              --build-number ${CIRCLE_BUILD_NUM} \
+              --artifact build/app/outputs/flutter-apk/app-release.apk
+
+      - run:
+          name: Create GitHub Release
+          command: |
+            set -e
+            VERSION=${CIRCLE_TAG#v}
+            gh release create "v${VERSION}" \
+              build/app/outputs/flutter-apk/app-release.apk \
+              --title "Curated Feeds v${VERSION}" \
+              --generate-notes \
+              --target ${CIRCLE_SHA1}
+
+      - store_artifacts:
+          path: build/app/outputs/flutter-apk/app-release.apk
+          destination: release/
+
+  # ---------------------------------------------------------------------------
+  # Job 6: Validate — check all required secrets are present before release
+  # ---------------------------------------------------------------------------
+  validate-secrets:
+    executor: flutter-executor
+    steps:
+      - run:
+          name: Validate required secrets
+          command: |
+            echo "Checking required secrets..."
+            ERRORS=0
+
+            if [ -z "${SHOREBIRD_TOKEN}" ]; then
+              echo "ERROR: SHOREBIRD_TOKEN is not set in context 'release-secrets'"
+              echo "  → Get it by running: shorebird login && shorebird token"
+              echo "  → Add it in CircleCI: Project Settings → Contexts → release-secrets → Add Environment Variable"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: SHOREBIRD_TOKEN is set"
+            fi
+
+            if [ $ERRORS -gt 0 ]; then
+              echo ""
+              echo "Setup incomplete. Fix the errors above and re-run."
+              exit 1
+            fi
+            echo "All secrets validated."
+
+# =============================================================================
+# Workflows
+# =============================================================================
+workflows:
+  # ---------------------------------------------------------------------------
+  # Workflow A: Test on every push and PR — fast feedback before review
+  # ---------------------------------------------------------------------------
+  test-all:
+    triggers:
+      - push:
+          branches:
+            ignore:
+              - gh-pages  # no CI noise for docs-only branches
+      - pull_request:
+    jobs:
+      - lint
+      - test
+      - build-android-preview
+      - build-ios
+
+  # ---------------------------------------------------------------------------
+  # Workflow B: Release on every version tag
+  # Validates secrets first, then builds and publishes
+  # ---------------------------------------------------------------------------
+  release:
+    triggers:
+      - tag:
+          # Matches v1.0.0, v1.2.3, v0.1.0-beta.1 etc.
+          pattern: v[0-9]+.[0-9]+.[0-9]+*
+    jobs:
+      - validate-secrets:
+          context:
+            - release-secrets
+      - test:
+          context:
+            - release-secrets
+          requires:
+            - validate-secrets
+      - build-release:
+          context:
+            - release-secrets
+          requires:
+            - test
