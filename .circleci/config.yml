@@ -3,12 +3,12 @@ version: 2.1
 # =============================================================================
 # CircleCI Config for Curated Feeds (Flutter)
 # =============================================================================
-# All CI/CD is handled exclusively by CircleCI — no GitHub Actions used.
+# All CI/CD handled exclusively by CircleCI — no GitHub Actions.
 #
-# Triggers:
-#   - push to any branch         → lint + analyze + test
-#   - pull_request               → above + Android debug APK + iOS build
-#   - git tag v*.*.*             → test + Android release + Shorebird + GitHub Release
+# How it works:
+#   - Every push to any branch          → runs test-all workflow
+#   - Every pull request               → runs test-all workflow (automatic)
+#   - Every git tag matching v*.*.*    → runs release workflow
 # =============================================================================
 
 executors:
@@ -35,7 +35,7 @@ commands:
   install-gh-cli:
     steps:
       - run:
-          name: Install GitHub CLI for release creation
+          name: Install GitHub CLI
           command: |
             if command -v gh &>/dev/null; then
               echo "gh already installed: $(gh --version)"
@@ -47,7 +47,7 @@ commands:
   install-shorebird:
     steps:
       - run:
-          name: Install and cache Shorebird CLI
+          name: Install Shorebird CLI
           command: |
             if command -v shorebird &>/dev/null; then
               echo "shorebird already installed: $(shorebird --version)"
@@ -62,7 +62,7 @@ commands:
 # =============================================================================
 jobs:
   # ---------------------------------------------------------------------------
-  # Job 1: Lint & Analyze — fast feedback, no waiting for tests
+  # Lint — fast feedback, no waiting for tests
   # ---------------------------------------------------------------------------
   lint:
     executor: flutter-executor
@@ -76,12 +76,9 @@ jobs:
       - run:
           name: Analyze code
           command: flutter analyze --no-fatal-infos
-      - store_artifacts:
-          path: /tmp/dart-analyze.txt
-          destination: analyze-output
 
   # ---------------------------------------------------------------------------
-  # Job 2: Test — runs all unit tests
+  # Test — runs all unit tests
   # ---------------------------------------------------------------------------
   test:
     executor: flutter-executor
@@ -93,7 +90,7 @@ jobs:
           name: Get dependencies
           command: flutter pub get
       - run:
-          name: Run tests (JUnit XML for CircleCI test insights)
+          name: Run tests
           command: |
             mkdir -p test-results
             flutter test --machine > test-results/flutter-tests.xml
@@ -101,7 +98,7 @@ jobs:
           path: test-results
 
   # ---------------------------------------------------------------------------
-  # Job 3: Build Android Debug APK — attached to PRs for review
+  # Build Android Debug APK
   # ---------------------------------------------------------------------------
   build-android-preview:
     executor: flutter-executor
@@ -122,7 +119,7 @@ jobs:
           destination: apks/
 
   # ---------------------------------------------------------------------------
-  # Job 4: Build iOS — simulator build, no App Store signing needed
+  # Build iOS — simulator build, no App Store signing
   # ---------------------------------------------------------------------------
   build-ios:
     executor: ios-executor
@@ -144,7 +141,7 @@ jobs:
           destination: ios-build/
 
   # ---------------------------------------------------------------------------
-  # Job 5: Build Android Release + Shorebird + GitHub Release
+  # Build Release — Android APK + Shorebird + GitHub Release
   # ---------------------------------------------------------------------------
   build-release:
     executor: flutter-executor
@@ -165,30 +162,16 @@ jobs:
           command: flutter pub get
 
       - run:
-          name: Run tests
-          command: flutter test
-
-      - run:
-          name: Analyze code
-          command: flutter analyze
-
-      - run:
           name: Build Android release APK
           command: |
             flutter build apk --release
             ls -la build/app/outputs/flutter-apk/
 
       - run:
-          name: Authenticate with Shorebird
-          command: |
-            set -e
-            shorebird login --token ${SHOREBIRD_TOKEN}
-            echo "Shorebird login successful"
-
-      - run:
           name: Publish to Shorebird
           command: |
             set -e
+            shorebird login --token ${SHOREBIRD_TOKEN}
             shorebird release android \
               --build-number ${CIRCLE_BUILD_NUM} \
               --artifact build/app/outputs/flutter-apk/app-release.apk
@@ -209,7 +192,7 @@ jobs:
           destination: release/
 
   # ---------------------------------------------------------------------------
-  # Job 6: Validate — check all required secrets are present before release
+  # Validate secrets — fail fast if SHOREBIRD_TOKEN is missing
   # ---------------------------------------------------------------------------
   validate-secrets:
     executor: flutter-executor
@@ -219,19 +202,16 @@ jobs:
           command: |
             echo "Checking required secrets..."
             ERRORS=0
-
             if [ -z "${SHOREBIRD_TOKEN}" ]; then
               echo "ERROR: SHOREBIRD_TOKEN is not set in context 'release-secrets'"
-              echo "  → Get it by running: shorebird login && shorebird token"
-              echo "  → Add it in CircleCI: Project Settings → Contexts → release-secrets → Add Environment Variable"
+              echo "  → Get it: shorebird login && shorebird token"
+              echo "  → Add in CircleCI: Project Settings → Contexts → release-secrets"
               ERRORS=$((ERRORS + 1))
             else
               echo "OK: SHOREBIRD_TOKEN is set"
             fi
-
             if [ $ERRORS -gt 0 ]; then
-              echo ""
-              echo "Setup incomplete. Fix the errors above and re-run."
+              echo "Setup incomplete. Fix the errors above."
               exit 1
             fi
             echo "All secrets validated."
@@ -241,28 +221,35 @@ jobs:
 # =============================================================================
 workflows:
   # ---------------------------------------------------------------------------
-  # Workflow A: Test on every push and PR
+  # test-all — runs on every push and pull request (automatic)
+  # Skips jobs on gh-pages to avoid CI noise for docs-only branches
   # ---------------------------------------------------------------------------
   test-all:
     jobs:
-      - lint
-      - test
+      - lint:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+      - test:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
       - build-android-preview:
           filters:
             branches:
-              only: /.*/
-            tags:
-              ignore: /.*/
+              ignore:
+                - gh-pages
       - build-ios:
           filters:
             branches:
-              only: /.*/
-            tags:
-              ignore: /.*/
+              ignore:
+                - gh-pages
 
   # ---------------------------------------------------------------------------
-  # Workflow B: Release on every version tag
-  # Validates secrets first, then builds and publishes
+  # release — runs only on version tags (v1.0.0, v1.2.3, etc.)
+  # Validates secrets first, then runs tests, then builds and publishes
   # ---------------------------------------------------------------------------
   release:
     jobs:
@@ -271,7 +258,7 @@ workflows:
             - release-secrets
           filters:
             tags:
-              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+              only: /v[0-9]+\.[0-9]+\.[0-9]+.*/
             branches:
               ignore: /.*/
       - test:
@@ -279,7 +266,7 @@ workflows:
             - release-secrets
           filters:
             tags:
-              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+              only: /v[0-9]+\.[0-9]+\.[0-9]+.*/
             branches:
               ignore: /.*/
           requires:
@@ -289,7 +276,7 @@ workflows:
             - release-secrets
           filters:
             tags:
-              only: /v[0-9]+.[0-9]+.[0-9]+.*/
+              only: /v[0-9]+\.[0-9]+\.[0-9]+.*/
             branches:
               ignore: /.*/
           requires:
