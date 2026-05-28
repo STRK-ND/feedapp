@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
 import '../utils/constants.dart';
@@ -134,9 +135,9 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 24),
                     Text(
                       AppConfig.appName,
-                      style: TextStyle(
+                      style: GoogleFonts.lexend(
                         fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: isDark ? Colors.white : AppColors.textPrimary,
                         letterSpacing: -0.5,
                       ),
@@ -182,17 +183,17 @@ class CuratedFeedsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SettingsService>(create: (_) => SettingsService()),
+        Provider<SettingsService>(create: (_) => getIt<SettingsService>()),
         ChangeNotifierProvider<ThemeProvider>(
           create: (context) {
-            final provider = ThemeProvider(SettingsService());
+            final provider = ThemeProvider(getIt<SettingsService>());
             provider.init();
             return provider;
           },
         ),
         ChangeNotifierProvider<SettingsNotifier>(
           create: (context) {
-            final provider = SettingsNotifier(SettingsService());
+            final provider = SettingsNotifier(getIt<SettingsService>());
             provider.loadSettings();
             return provider;
           },
