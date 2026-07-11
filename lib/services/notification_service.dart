@@ -1,7 +1,14 @@
+import 'dart:convert';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'in_app_notification_manager.dart';
 import '../models/in_app_notification.dart';
+import '../di/service_locator.dart';
+import 'settings_service.dart';
+import 'update_service.dart';
 
 /// Service for handling push notifications
 class NotificationService {
@@ -20,6 +27,15 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    // Check if notifications are enabled
+    final settingsService = getIt<SettingsService>();
+    final notificationsEnabled = await settingsService.getNotificationsEnabled();
+    if (!notificationsEnabled) {
+      debugPrint('[Notification] Notifications disabled by user, skipping init');
+      _isInitialized = true;
+      return;
+    }
+
     // Request permissions (iOS)
     await _requestPermissions();
 
@@ -28,7 +44,7 @@ class NotificationService {
 
     // Get FCM token
     _fcmToken = await _firebaseMessaging.getToken();
-    print('[Notification] FCM Token: ${_fcmToken?.substring(0, 20)}...');
+    debugPrint('[Notification] FCM Token: ${_fcmToken?.substring(0, 20)}...');
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -61,7 +77,7 @@ class NotificationService {
       sound: true,
     );
 
-    print(
+    debugPrint(
       '[Notification] iOS Permission status: ${iosSettings.authorizationStatus}',
     );
 
@@ -90,7 +106,7 @@ class NotificationService {
     );
 
     await _localNotifications.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
   }
@@ -99,67 +115,196 @@ class NotificationService {
   void _onNotificationResponse(NotificationResponse response) {
     final payload = response.payload;
     if (payload != null) {
-      print('[Notification] Tapped with payload: $payload');
+      debugPrint('[Notification] Tapped with payload: $payload');
+      _handleUpdateNotificationTap(payload);
+    }
+  }
+
+  /// Foreground/background scheduled local notification (the OTA
+  /// announcement). Stored in [SharedPreferences] so that cold-start
+  /// launches where the app was opened *by* the tap can find it.
+  static const String _pendingUpdatePayloadKey = 'pending_update_payload';
+
+  /// Schedule a high-priority heads-up local notification announcing
+  /// that a new release is available, with the `UpdateInfo` payload
+  /// for tap-to-update routing. Suppresses re-announcing the same
+  /// version on subsequent cold starts, so the user is notified once
+  /// per published release.
+  Future<void> announceUpdate(UpdateInfo info) async {
+    final settingsService = getIt<SettingsService>();
+    if (!await settingsService.getNotificationsEnabled()) {
+      debugPrint(
+        '[Notification] announceUpdate: notifications disabled by user, skipping',
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastAnnounced = prefs.getString('last_announced_update_version');
+    if (lastAnnounced == info.version) {
+      debugPrint(
+        '[Notification] announceUpdate: version ${info.version} already announced, skipping',
+      );
+      return;
+    }
+
+    const channelId = 'ota_updates';
+    const channelName = 'Curated Feeds updates';
+    const channelDescription =
+        'Heads-up announcement when a new app version is published.';
+
+    final android = AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      ticker: '${info.version} is available',
+      styleInformation: BigTextStyleInformation(
+        info.releaseNotes.isEmpty
+            ? 'Version ${info.version} is available.'
+            : info.releaseNotes,
+      ),
+    );
+    const ios = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    final details = NotificationDetails(android: android, iOS: ios);
+
+    final payload = jsonEncode({
+      'type': 'ota_update',
+      'version': info.version,
+      'downloadUrl': info.downloadUrl,
+      'releaseNotes': info.releaseNotes,
+      'htmlUrl': info.htmlUrl,
+      'releaseDate': info.releaseDate,
+    });
+
+    // Strip the first line of release notes as the visible body —
+    // BigTextStyle expands when the user long-presses the notification.
+    final firstLine = info.releaseNotes.isEmpty
+        ? 'Tap to update Curated Feeds.'
+        : (info.releaseNotes.split('\n').first.length > 80
+            ? '${info.releaseNotes.substring(0, 77)}…'
+            : info.releaseNotes.split('\n').first);
+
+    await _localNotifications.show(
+      id: _kOtaNotificationId,
+      title: 'Version ${info.version} is available',
+      body: firstLine,
+      notificationDetails: details,
+      payload: payload,
+    );
+
+    await prefs.setString(_pendingUpdatePayloadKey, payload);
+    await prefs.setString('last_announced_update_version', info.version);
+
+    debugPrint(
+      '[Notification] Scheduled OTA announcement for ${info.version}',
+    );
+  }
+
+  /// Stable ID used for the OTA announcement notification. Re-using
+  /// the same id means a newer version supersedes the older one
+  /// instead of stacking two banners.
+  static const int _kOtaNotificationId = 8001;
+
+  /// Consumer tap-handler. Set via [setUpdateNotificationTapHandler]
+  /// from a UI entry-point that has access to a `BuildContext`. The
+  /// default implementation just logs the payload — the host app
+  /// overrides this with the actual "start the install" flow.
+  void Function(String payload)? _updateTapHandler;
+  void setUpdateNotificationTapHandler(void Function(String payload)? h) {
+    _updateTapHandler = h;
+  }
+
+  /// Called from cold-start / background-tap callback when the local
+  /// notification plugin hand the tap to us. Pulls the cached JSON
+  /// out of SharedPreferences so a cold-start launch (the plugin
+  /// may have already cleared its in-memory tap queue) still has
+  /// the UpdateInfo available.
+  ///
+  /// Two entry points:
+  /// - [calledWith] != null: a tap callback handed us a payload
+  ///   string. Parse it, but ALSO read+clear the cached version
+  ///   (prewarm).
+  /// - [calledWith] == null: cold-start check. Read-and-clear
+  ///   the cached payload; returns null if there was nothing.
+  Future<UpdateInfo?> consumeUpdateNotificationPayload(
+    String? calledWith,
+  ) async {
+    String? payload = calledWith;
+    if (payload == null) {
+      final prefs = await SharedPreferences.getInstance();
+      payload = prefs.getString(_pendingUpdatePayloadKey);
+      if (payload != null) {
+        await prefs.remove(_pendingUpdatePayloadKey);
+      }
+    }
+    if (payload == null) return null;
+    return _decodePayload(payload);
+  }
+
+  /// Parse the JSON payload back to [UpdateInfo]. Public so the
+  /// cold-start path can call it directly without round-tripping
+  /// through SharedPreferences when the payload is already in hand.
+  Future<UpdateInfo?> parseUpdatePayload(String payload) async {
+    return _decodePayload(payload);
+  }
+
+  Future<UpdateInfo?> _decodePayload(String payload) async {
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      if (data['type'] != 'ota_update') return null;
+      return UpdateInfo(
+        version: data['version'] as String? ?? '',
+        downloadUrl: data['downloadUrl'] as String? ?? '',
+        releaseNotes: data['releaseNotes'] as String? ?? '',
+        htmlUrl: data['htmlUrl'] as String? ?? '',
+        releaseDate: data['releaseDate'] as String? ?? '',
+      );
+    } catch (e) {
+      debugPrint('[Notification] Failed to parse update payload: $e');
+      return null;
+    }
+  }
+
+  void _handleUpdateNotificationTap(String payload) {
+    if (_updateTapHandler != null) {
+      _updateTapHandler!(payload);
+    } else {
+      debugPrint(
+        '[Notification] no tap handler registered — payload saved for cold start',
+      );
     }
   }
 
   /// Handle foreground message
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    print('[Notification] Foreground message: ${message.notification?.title}');
+    debugPrint('[Notification] Foreground message: ${message.notification?.title}');
+
+    // Check if in-app notifications are enabled
+    final settingsService = getIt<SettingsService>();
+    final inAppEnabled = await settingsService.getInAppNotificationsEnabled();
+    if (!inAppEnabled) return;
 
     final title = message.notification?.title ?? 'New Article';
     final body = message.notification?.body ?? 'Check out the latest articles!';
 
-    // When app is in foreground, only show in-app notification (not both)
-    // This avoids duplicate UX - local notifications are for background/minimized state
     _showInAppNotification(title: title, body: body, data: message.data);
   }
 
   /// Handle background message (must be top-level function)
   static Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-    print('[Notification] Background message: ${message.notification?.title}');
+    debugPrint('[Notification] Background message: ${message.notification?.title}');
   }
 
   /// Handle notification tap from terminated/background
   void _handleNotificationTap(RemoteMessage message) {
-    print('[Notification] Tapped from: ${message.from}');
-  }
-
-  /// Show local notification
-  Future<void> _showLocalNotification({
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'curated_feeds_channel',
-      'Curated Feeds',
-      channelDescription: 'Notifications for new articles and updates',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-      enableVibration: true,
-      playSound: true,
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      title,
-      body,
-      details,
-      payload: payload,
-    );
+    debugPrint('[Notification] Tapped from: ${message.from}');
   }
 
   /// Show in-app notification banner
@@ -186,40 +331,15 @@ class NotificationService {
   /// Subscribe to topic (for category-based notifications)
   Future<void> subscribeToTopic(String topic) async {
     await _firebaseMessaging.subscribeToTopic(topic);
-    print('[Notification] Subscribed to topic: $topic');
+    debugPrint('[Notification] Subscribed to topic: $topic');
   }
 
   /// Unsubscribe from topic
   Future<void> unsubscribeFromTopic(String topic) async {
     await _firebaseMessaging.unsubscribeFromTopic(topic);
-    print('[Notification] Unsubscribed from topic: $topic');
+    debugPrint('[Notification] Unsubscribed from topic: $topic');
   }
 
   /// Get FCM token
   String? get fcmToken => _fcmToken;
-
-  /// Refresh FCM token
-  Future<void> refreshToken() async {
-    _fcmToken = await _firebaseMessaging.getToken();
-    print('[Notification] Refreshed FCM Token');
-  }
-
-  /// Send test notification (for debugging)
-  Future<void> sendTestNotification() async {
-    await _showLocalNotification(
-      title: 'Test Notification',
-      body: 'Notifications are working correctly!',
-    );
-  }
-
-  /// Cancel all notifications
-  Future<void> cancelAllNotifications() async {
-    await _localNotifications.cancelAll();
-    print('[Notification] All notifications cancelled');
-  }
-
-  /// Get pending notifications
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    return _localNotifications.pendingNotificationRequests();
-  }
 }

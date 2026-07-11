@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/version_provider.dart';
 import '../utils/helpers.dart';
+import 'notification_service.dart';
 
 /// UpdateService — GitHub Releases based OTA.
 ///
@@ -70,13 +71,24 @@ class UpdateService {
         if (Helpers.isNewerVersion(currentVersion, cleanVersion)) {
           final ignoredVersion = prefs.getString(_ignoredVersionKey);
           if (ignoredVersion != cleanVersion) {
-            return UpdateInfo(
+            final info = UpdateInfo(
               version: cleanVersion,
               releaseDate: data['published_at'] as String,
               downloadUrl: _getApkDownloadUrl(data),
               releaseNotes: data['body'] as String? ?? '',
               htmlUrl: data['html_url'] as String,
             );
+            // Best-effort: surface an OTA heads-up notification
+            // when a published release is detected, so users who
+            // don't open the app on launch day still get a nudge.
+            // Silent no-op if the user disabled notifications or
+            // if this version was already announced.
+            try {
+              await NotificationService().announceUpdate(info);
+            } catch (e) {
+              debugPrint('[UpdateService] announceUpdate failed: $e');
+            }
+            return info;
           }
         }
       }
