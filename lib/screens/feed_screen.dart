@@ -402,7 +402,12 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
     return articles;
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+    Duration duration = const Duration(milliseconds: 2000),
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -420,9 +425,58 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
           borderRadius: BorderRadius.circular(16),
         ),
         elevation: 8,
-        duration: const Duration(milliseconds: 2000),
+        duration: duration,
+        action: (actionLabel != null && onAction != null)
+            ? SnackBarAction(
+                label: actionLabel.toUpperCase(),
+                textColor: colorScheme.primary,
+                onPressed: onAction,
+              )
+            : null,
       ),
     );
+  }
+
+  Future<void> _onMarkAllRead() async {
+    if (!mounted || _unreadCount == 0) return;
+    final result = await _articleRepository.markAllAsRead();
+    if (!mounted) return;
+    if (result.isFailure) {
+      _showSnackBar(
+        result.error ?? 'Couldn\'t mark all read.',
+      );
+      return;
+    }
+
+    final snapshot = result.data ?? <String, bool>{};
+    setState(() {
+      _articles = _articles
+          .map((a) => snapshot.containsKey(a.id) ? a.copyWith(isRead: true) : a)
+          .toList();
+      _displayedArticles = _getFilteredArticles();
+    });
+
+    final flipped = snapshot.length;
+    _showSnackBar(
+      'Marked $flipped article${flipped == 1 ? '' : 's'} as read.',
+      actionLabel: 'Undo',
+      onAction: () => _undoMarkAllRead(snapshot),
+      duration: const Duration(milliseconds: 4000),
+    );
+  }
+
+  Future<void> _undoMarkAllRead(Map<String, bool> snapshot) async {
+    final ids = snapshot.keys.toSet();
+    if (ids.isEmpty) return;
+    await _articleRepository.restoreReadState(snapshot);
+    if (!mounted) return;
+    setState(() {
+      _articles = _articles
+          .map((a) => ids.contains(a.id) ? a.copyWith(isRead: false) : a)
+          .toList();
+      _displayedArticles = _getFilteredArticles();
+    });
+    _showSnackBar('Restored.');
   }
 
   Widget _buildEmptyState() {
@@ -697,6 +751,34 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
             ),
           ),
           actions: [
+            // Mark-all-read with undo.
+            if (_selectedTab == 0)
+              Semantics(
+                button: true,
+                label: _unreadCount > 0
+                    ? 'Mark $_unreadCount unread articles as read'
+                    : 'No unread to mark as read',
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: IconButton(
+                    onPressed: _unreadCount == 0
+                        ? null
+                        : () {
+                            HapticFeedback.lightImpact();
+                            _onMarkAllRead();
+                          },
+                    tooltip: _unreadCount > 0
+                        ? 'Mark all as read'
+                        : 'All caught up',
+                    icon: Icon(
+                      _unreadCount == 0
+                          ? Icons.done_all_rounded
+                          : Icons.done_all_outlined,
+                      color: appBarTitleColor,
+                    ),
+                  ),
+                ),
+              ),
             // View-mode toggle (Stack / Continuous) — feed tab only.
             if (_selectedTab == 0)
               Semantics(
@@ -894,13 +976,12 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
                       edition: settings.edition,
                       articleCount: _displayedArticles.length,
                       unreadCount: _unreadCount,
-                      onTapDot: _unreadCount > 0 ? () {
-                        if (_viewMode == 'stack') {
-                          _showSnackBar(
-                            '$_unreadCount articles waiting. Swipe left to dismiss.',
-                          );
-                        }
-                      } : null,
+                      // The amber dot doubles as the "mark all read"
+                      // affordance — it ONLY exists when there is
+                      // something unread, so tapping it is the
+                      // fastest path to a clean slate. Stack mode
+                      // and Continuous mode both use the same action.
+                      onTapDot: _unreadCount > 0 ? _onMarkAllRead : null,
                     );
                   },
                 ),

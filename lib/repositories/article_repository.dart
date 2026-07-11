@@ -1,12 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../models/filter_params.dart';
-import '../models/outbox_mutation.dart';
 import '../services/worker_feed_service.dart';
 import '../services/storage_service.dart';
-import '../services/outbox_service.dart';
 import '../utils/error_handler.dart';
-import '../utils/helpers.dart';
 import '../di/service_locator.dart';
 
 /// Repository for managing article data access
@@ -14,15 +11,12 @@ import '../di/service_locator.dart';
 class ArticleRepository {
   final StorageService _storageService;
   final WorkerFeedService _workerFeedService;
-  final OutboxService _outboxService;
 
   ArticleRepository({
     StorageService? storageService,
     WorkerFeedService? workerFeedService,
-    OutboxService? outboxService,
   }) : _storageService = storageService ?? getIt<StorageService>(),
-       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>(),
-       _outboxService = outboxService ?? getIt<OutboxService>();
+       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
 
   // Cache for articles to avoid repeated storage reads
   List<Article>? _cachedArticles;
@@ -39,7 +33,7 @@ class ArticleRepository {
     bool forceRefresh = false,
   }) async {
     try {
-      ErrorHandlerExtensions.logInfo('Fetching all articles');
+      debugPrint('[Repository] Fetching all articles');
 
       final cached = _cachedArticles;
       if (!forceRefresh && cached != null) {
@@ -67,7 +61,7 @@ class ArticleRepository {
   /// Now fetches all pages from the paginated API
   Future<Result<List<Article>>> fetchNewArticles() async {
     try {
-      ErrorHandlerExtensions.logInfo('Fetching new articles from Worker API');
+      debugPrint('[Repository] Fetching new articles from Worker API');
 
       // Fetch all pages
       final allArticles = <Article>[];
@@ -133,38 +127,10 @@ class ArticleRepository {
     }
   }
 
-  /// Fetch articles from a specific source
-  Future<Result<List<Article>>> fetchArticlesFromSource(String sourceId) async {
-    try {
-      ErrorHandlerExtensions.logInfo(
-        'Fetching articles from source: $sourceId',
-      );
-
-      final allResult = await fetchAllArticles();
-      if (allResult.isFailure) {
-        return allResult;
-      }
-
-      final articles = allResult.data ?? [];
-      final filteredArticles = articles
-          .where((a) => a.sourceId == sourceId)
-          .toList();
-
-      return Result.success(filteredArticles);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to fetch articles from source $sourceId',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
   /// Fetch saved articles
   Future<Result<List<Article>>> fetchSavedArticles() async {
     try {
-      ErrorHandlerExtensions.logInfo('Fetching saved articles');
+      debugPrint('[Repository] Fetching saved articles');
 
       final cached = _cachedSavedArticles;
       if (cached != null) {
@@ -178,129 +144,6 @@ class ArticleRepository {
     } catch (e, stackTrace) {
       ErrorHandler.logError(
         'Failed to fetch saved articles',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Search articles by query across title, description, and source name
-  Future<Result<List<Article>>> searchArticles(String query) async {
-    try {
-      if (query.isEmpty) {
-        return await fetchAllArticles();
-      }
-
-      ErrorHandlerExtensions.logInfo('Searching articles with query: $query');
-
-      final allResult = await fetchAllArticles();
-      if (allResult.isFailure) {
-        return allResult;
-      }
-
-      final articles = allResult.data ?? [];
-      final filteredArticles = Helpers.filterArticlesByQuery(articles, query);
-
-      return Result.success(filteredArticles);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to search articles',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Filter articles by category using source metadata from Worker response
-  Future<Result<List<Article>>> filterByCategory(String category) async {
-    try {
-      if (category.isEmpty || category == 'All') {
-        return await fetchAllArticles();
-      }
-
-      ErrorHandlerExtensions.logInfo(
-        'Filtering articles by category: $category',
-      );
-
-      // Get all articles
-      final allResult = await fetchAllArticles();
-      if (allResult.isFailure) {
-        return allResult;
-      }
-
-      final articles = allResult.data ?? [];
-      // Filter by sourceCategory from article metadata (provided by Worker)
-      final filteredArticles = articles
-          .where((a) => a.sourceCategory == category)
-          .toList();
-
-      return Result.success(filteredArticles);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to filter articles by category',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Filter unread articles
-  Future<Result<List<Article>>> filterUnread() async {
-    try {
-      ErrorHandlerExtensions.logInfo('Filtering unread articles');
-
-      final allResult = await fetchAllArticles();
-      if (allResult.isFailure) {
-        return allResult;
-      }
-
-      final articles = allResult.data ?? [];
-      final unreadArticles = articles.where((a) => !a.isRead).toList();
-
-      return Result.success(unreadArticles);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to filter unread articles',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Mark an article as read
-  Future<Result<void>> markAsRead(Article article) async {
-    try {
-      // Work with cached data directly - avoid full refresh
-      var articles = _cachedArticles;
-      if (articles == null) {
-        final allResult = await fetchAllArticles();
-        if (allResult.isFailure) {
-          return Result.failure(allResult.error ?? 'Failed to fetch articles');
-        }
-        articles = allResult.data ?? [];
-      }
-
-      final index = articles.indexWhere((a) => a.id == article.id);
-      if (index == -1) {
-        return Result.failure('Article not found');
-      }
-
-      // Create updated list with immutable copy
-      final updatedArticles = List<Article>.from(articles);
-      updatedArticles[index] = updatedArticles[index].copyWith(isRead: true);
-
-      // Update cache and persist
-      _cachedArticles = updatedArticles;
-      await _storageService.saveArticles(updatedArticles);
-
-      return Result.success(null);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to mark article as read',
         error: e,
         stackTrace: stackTrace,
       );
@@ -338,8 +181,7 @@ class ArticleRepository {
           // Add to saved if not already there
           if (!updatedSavedArticles.any((a) => a.id == article.id)) {
             updatedSavedArticles.insert(0, updatedArticle);
-          }
-        } else {
+          }        } else {
           // Remove from saved
           updatedSavedArticles.removeWhere((a) => a.id == article.id);
         }
@@ -359,26 +201,87 @@ class ArticleRepository {
     }
   }
 
-  /// Remove an article from the main list
-  Future<Result<void>> removeArticle(String articleId) async {
+  /// Mark every currently-unread, not-yet-saved article as read.
+  ///
+  /// Returns the **previous** read state per article as `Map<String,
+  /// bool>` keyed by id — only articles whose isRead=false at the
+  /// moment of the call are included, so undo restores exactly the
+  /// set that flipped. Articles that were already-read stay read,
+  /// even after undo.
+  Future<Result<Map<String, bool>>> markAllAsRead() async {
     try {
-      final allResult = await fetchAllArticles(forceRefresh: true);
-      if (allResult.isFailure) {
-        return Result.failure(allResult.error ?? 'Failed to fetch articles');
+      final articles = _cachedArticles;
+      if (articles == null) {
+        return Result.success(<String, bool>{});
       }
 
-      final articles = allResult.data ?? [];
-      final remainingArticles = articles
-          .where((a) => a.id != articleId)
-          .toList();
+      final previousReadState = <String, bool>{};
+      var touched = 0;
+      final updated = <Article>[];
+      for (final a in articles) {
+        if (!a.isRead) {
+          previousReadState[a.id] = false; // value irrelevant; key matters
+          updated.add(a.copyWith(isRead: true));
+          touched++;
+        } else {
+          updated.add(a);
+        }
+      }
 
-      _cachedArticles = remainingArticles;
-      await _storageService.saveArticles(remainingArticles);
+      if (touched == 0) {
+        return Result.success(<String, bool>{});
+      }
 
+      _cachedArticles = updated;
+      await _storageService.saveArticles(updated);
+
+      debugPrint(
+        '[Repository] Marked all read. Flipped $touched article(s).',
+      );
+      return Result.success(previousReadState);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+        'Failed to mark all as read',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return Result.failure(ErrorHandler.getUserMessage(e));
+    }
+  }
+
+  /// Restore a previously-flipped set of reads back to unread.
+  ///
+  /// Pass the exact `Map<String, bool>` returned from `markAllAsRead`.
+  /// Articles whose ids are in the map are reset to `isRead=false`;
+  /// everything else is left untouched.
+  Future<Result<void>> restoreReadState(Map<String, bool> snapshot) async {
+    try {
+      final articles = _cachedArticles;
+      if (articles == null) {
+        return Result.success(null);
+      }
+      final ids = snapshot.keys.toSet();
+      if (ids.isEmpty) return Result.success(null);
+
+      final updated = <Article>[];
+      for (final a in articles) {
+        if (ids.contains(a.id)) {
+          updated.add(a.copyWith(isRead: false));
+        } else {
+          updated.add(a);
+        }
+      }
+
+      _cachedArticles = updated;
+      await _storageService.saveArticles(updated);
+
+      debugPrint(
+        '[Repository] Restored ${ids.length} article(s) to unread.',
+      );
       return Result.success(null);
     } catch (e, stackTrace) {
       ErrorHandler.logError(
-        'Failed to remove article',
+        'Failed to restore read state',
         error: e,
         stackTrace: stackTrace,
       );
@@ -386,149 +289,4 @@ class ArticleRepository {
     }
   }
 
-  /// Get unread count
-  Future<Result<int>> getUnreadCount() async {
-    try {
-      final unreadResult = await filterUnread();
-      if (unreadResult.isFailure) {
-        return Result.failure(
-          unreadResult.error ?? 'Failed to get unread articles',
-        );
-      }
-
-      return Result.success(unreadResult.data?.length ?? 0);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to get unread count',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Fetch articles with specific filter parameters
-  Future<Result<List<Article>>> fetchArticlesWithFilters(
-    FilterParams params,
-  ) async {
-    try {
-      ErrorHandlerExtensions.logInfo('Fetching articles with filters');
-
-      final response = await _workerFeedService.fetchArticles(params: params);
-
-      return Result.success(response.items);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to fetch articles with filters',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Fetch available sources from Worker
-  Future<Result<List<Map<String, dynamic>>>> fetchAvailableSources() async {
-    try {
-      ErrorHandlerExtensions.logInfo('Fetching available sources');
-
-      final sources = await _workerFeedService.fetchSources();
-      return Result.success(sources);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to fetch sources',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Fetch full article content
-  Future<Result<Map<String, dynamic>?>> fetchArticleFullContent(
-    String articleUrl,
-  ) async {
-    try {
-      ErrorHandlerExtensions.logInfo('Fetching full content for article');
-
-      final content = await _workerFeedService.fetchFullContent(articleUrl);
-
-      if (content == null) {
-        return Result.failure('Failed to fetch full content');
-      }
-
-      return Result.success(content);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-        'Failed to fetch full content',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return Result.failure(ErrorHandler.getUserMessage(e));
-    }
-  }
-
-  /// Replay pending mutations from outbox when coming back online
-  Future<void> replayOutbox() async {
-    final pending = await _outboxService.getPendingMutations();
-
-    for (final mutation in pending) {
-      try {
-        await _replayMutation(mutation);
-        await _outboxService.dequeue(mutation.id);
-      } catch (e) {
-        await _outboxService.incrementRetry(mutation.id);
-        ErrorHandler.logError(
-          'Failed to replay mutation ${mutation.id}',
-          error: e,
-          severity: ErrorSeverity.low,
-        );
-      }
-    }
-  }
-
-  Future<void> _replayMutation(OutboxMutation mutation) async {
-    // Find the article in cache or storage
-    final articles = _cachedArticles ?? await _storageService.loadArticles();
-    final articleIndex = articles.indexWhere((a) => a.id == mutation.articleId);
-
-    if (articleIndex == -1) return;
-
-    switch (mutation.type) {
-      case OutboxMutationType.markRead:
-        articles[articleIndex].isRead = true;
-        break;
-      case OutboxMutationType.markUnread:
-        articles[articleIndex].isRead = false;
-        break;
-      case OutboxMutationType.saveArticle:
-        articles[articleIndex].isSaved = true;
-        break;
-      case OutboxMutationType.unsaveArticle:
-        articles[articleIndex].isSaved = false;
-        break;
-      case OutboxMutationType.toggleRead:
-        articles[articleIndex].isRead = !articles[articleIndex].isRead;
-        break;
-      case OutboxMutationType.toggleSave:
-        articles[articleIndex].isSaved = !articles[articleIndex].isSaved;
-        break;
-    }
-
-    await _storageService.saveArticles(articles);
-    _cachedArticles = articles;
-  }
-}
-
-/// Extension on ErrorHandler for logging shortcuts
-extension ErrorHandlerExtensions on ErrorHandler {
-  /// Log info message
-  static void logInfo(String message) {
-    ErrorHandler.logError(message, severity: ErrorSeverity.low);
-  }
-
-  /// Log warning message
-  static void logWarning(String message) {
-    ErrorHandler.logError(message, severity: ErrorSeverity.medium);
-  }
 }
