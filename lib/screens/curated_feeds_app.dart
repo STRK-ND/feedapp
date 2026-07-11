@@ -23,18 +23,26 @@ class CuratedFeedsApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<SettingsService>(create: (_) => getIt<SettingsService>()),
-        ChangeNotifierProvider<ThemeProvider>(
-          create: (context) {
-            final provider = ThemeProvider(getIt<SettingsService>());
-            provider.init();
-            return provider;
-          },
-        ),
+        // SettingsNotifier is the source of truth for prefs (theme mode,
+        // body font, viewer prefs, view mode, edition). ThemeProvider
+        // proxies off it so MaterialApp.themeMode updates live.
         ChangeNotifierProvider<SettingsNotifier>(
           create: (context) {
             final provider = SettingsNotifier(getIt<SettingsService>());
             provider.loadSettings();
             return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<SettingsNotifier, ThemeProvider>(
+          create: (_) {
+            final provider = ThemeProvider(getIt<SettingsService>());
+            provider.init();
+            return provider;
+          },
+          update: (_, notifier, theme) {
+            // Keep the first arg non-null. If theme is null for any
+            // reason, return the existing provider untouched.
+            return theme!..setThemeMode(notifier.themeMode);
           },
         ),
       ],

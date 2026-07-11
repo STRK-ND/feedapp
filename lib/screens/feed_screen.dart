@@ -75,7 +75,11 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   }
 
   Future<void> _loadViewMode() async {
-    final mode = await _settingsService.getFeedViewMode();
+    // SettingsNotifier has already been initialized and has the
+    // persisted view mode in memory. Mirror it locally so toggling
+    // updates both surfaces.
+    final notifier = context.read<SettingsNotifier>();
+    final mode = notifier.viewMode;
     if (!mounted) return;
     setState(() => _viewMode = mode);
   }
@@ -83,7 +87,7 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   Future<void> _toggleViewMode() async {
     final next = _viewMode == 'stack' ? 'continuous' : 'stack';
     setState(() => _viewMode = next);
-    await _settingsService.setFeedViewMode(next);
+    await context.read<SettingsNotifier>().setViewMode(next);
   }
 
   @override
@@ -247,8 +251,11 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
         });
 
         // Bump the editorial edition number on every successful refresh.
-        EditionState.current = await _settingsService.bumpEditionNumber();
-        if (mounted) setState(() {});
+        if (mounted) {
+          final next = await context.read<SettingsNotifier>().bumpEdition();
+          EditionState.current = next;
+          setState(() {});
+        }
 
         debugPrint(
           '[Feed] Refresh complete. Total articles: ${_articles.length}',
@@ -880,24 +887,22 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
             children: [
               // Folio Rule — signature masthead. Only on the feed tab.
               if (_selectedTab == 0)
-                FolioRule(
-                  date: DateTime.now(),
-                  edition: EditionState.current,
-                  articleCount: _displayedArticles.length,
-                  unreadCount: _unreadCount,
-                  onTapDot: _unreadCount > 0 ? () {
-                    // In continuous mode, scroll to first unread. In stack
-                    // mode, no-op (the stack front is implicitly first).
-                    if (_viewMode == 'stack') {
-                      // First article is always the front card, but if it's
-                      // already read, the swipe-left to dismiss leaves the
-                      // next as front. We don't auto-advance here — the dot
-                      // exists to indicate "there's unread", not to drive.
-                      _showSnackBar(
-                        '$_unreadCount articles waiting. Swipe left to dismiss.',
-                      );
-                    }
-                  } : null,
+                Consumer<SettingsNotifier>(
+                  builder: (context, settings, _) {
+                    return FolioRule(
+                      date: DateTime.now(),
+                      edition: settings.edition,
+                      articleCount: _displayedArticles.length,
+                      unreadCount: _unreadCount,
+                      onTapDot: _unreadCount > 0 ? () {
+                        if (_viewMode == 'stack') {
+                          _showSnackBar(
+                            '$_unreadCount articles waiting. Swipe left to dismiss.',
+                          );
+                        }
+                      } : null,
+                    );
+                  },
                 ),
               // Search bar - theme-aware styling
               if (_isSearchActive)

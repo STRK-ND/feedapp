@@ -12,7 +12,6 @@ import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
-import '../services/settings_service.dart';
 import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
@@ -42,7 +41,10 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   bool _isLoadingContent = false;
   String? _fullContent;
 
-  // Reader preferences local state (initialized from settings).
+  // Reader preferences are now sourced from the SettingsNotifier (which
+  // is the single owner). Local copies are kept only as a brief in-
+  // frame cache so we don't `read` on every widget rebuild; the
+  // Consumer below triggers a rebuild on every notify.
   ReaderTheme _readerTheme = ReaderTheme.defaultTheme;
   double _fontSize = 16;
   double _lineHeight = 1.6;
@@ -57,46 +59,40 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   }
 
   Future<void> _loadPrefs() async {
-    final settings = getIt<SettingsService>();
-    final prefs = await settings.getReadingPreferences();
+    final notifier = context.read<SettingsNotifier>();
     if (!mounted) return;
     setState(() {
-      _readerTheme = prefs.theme;
-      _fontSize = prefs.fontSize;
-      _lineHeight = prefs.lineHeight;
-      _widenMeasure = prefs.widenMeasure;
-      _bodyFont = prefs.bodyFont;
+      _readerTheme = notifier.readerTheme;
+      _fontSize = notifier.fontSize;
+      _lineHeight = notifier.lineHeight;
+      _widenMeasure = notifier.widenMeasure;
+      _bodyFont = notifier.bodyFont;
     });
   }
 
   Future<void> _persistTheme(ReaderTheme t) async {
-    final settings = getIt<SettingsService>();
-    await settings.setReaderTheme(t);
-    setState(() => _readerTheme = t);
+    await context.read<SettingsNotifier>().setReaderTheme(t);
+    if (mounted) setState(() => _readerTheme = t);
   }
 
   Future<void> _persistFontSize(double v) async {
-    final settings = getIt<SettingsService>();
-    await settings.setReaderFontSize(v);
-    setState(() => _fontSize = v);
+    await context.read<SettingsNotifier>().setFontSize(v);
+    if (mounted) setState(() => _fontSize = v);
   }
 
   Future<void> _persistLineHeight(double v) async {
-    final settings = getIt<SettingsService>();
-    await settings.setReaderLineHeight(v);
-    setState(() => _lineHeight = v);
+    await context.read<SettingsNotifier>().setLineHeight(v);
+    if (mounted) setState(() => _lineHeight = v);
   }
 
   Future<void> _persistWiden(bool v) async {
-    final settings = getIt<SettingsService>();
-    await settings.setWidenMeasure(v);
-    setState(() => _widenMeasure = v);
+    await context.read<SettingsNotifier>().setWidenMeasure(v);
+    if (mounted) setState(() => _widenMeasure = v);
   }
 
   Future<void> _persistBodyFont(String v) async {
-    final settings = getIt<SettingsService>();
-    await settings.setBodyFont(v);
-    setState(() => _bodyFont = v);
+    await context.read<SettingsNotifier>().setBodyFont(v);
+    if (mounted) setState(() => _bodyFont = v);
   }
 
   Future<void> _initContent() async {
@@ -233,6 +229,16 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       builder: (context, settings, _) {
         final showImages = settings.showImages;
         final imageMaxWidth = settings.imageMaxWidth.toDouble();
+        // Mirror from the notifier so any external change (from Settings)
+        // propagates live. The local setters above also call setX (which
+        // notifies) so the Consumer will rebuild after our own writes
+        // too — but using the notifier values directly avoids the
+        // single-frame lag.
+        _readerTheme = settings.readerTheme;
+        _fontSize = settings.fontSize;
+        _lineHeight = settings.lineHeight;
+        _widenMeasure = settings.widenMeasure;
+        _bodyFont = settings.bodyFont;
 
         Widget buildHeaderButton({
           required IconData icon,

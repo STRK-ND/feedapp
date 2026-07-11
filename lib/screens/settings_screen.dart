@@ -83,11 +83,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveThemeMode(ThemeMode mode) async {
     if (!mounted) return;
     setState(() => _themeMode = mode);
-    final themeProvider = context.read<ThemeProvider>();
-    await _settingsService.setThemeMode(mode);
-    if (mounted) {
-      await themeProvider.setThemeMode(mode);
-    }
+    // The SettingsNotifier is the single write-path for app pref
+    // changes; it persists to SettingsService and notifies listeners
+    // (ThemeProvider included) so all surfaces that read from the
+    // observer update without a refresh.
+    await context.read<SettingsNotifier>().setThemeMode(mode);
   }
 
   Future<void> _clearCache() async {
@@ -485,14 +485,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // article — full integration would put this through the navigation
     // stack, but for Settings we keep it as a quick bottom sheet so the
     // user doesn't have to scroll through an article to reach them.
+    final notifier = context.read<SettingsNotifier>();
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _SettingsReaderSheet(initial: _readerPrefs),
+      builder: (ctx) => _SettingsReaderSheet(
+        initial: _readerPrefs,
+        notifier: notifier,
+      ),
     );
     if (updated == true) {
-      await _loadSettings();
+      // The notifier already updated its state in flight; just mirror.
+      if (mounted) setState(() => _readerPrefs = notifier.readingPrefs);
     }
   }
 
@@ -869,11 +874,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 ///
 /// Mirrors the shape of the article reader's Aa panel — the same three
 /// sliders (font size, line height, body font), without the theme
-/// swatches. Returns `true` to the caller so the parent can re-load
-/// settings.
+/// swatches. Writes go through the provided [SettingsNotifier] so any
+/// open reader surface updates immediately. Returns `true` to the
+/// caller so the parent can re-render its summary rows.
 class _SettingsReaderSheet extends StatefulWidget {
   final ReadingPreferences initial;
-  const _SettingsReaderSheet({required this.initial});
+  final SettingsNotifier notifier;
+  const _SettingsReaderSheet({
+    required this.initial,
+    required this.notifier,
+  });
 
   @override
   State<_SettingsReaderSheet> createState() => _SettingsReaderSheetState();
@@ -933,7 +943,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
             display: '${_fontSize.round()} PT',
             onChange: (v) async {
               setState(() => _fontSize = v);
-              await getIt<SettingsService>().setReaderFontSize(v);
+              await widget.notifier.setFontSize(v);
             },
           ),
           SizedBox(height: AppSpacing.s4),
@@ -945,7 +955,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
             display: _lineHeight.toStringAsFixed(2),
             onChange: (v) async {
               setState(() => _lineHeight = v);
-              await getIt<SettingsService>().setReaderLineHeight(v);
+              await widget.notifier.setLineHeight(v);
             },
           ),
           SizedBox(height: AppSpacing.s4),
@@ -976,7 +986,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
                   selected: _bodyFont == 'dm',
                   onTap: () async {
                     setState(() => _bodyFont = 'dm');
-                    await getIt<SettingsService>().setBodyFont('dm');
+                    await widget.notifier.setBodyFont('dm');
                   },
                 ),
                 _FontSegment(
@@ -984,7 +994,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
                   selected: _bodyFont == 'lora',
                   onTap: () async {
                     setState(() => _bodyFont = 'lora');
-                    await getIt<SettingsService>().setBodyFont('lora');
+                    await widget.notifier.setBodyFont('lora');
                   },
                 ),
               ],
