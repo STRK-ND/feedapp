@@ -102,6 +102,7 @@ class ReadingPreferences {
   final double lineHeight; // 1.4..1.8
   final bool monoDatelines;
   final bool widenMeasure; // 64ch vs 70ch
+  final String bodyFont; // 'dm' | 'lora'
 
   const ReadingPreferences({
     this.theme = ReaderTheme.defaultTheme,
@@ -109,6 +110,7 @@ class ReadingPreferences {
     this.lineHeight = 1.6,
     this.monoDatelines = true,
     this.widenMeasure = false,
+    this.bodyFont = 'dm',
   });
 
   ReadingPreferences copyWith({
@@ -117,6 +119,7 @@ class ReadingPreferences {
     double? lineHeight,
     bool? monoDatelines,
     bool? widenMeasure,
+    String? bodyFont,
   }) =>
       ReadingPreferences(
         theme: theme ?? this.theme,
@@ -124,5 +127,6 @@ class ReadingPreferences {
         lineHeight: lineHeight ?? this.lineHeight,
         monoDatelines: monoDatelines ?? this.monoDatelines,
         widenMeasure: widenMeasure ?? this.widenMeasure,
+        bodyFont: bodyFont ?? this.bodyFont,
       );
 }

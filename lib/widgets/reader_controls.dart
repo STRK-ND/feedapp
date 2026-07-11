@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../utils/design_tokens.dart';
 import '../utils/reader_theme.dart';
 
@@ -14,10 +15,12 @@ class ReaderControls extends StatelessWidget {
   final double fontSize;
   final double lineHeight;
   final bool widenMeasure;
+  final String bodyFont;
   final ValueChanged<ReaderTheme> onTheme;
   final ValueChanged<double> onFontSize;
   final ValueChanged<double> onLineHeight;
   final ValueChanged<bool> onWidenMeasure;
+  final ValueChanged<String> onBodyFont;
 
   const ReaderControls({
     super.key,
@@ -25,10 +28,12 @@ class ReaderControls extends StatelessWidget {
     required this.fontSize,
     required this.lineHeight,
     required this.widenMeasure,
+    required this.bodyFont,
     required this.onTheme,
     required this.onFontSize,
     required this.onLineHeight,
     required this.onWidenMeasure,
+    required this.onBodyFont,
   });
 
   @override
@@ -44,9 +49,11 @@ class ReaderControls extends StatelessWidget {
           fontSize: fontSize,
           lineHeight: lineHeight,
           widenMeasure: widenMeasure,
+          bodyFont: bodyFont,
           onFontSize: onFontSize,
           onLineHeight: onLineHeight,
           onWidenMeasure: onWidenMeasure,
+          onBodyFont: onBodyFont,
           theme: currentTheme,
         ),
       ],
@@ -110,18 +117,22 @@ class _AaButton extends StatelessWidget {
   final double fontSize;
   final double lineHeight;
   final bool widenMeasure;
+  final String bodyFont;
   final ValueChanged<double> onFontSize;
   final ValueChanged<double> onLineHeight;
   final ValueChanged<bool> onWidenMeasure;
+  final ValueChanged<String> onBodyFont;
 
   const _AaButton({
     required this.theme,
     required this.fontSize,
     required this.lineHeight,
     required this.widenMeasure,
+    required this.bodyFont,
     required this.onFontSize,
     required this.onLineHeight,
     required this.onWidenMeasure,
+    required this.onBodyFont,
   });
 
   @override
@@ -131,14 +142,21 @@ class _AaButton extends StatelessWidget {
       child: InkWell(
         onTap: () => _openSheet(context),
         borderRadius: BorderRadius.circular(AppRadius.button),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s3, vertical: AppSpacing.s2),
-          child: Text(
-            'Aa',
-            style: AppType.titleLarge(
-              color: AppColors.primary,
-            ).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+        // 48x48 hit area — Android tap-target floor.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Tooltip(
+            message: 'Type & spacing',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s3, vertical: AppSpacing.s2),
+              child: Text(
+                'Aa',
+                style: AppType.titleLarge(
+                  color: AppColors.primary,
+                ).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
         ),
       ),
@@ -155,9 +173,11 @@ class _AaButton extends StatelessWidget {
           fontSize: fontSize,
           lineHeight: lineHeight,
           widenMeasure: widenMeasure,
+          bodyFont: bodyFont,
           onFontSize: onFontSize,
           onLineHeight: onLineHeight,
           onWidenMeasure: onWidenMeasure,
+          onBodyFont: onBodyFont,
         );
       },
     );
@@ -168,17 +188,21 @@ class _AaPanel extends StatefulWidget {
   final double fontSize;
   final double lineHeight;
   final bool widenMeasure;
+  final String bodyFont;
   final ValueChanged<double> onFontSize;
   final ValueChanged<double> onLineHeight;
   final ValueChanged<bool> onWidenMeasure;
+  final ValueChanged<String> onBodyFont;
 
   const _AaPanel({
     required this.fontSize,
     required this.lineHeight,
     required this.widenMeasure,
+    required this.bodyFont,
     required this.onFontSize,
     required this.onLineHeight,
     required this.onWidenMeasure,
+    required this.onBodyFont,
   });
 
   @override
@@ -189,6 +213,7 @@ class _AaPanelState extends State<_AaPanel> {
   late double _fontSize = widget.fontSize;
   late double _lineHeight = widget.lineHeight;
   late bool _widenMeasure = widget.widenMeasure;
+  late String _bodyFont = widget.bodyFont;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +346,127 @@ class _AaPanelState extends State<_AaPanel> {
               widget.onWidenMeasure(v);
             },
           ),
+          SizedBox(height: AppSpacing.s3),
+          // Body font — DM Sans (default) vs Lora (editorial contrast).
+          Row(
+            children: [
+              Text(
+                'BODY FONT',
+                style: AppType.monoEyebrow(color: AppColors.inkSoft),
+              ),
+            ],
+          ),
+          SizedBox(height: AppSpacing.s2),
+          _BodyFontSegment(
+            value: _bodyFont,
+            onChange: (v) {
+              setState(() => _bodyFont = v);
+              widget.onBodyFont(v);
+            },
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Two-up segmented control for body font. Live preview, mono labels,
+/// amber accent.
+class _BodyFontSegment extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChange;
+  const _BodyFontSegment({required this.value, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.paperRaised,
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        border: Border.all(color: AppColors.rule),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          _Segment(
+            label: 'DM SANS',
+            sample: 'Aa',
+            style: GoogleFonts.dmSans(
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
+            selected: value == 'dm',
+            onTap: () => onChange('dm'),
+          ),
+          _Segment(
+            label: 'LORA',
+            sample: 'Aa',
+            style: GoogleFonts.lora(
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
+            selected: value == 'lora',
+            onTap: () => onChange('lora'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  final String label;
+  final String sample;
+  final TextStyle style;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _Segment({
+    required this.label,
+    required this.sample,
+    required this.style,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: AppMotion.fast,
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.s3,
+            horizontal: AppSpacing.s2,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.chip),
+            border: selected
+                ? Border.all(color: AppColors.primary, width: 1.5)
+                : Border.all(color: Colors.transparent, width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                sample,
+                style: style.copyWith(fontSize: 22, height: 1.0),
+              ),
+              SizedBox(height: AppSpacing.s2),
+              Text(
+                label,
+                style: AppType.monoEyebrow(
+                  color: selected ? AppColors.primary : AppColors.inkSoft,
+                ).copyWith(letterSpacing: 0.6),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

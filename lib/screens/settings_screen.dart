@@ -9,9 +9,12 @@ import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
 import '../repositories/article_repository.dart';
-import '../utils/constants.dart';
+import '../utils/constants.dart' hide AppColors;
+import '../utils/design_tokens.dart';
+import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
 import 'sources_screen.dart' show SourcesScreen;
+import '../widgets/folio_rule.dart';
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -33,6 +36,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _inAppNotifsEnabled = true;
   int _cachedArticles = 0;
   int _savedArticles = 0;
+  ReadingPreferences _readerPrefs = const ReadingPreferences();
+  int _edition = 1;
+  String _bodyFont = 'dm';
 
   @override
   void initState() {
@@ -53,6 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _settingsService.getInAppNotificationsEnabled(),
       _settingsService.getNotificationsEnabled(),
       _settingsService.getNewArticleNotifications(),
+      _settingsService.getReadingPreferences(),
+      _settingsService.getEditionNumber(),
+      _settingsService.getBodyFont(),
     ]);
 
     if (mounted) {
@@ -63,6 +72,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _inAppNotifsEnabled = results[3] as bool;
         _notificationsEnabled = results[4] as bool;
         _newArticleNotifs = results[5] as bool;
+        _readerPrefs = results[6] as ReadingPreferences;
+        _edition = results[7] as int;
+        _bodyFont = results[8] as String;
         _isLoading = false;
       });
     }
@@ -313,6 +325,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ]),
           const SizedBox(height: 24),
+          _buildSectionHeader('Reading'),
+          _buildSettingsCard([
+            _buildReaderPrefsRow(),
+            _buildDivider(),
+            _buildInfoTile(
+              icon: Icons.text_fields_outlined,
+              title: 'Body font',
+              value: _bodyFont == 'lora' ? 'Lora' : 'DM Sans',
+            ),
+            _buildDivider(),
+            _buildInfoTile(
+              icon: Icons.format_line_spacing_outlined,
+              title: 'Line height',
+              value: _readerPrefs.lineHeight.toStringAsFixed(2),
+            ),
+            _buildDivider(),
+            _buildInfoTile(
+              icon: Icons.format_size_outlined,
+              title: 'Font size',
+              value: '${_readerPrefs.fontSize.round()} pt',
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _buildSectionHeader('Edition'),
+          _buildSettingsCard([
+            _buildEditionRow(),
+          ]),
+          const SizedBox(height: 24),
           _buildSectionHeader('Storage & Data'),
           _buildSettingsCard([
             _buildInfoTile(
@@ -402,13 +442,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Padding(
       padding: const EdgeInsets.only(left: 8, bottom: 12),
       child: Text(
-        title,
-        style: GoogleFonts.dmSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(153),
-          letterSpacing: 0.5,
+        title.toUpperCase(),
+        style: AppType.monoEyebrow(
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+        ).copyWith(letterSpacing: 1.0),
+      ),
+    );
+  }
+
+  Widget _buildReaderPrefsRow() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
+        child: Icon(
+          Icons.menu_book_outlined,
+          size: 20,
+          color: AppColors.primary,
+        ),
+      ),
+      title: Text(
+        'Reader preferences',
+        style: AppType.titleMedium(color: colorScheme.onSurface),
+      ),
+      subtitle: Text(
+        'Tune in the article reader, any time',
+        style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+      onTap: () => _openReaderSheet(),
+    );
+  }
+
+  Future<void> _openReaderSheet() async {
+    // For now, show a small sheet that opens the same controls as on the
+    // article — full integration would put this through the navigation
+    // stack, but for Settings we keep it as a quick bottom sheet so the
+    // user doesn't have to scroll through an article to reach them.
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SettingsReaderSheet(initial: _readerPrefs),
+    );
+    if (updated == true) {
+      await _loadSettings();
+    }
+  }
+
+  Widget _buildEditionRow() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
+        child: Text(
+          _edition.toString().padLeft(2, '0').substring(0, 2),
+          textAlign: TextAlign.center,
+          style: AppType.folioTop(color: AppColors.primary)
+              .copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ),
+      title: Text(
+        'Edition Nº ${_edition.toString().padLeft(4, '0')}',
+        style: AppType.titleMedium(color: colorScheme.onSurface),
+      ),
+      subtitle: Text(
+        'Bumps on every refresh.',
+        style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -583,68 +695,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildThemeSelector() {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-        ),
-        child: Icon(
-          _getThemeIcon(_themeMode),
-          size: 20,
-          color: colorScheme.onPrimaryContainer,
-        ),
-      ),
-      title: Text(
-        'Theme',
-        style: GoogleFonts.dmSans(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-        ),
-      ),
-      trailing: DropdownButton<ThemeMode>(
-        value: _themeMode,
-        dropdownColor: colorScheme.surface,
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(12),
-        icon: Icon(Icons.expand_more, color: colorScheme.primary),
-        items: [
-          DropdownMenuItem(
-            value: ThemeMode.system,
-            child: Text(
-              'System',
-              style: GoogleFonts.dmSans(
-                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+    Widget tile({
+      required ThemeMode mode,
+      required String label,
+      required Color ground,
+      required Color ink,
+    }) {
+      final selected = _themeMode == mode;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => _saveThemeMode(mode),
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            padding: const EdgeInsets.all(AppSpacing.s3),
+            decoration: BoxDecoration(
+              color: ground,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(
+                color: selected ? colorScheme.primary : AppColors.rule,
+                width: selected ? 2 : 1,
               ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppType.folioTop(color: AppColors.primary),
+                ),
+                SizedBox(height: AppSpacing.s2),
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: ink,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s2),
+                    Expanded(
+                      child: Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: ink.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          DropdownMenuItem(
-            value: ThemeMode.light,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s4, vertical: AppSpacing.s2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(
+                left: AppSpacing.s2, top: AppSpacing.s2, bottom: AppSpacing.s3),
             child: Text(
-              'Light',
-              style: GoogleFonts.dmSans(
-                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-              ),
+              'Theme',
+              style: AppType.titleMedium(),
             ),
           ),
-          DropdownMenuItem(
-            value: ThemeMode.dark,
-            child: Text(
-              'Dark',
-              style: GoogleFonts.dmSans(
-                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+          Row(
+            children: [
+              tile(
+                mode: ThemeMode.light,
+                label: 'PAPER',
+                ground: AppColors.paperRaised,
+                ink: AppColors.ink,
               ),
-            ),
+              const SizedBox(width: AppSpacing.s2),
+              tile(
+                mode: ThemeMode.dark,
+                label: 'LAMPLIGHT',
+                ground: AppColors.ground,
+                ink: AppColors.paperOnGround,
+              ),
+              const SizedBox(width: AppSpacing.s2),
+              tile(
+                mode: ThemeMode.system,
+                label: 'AUTO',
+                ground: colorScheme.surfaceContainerHighest,
+                ink: colorScheme.onSurface,
+              ),
+            ],
           ),
         ],
-        onChanged: (mode) {
-          if (mode != null) _saveThemeMode(mode);
-        },
       ),
     );
   }
@@ -714,5 +862,242 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case ThemeMode.dark:
         return Icons.dark_mode_outlined;
     }
+  }
+}
+
+/// Bottom sheet for editing reading preferences from Settings.
+///
+/// Mirrors the shape of the article reader's Aa panel — the same three
+/// sliders (font size, line height, body font), without the theme
+/// swatches. Returns `true` to the caller so the parent can re-load
+/// settings.
+class _SettingsReaderSheet extends StatefulWidget {
+  final ReadingPreferences initial;
+  const _SettingsReaderSheet({required this.initial});
+
+  @override
+  State<_SettingsReaderSheet> createState() => _SettingsReaderSheetState();
+}
+
+class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
+  late double _fontSize = widget.initial.fontSize;
+  late double _lineHeight = widget.initial.lineHeight;
+  late String _bodyFont = widget.initial.bodyFont;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ground = isDark ? AppColors.groundElev : AppColors.paperRaised;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    return Container(
+      decoration: BoxDecoration(
+        color: ground,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.sheetTop)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            blurRadius: 32,
+            offset: const Offset(0, -16),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.s6,
+        AppSpacing.s3,
+        AppSpacing.s6,
+        AppSpacing.s8 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.rule,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          SizedBox(height: AppSpacing.s4),
+          Text('Reader preferences', style: AppType.titleLarge(color: ink)),
+          SizedBox(height: AppSpacing.s5),
+          _SliderRow(
+            label: 'FONT SIZE',
+            value: _fontSize,
+            min: 14,
+            max: 22,
+            display: '${_fontSize.round()} PT',
+            onChange: (v) async {
+              setState(() => _fontSize = v);
+              await getIt<SettingsService>().setReaderFontSize(v);
+            },
+          ),
+          SizedBox(height: AppSpacing.s4),
+          _SliderRow(
+            label: 'LINE HEIGHT',
+            value: _lineHeight,
+            min: 1.4,
+            max: 1.8,
+            display: _lineHeight.toStringAsFixed(2),
+            onChange: (v) async {
+              setState(() => _lineHeight = v);
+              await getIt<SettingsService>().setReaderLineHeight(v);
+            },
+          ),
+          SizedBox(height: AppSpacing.s4),
+          Row(
+            children: [
+              Text(
+                'BODY FONT',
+                style: AppType.monoEyebrow(
+                  color: isDark
+                      ? AppColors.paperOnGroundSoft
+                      : AppColors.inkSoft,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppSpacing.s2),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.paperRaised,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(color: AppColors.rule),
+            ),
+            padding: const EdgeInsets.all(4),
+            child: Row(
+              children: [
+                _FontSegment(
+                  label: 'DM SANS',
+                  selected: _bodyFont == 'dm',
+                  onTap: () async {
+                    setState(() => _bodyFont = 'dm');
+                    await getIt<SettingsService>().setBodyFont('dm');
+                  },
+                ),
+                _FontSegment(
+                  label: 'LORA',
+                  selected: _bodyFont == 'lora',
+                  onTap: () async {
+                    setState(() => _bodyFont = 'lora');
+                    await getIt<SettingsService>().setBodyFont('lora');
+                  },
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: AppSpacing.s5),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
+            child: Text(
+              'DONE',
+              style: AppType.labelLarge(color: Colors.white)
+                  .copyWith(letterSpacing: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliderRow extends StatelessWidget {
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final String display;
+  final ValueChanged<double> onChange;
+
+  const _SliderRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.display,
+    required this.onChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final soft =
+        isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label,
+                style: AppType.monoEyebrow(color: soft)
+                    .copyWith(letterSpacing: 0.8)),
+            const Spacer(),
+            Text(display,
+                style: AppType.monoDateline(color: AppColors.primary)
+                    .copyWith(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        Slider(
+          value: value.clamp(min, max).toDouble(),
+          min: min,
+          max: max,
+          activeColor: AppColors.primary,
+          inactiveColor: AppColors.primary.withValues(alpha: 0.2),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+}
+
+class _FontSegment extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FontSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: AppMotion.fast,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s3),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.chip),
+            border: selected
+                ? Border.all(color: AppColors.primary, width: 1.5)
+                : Border.all(color: Colors.transparent, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: AppType.monoEyebrow(
+              color: selected ? AppColors.primary : AppColors.inkSoft,
+            ).copyWith(letterSpacing: 0.6),
+          ),
+        ),
+      ),
+    );
   }
 }

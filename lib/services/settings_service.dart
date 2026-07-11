@@ -185,7 +185,15 @@ class SettingsService {
   Future<bool> getWidenMeasure() => _getBool('widen_measure', false);
   Future<void> setWidenMeasure(bool value) => _setBool('widen_measure', value);
 
-  Future<ReaderTheme> getReaderThemeOrDefault() async => getReaderTheme();
+  /// Body font choice — applies to the in-app article reader only.
+  /// `dm` (default) or `lora`.
+  Future<String> getBodyFont() async {
+    final v = await _getString('body_font');
+    return (v == 'lora') ? 'lora' : 'dm';
+  }
+  Future<void> setBodyFont(String value) =>
+      _setString('body_font', value == 'lora' ? 'lora' : 'dm');
+
   Future<ReadingPreferences> getReadingPreferences() async {
     return ReadingPreferences(
       theme: await getReaderTheme(),
@@ -193,8 +201,11 @@ class SettingsService {
       lineHeight: await getReaderLineHeight(),
       monoDatelines: await getMonoDatelinesEnabled(),
       widenMeasure: await getWidenMeasure(),
+      bodyFont: await getBodyFont(),
     );
   }
+
+  Future<ReaderTheme> getReaderThemeOrDefault() async => getReaderTheme();
 
   // ============================================
   // DEFAULT SETTINGS

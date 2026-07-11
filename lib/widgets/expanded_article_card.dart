@@ -47,6 +47,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   double _fontSize = 16;
   double _lineHeight = 1.6;
   bool _widenMeasure = false;
+  String _bodyFont = 'dm';
 
   @override
   void initState() {
@@ -64,6 +65,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       _fontSize = prefs.fontSize;
       _lineHeight = prefs.lineHeight;
       _widenMeasure = prefs.widenMeasure;
+      _bodyFont = prefs.bodyFont;
     });
   }
 
@@ -89,6 +91,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     final settings = getIt<SettingsService>();
     await settings.setWidenMeasure(v);
     setState(() => _widenMeasure = v);
+  }
+
+  Future<void> _persistBodyFont(String v) async {
+    final settings = getIt<SettingsService>();
+    await settings.setBodyFont(v);
+    setState(() => _bodyFont = v);
   }
 
   Future<void> _initContent() async {
@@ -448,10 +456,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               fontSize: _fontSize,
                               lineHeight: _lineHeight,
                               widenMeasure: _widenMeasure,
+                              bodyFont: _bodyFont,
                               onTheme: _persistTheme,
                               onFontSize: _persistFontSize,
                               onLineHeight: _persistLineHeight,
                               onWidenMeasure: _persistWiden,
+                              onBodyFont: _persistBodyFont,
                             ),
                             const SizedBox(height: AppSpacing.s5),
                             Text(
@@ -467,7 +477,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             const SizedBox(height: 20),
                             Text(
                               widget.article.description,
-                              style: GoogleFonts.dmSans(
+                              style: _bodyStyle().copyWith(
                                 fontSize: _fontSize,
                                 color: colorScheme.onSurface,
                                 height: _lineHeight,
@@ -506,7 +516,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 _fullContent!.isNotEmpty)
                               Text(
                                 _fullContent!,
-                                style: GoogleFonts.dmSans(
+                                style: _bodyStyle().copyWith(
                                   fontSize: _fontSize - 1,
                                   color: colorScheme.onSurfaceVariant,
                                   height: _lineHeight + 0.1,
@@ -526,5 +536,13 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         );
       },
     );
+  }
+
+  /// Body font for the article text. 'dm' → DM Sans; 'lora' → Lora.
+  TextStyle _bodyStyle() {
+    if (_bodyFont == 'lora') {
+      return GoogleFonts.lora(fontWeight: FontWeight.w400);
+    }
+    return GoogleFonts.dmSans(fontWeight: FontWeight.w400);
   }
 }

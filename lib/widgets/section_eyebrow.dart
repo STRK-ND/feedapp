@@ -118,13 +118,15 @@ class _SectionEyebrowState extends State<SectionEyebrow>
               ),
               SizedBox(height: padBottom),
               // Hairline reveals from left to right.
-              ClipRect(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: _rule.value,
-                  child: Container(
-                    height: 0.5,
-                    color: ruleColor,
+              SizedBox(
+                height: 0.5,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: _rule.value.clamp(0.0, 1.0),
+                    child: Container(
+                      color: ruleColor,
+                    ),
                   ),
                 ),
               ),

@@ -110,25 +110,28 @@ class ListArticleCard extends StatelessWidget {
                     if (article.imageUrl == null) return const SizedBox.shrink();
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.card),
-                      child: CachedNetworkImage(
-                        imageUrl: article.imageUrl!,
-                        fit: BoxFit.cover,
-                        cacheManager: AppCacheManager(),
-                        width: double.infinity,
-                        height: 200,
-                        fadeInDuration: AppMotion.base,
-                        placeholder: (context, _) =>
-                            Container(color: ruleColor),
-                        errorWidget: (context, _, __) =>
-                            Container(color: ruleColor),
+                      child: RepaintBoundary(
+                        child: CachedNetworkImage(
+                          imageUrl: article.imageUrl!,
+                          fit: BoxFit.cover,
+                          cacheManager: AppCacheManager(),
+                          width: double.infinity,
+                          height: 200,
+                          fadeInDuration: AppMotion.base,
+                          placeholder: (context, _) =>
+                              Container(color: ruleColor),
+                          errorWidget: (context, _, __) =>
+                              Container(color: ruleColor),
+                        ),
                       ),
                     );
                   },
                 ),
                 SizedBox(height: AppSpacing.s3),
-                Container(
+                // Hairline — keep a fixed slot so trailing border aligns.
+                SizedBox(
                   height: 0.5,
-                  color: ruleColor,
+                  child: Container(color: ruleColor),
                 ),
               ],
             ),

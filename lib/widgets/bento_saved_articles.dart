@@ -1,19 +1,23 @@
+/// Saved articles flow — rebuilt for the editorial design system.
+///
+/// Uses the same time-grouped section eyebrow pattern as ContinuousFeedList,
+/// so the user sees the same visual language whether on Feed or Saved.
+/// Each saved article renders compactly: mono source / Playfair title /
+/// mono dateline. No photo grid — the editorial style preserves the
+/// print-like calm.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
-import '../services/rss_feed_service.dart';
 import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
-import '../utils/constants.dart';
-import '../utils/helpers.dart';
-import '../di/service_locator.dart';
+import '../utils/design_tokens.dart';
+import 'section_eyebrow.dart';
 
-/// Bento Grid layout for saved articles - Stitch Design
-/// Features different card sizes: 1x1 (standard), 2x1 (featured)
 class BentoSavedArticlesGrid extends StatefulWidget {
   final List<Article> articles;
   final Function(int) onTap;
@@ -36,412 +40,295 @@ class BentoSavedArticlesGrid extends StatefulWidget {
 
 class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     with SingleTickerProviderStateMixin {
-  late AnimationController _entranceController;
-  late ColorScheme _colorScheme;
+  late final AnimationController _entrance;
+  late ColorScheme _cs;
 
   @override
   void initState() {
     super.initState();
-    _entranceController = AnimationController(
+    _entrance = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _entranceController.forward();
+      duration: AppMotion.base,
+    )..forward();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _colorScheme = Theme.of(context).colorScheme;
+    _cs = Theme.of(context).colorScheme;
   }
 
   @override
   void dispose() {
-    _entranceController.dispose();
+    _entrance.dispose();
     super.dispose();
   }
 
   @override
   void didUpdateWidget(BentoSavedArticlesGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.articles.length != oldWidget.articles.length) {
-      _entranceController.reset();
-      _entranceController.forward();
+    // Replay entrance when list goes from empty → non-empty.
+    if (oldWidget.articles.isEmpty && widget.articles.isNotEmpty) {
+      _entrance.reset();
+      _entrance.forward();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SettingsNotifier>(
-      builder: (context, settings, _) {
-        if (widget.isEmpty || widget.articles.isEmpty) {
-          return _buildEmptyState();
-        }
-
-        final imageMaxWidth = settings.dataSaverMode ? 400 : 800;
-
-        return GridView.builder(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: BentoGridConfig.crossAxisCount,
-            mainAxisSpacing: BentoGridConfig.mainAxisSpacing,
-            crossAxisSpacing: BentoGridConfig.crossAxisSpacing,
-            childAspectRatio: BentoGridConfig.standardRatio,
-          ),
-          itemCount: widget.articles.length,
-          itemBuilder: (context, index) {
-            final span = BentoGridConfig.getSpanForArticle(
-              index,
-              widget.articles.length,
-            );
-            return _buildBentoCard(
-              index,
-              span,
-              settings.showImages,
-              imageMaxWidth,
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildBentoCard(
-    int index,
-    int span,
-    bool showImages,
-    int imageMaxWidth,
-  ) {
-    final article = widget.articles[index];
-    final sourceColor = getIt<RssFeedService>().getSourceColorFromArticle(
-      article,
-    );
-    final sourceName = getIt<RssFeedService>().getSourceNameFromArticle(
-      article,
-    );
-
-    // Entrance animation with stagger
-    final Animation<double> animation = CurvedAnimation(
-      parent: _entranceController,
-      curve: Interval(
-        (index * 0.08).clamp(0.0, 0.7),
-        (0.2 + index * 0.08).clamp(0.2, 1.0),
-        curve: Curves.easeOutCubic,
-      ),
-    );
-
-    if (span == 2) {
-      return _buildFeaturedCard(
-        article,
-        sourceName,
-        sourceColor,
-        index,
-        animation,
-        showImages,
-        imageMaxWidth,
-      );
+    if (widget.isEmpty || widget.articles.isNotEmpty == false) {
+      return _buildEmpty();
     }
-    return _buildStandardCard(
-      article,
-      sourceName,
-      sourceColor,
-      index,
-      animation,
-      showImages,
-      imageMaxWidth,
-    );
-  }
 
-  Widget _buildFeaturedCard(
-    Article article,
-    String sourceName,
-    Color sourceColor,
-    int index,
-    Animation<double> animation,
-    bool showImages,
-    int imageMaxWidth,
-  ) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 20.0 * (1.0 - animation.value)),
-          child: FadeTransition(opacity: animation, child: child),
-        );
-      },
-      child: AspectRatio(
-        aspectRatio: 2.0,
-        child: GestureDetector(
-          onTapDown: (_) => HapticFeedback.lightImpact(),
-          onTap: () => widget.onTap(index),
+    final groups = _groupByRecency(widget.articles);
+
+    if (groups.isEmpty) return _buildEmpty();
+
+    final items = <Widget>[];
+    for (final g in groups) {
+      items.add(SectionEyebrow(
+        label: g.label,
+        count: g.items.length,
+        density: g.density,
+      ));
+      for (var i = 0; i < g.items.length; i++) {
+        final article = g.items[i];
+        final globalIndex = widget.articles.indexOf(article);
+        items.add(_SavedRow(
+          article: article,
+          onTap: () => widget.onTap(globalIndex),
           onLongPress: () {
             HapticFeedback.mediumImpact();
-            widget.onToggleSave(index);
+            widget.onToggleSave(globalIndex);
           },
-          child: Container(
-            decoration: BoxDecoration(
-              color: _colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _colorScheme.primary.withValues(alpha: 0.1),
+        ));
+      }
+    }
+
+    return Consumer<SettingsNotifier>(
+      builder: (context, settings, _) {
+        return ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: AppSpacing.s16),
+          children: items,
+        );
+      },
+    );
+  }
+
+  Widget _buildEmpty() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s6,
+        vertical: AppSpacing.s16,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.4),
+                  width: 1,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.bookmark_outline_rounded,
+                color: AppColors.primary,
+                size: 28,
               ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Background image
-                  if (article.imageUrl != null && showImages)
-                    CachedNetworkImage(
-                      imageUrl: article.imageUrl!,
-                      width: imageMaxWidth.toDouble(),
-                      fit: BoxFit.cover,
-                      cacheManager: AppCacheManager(),
-                      memCacheWidth: imageMaxWidth,
-                      placeholder: (context, url) =>
-                          Container(color: _colorScheme.surface),
-                      errorWidget: (context, url, error) =>
-                          Container(color: sourceColor.withValues(alpha: 0.1)),
-                    )
-                  else
-                    Container(color: sourceColor.withValues(alpha: 0.1)),
+            SizedBox(height: AppSpacing.s5),
+            Text(
+              'Nothing saved yet.',
+              style: AppType.headlineSmall(color: ink),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: AppSpacing.s3),
+            Text(
+              'Swipe right on the feed to keep\narticles for later.',
+              style: AppType.bodyLarge(color: soft),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-                  // Gradient overlay
+class _Group {
+  final String label;
+  final SectionDensity density;
+  final List<Article> items;
+  _Group(this.label, this.density, this.items);
+}
+
+List<_Group> _groupByRecency(List<Article> articles) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+  final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
+
+  final List<Article> todayList = [];
+  final List<Article> yesterdayList = [];
+  final List<Article> thisWeekList = [];
+
+  for (final a in articles) {
+    final dtDay = DateTime(a.pubDate.year, a.pubDate.month, a.pubDate.day);
+    if (dtDay == today) {
+      todayList.add(a);
+    } else if (dtDay == yesterday) {
+      yesterdayList.add(a);
+    } else if (dtDay.isAfter(thisWeekStart)) {
+      thisWeekList.add(a);
+    } else {
+      thisWeekList.add(a);
+    }
+  }
+
+  todayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+  yesterdayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+  thisWeekList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+
+  return [
+    if (todayList.isNotEmpty)
+      _Group('Saved today', SectionDensity.relaxed, todayList),
+    if (yesterdayList.isNotEmpty)
+      _Group('Yesterday', SectionDensity.moderate, yesterdayList),
+    if (thisWeekList.isNotEmpty)
+      _Group('Earlier', SectionDensity.compact, thisWeekList),
+  ];
+}
+
+/// Single saved-article row — mono source, Playfair title + truncated
+/// description, mono dateline. No image by default; Saved should feel
+/// like a reading index, not a magazine shelf.
+class _SavedRow extends StatelessWidget {
+  final Article article;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _SavedRow({
+    required this.article,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
+    final sourceColor = _sourceColor(article.sourceColor);
+
+    return Semantics(
+      button: true,
+      label:
+          '${article.title}. Saved from ${article.sourceName}. Tap to read, long press to remove.',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s6,
+            vertical: AppSpacing.s4,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Source color dot for visual at-a-glance.
                   Container(
+                    width: 6,
+                    height: 6,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          _colorScheme.surface.withValues(alpha: 0.9),
-                        ],
-                        stops: const [0.4, 1.0],
-                      ),
+                      color: sourceColor,
+                      shape: BoxShape.circle,
                     ),
                   ),
-
-                  // Content
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _colorScheme.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            sourceName,
-                            style: GoogleFonts.lexend(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: _colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          article.title,
-                          style: GoogleFonts.lexend(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          Helpers.formatTimeAgo(article.pubDate),
-                          style: GoogleFonts.lexend(
-                            fontSize: 12,
-                            color: _colorScheme.onSurface.withValues(
-                              alpha: 0.7,
-                            ),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(width: AppSpacing.s2),
+                  Expanded(
+                    child: Text(
+                      article.sourceName.toUpperCase(),
+                      style: AppType.monoEyebrow(color: sourceColor)
+                          .copyWith(letterSpacing: 0.6),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  const SizedBox(width: AppSpacing.s2),
+                  Text(
+                    _formatDateline(article.pubDate),
+                    style: AppType.monoDateline(color: soft),
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStandardCard(
-    Article article,
-    String sourceName,
-    Color sourceColor,
-    int index,
-    Animation<double> animation,
-    bool showImages,
-    int imageMaxWidth,
-  ) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 20.0 * (1.0 - animation.value)),
-          child: FadeTransition(opacity: animation, child: child),
-        );
-      },
-      child: GestureDetector(
-        onTapDown: (_) => HapticFeedback.lightImpact(),
-        onTap: () => widget.onTap(index),
-        onLongPress: () {
-          HapticFeedback.mediumImpact();
-          widget.onToggleSave(index);
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: _colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _colorScheme.primary.withValues(alpha: 0.1),
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Background image
-                if (article.imageUrl != null && showImages)
-                  CachedNetworkImage(
-                    imageUrl: article.imageUrl!,
-                    width: imageMaxWidth.toDouble(),
-                    fit: BoxFit.cover,
-                    cacheManager: AppCacheManager(),
-                    memCacheWidth: imageMaxWidth,
-                    placeholder: (context, url) =>
-                        Container(color: _colorScheme.surface),
-                    errorWidget: (context, url, error) =>
-                        Container(color: sourceColor.withValues(alpha: 0.1)),
-                  )
-                else
-                  Container(color: sourceColor.withValues(alpha: 0.1)),
-
-                // Gradient overlay
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        _colorScheme.surface.withValues(alpha: 0.95),
-                      ],
-                      stops: const [0.5, 1.0],
-                    ),
-                  ),
-                ),
-
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _colorScheme.primary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          sourceName,
-                          style: GoogleFonts.lexend(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: _colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        article.title,
-                        style: GoogleFonts.lexend(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          height: 1.3,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        Helpers.formatTimeAgo(article.pubDate),
-                        style: GoogleFonts.lexend(
-                          fontSize: 11,
-                          color: _colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
+              SizedBox(height: AppSpacing.s2),
+              Text(
+                article.title,
+                style: AppType.titleLarge(color: ink)
+                    .copyWith(fontSize: 18, height: 1.25),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (article.description.isNotEmpty) ...[
+                SizedBox(height: AppSpacing.s2),
+                Text(
+                  article.description,
+                  style: AppType.bodyMedium(color: soft).copyWith(height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
-            ),
+              SizedBox(height: AppSpacing.s3),
+              // Hairline.
+              SizedBox(
+                height: 0.5,
+                child: Container(color: ruleColor),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _colorScheme.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.bookmark_outline_rounded,
-              size: 48,
-              color: _colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No saved articles',
-            style: GoogleFonts.lexend(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Swipe right on articles to save them',
-            style: GoogleFonts.lexend(
-              fontSize: 14,
-              color: _colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
+/// Trim to "08/12 · 14:03" / "Yesterday" / "5D AGO" / "DD/MM/YY".
+String _formatDateline(DateTime dt) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final dtDay = DateTime(dt.year, dt.month, dt.day);
+  final diff = today.difference(dtDay).inDays;
+  if (diff == 0) {
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
+  if (diff == 1) return 'YESTERDAY';
+  if (diff < 7) return '${diff}D AGO';
+  return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year % 100).toString().padLeft(2, '0')}';
+}
+
+Color _sourceColor(String? hex) {
+  if (hex == null || hex.isEmpty) return AppColors.primary;
+  final cleaned = hex.replaceFirst('#', '');
+  if (cleaned.length == 6) {
+    return Color(int.parse('0xFF$cleaned'));
+  }
+  return AppColors.primary;
 }

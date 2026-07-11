@@ -66,6 +66,15 @@ String _formatMasthead(DateTime when) {
   return '$wd · $dd.$mm.$yyyy';
 }
 
+/// Compact masthead that drops the weekday on narrow screens, used when
+/// weekday + date + edition all wouldn't fit (sub-360dp).
+String _formatMastheadCompact(DateTime when) {
+  final dd = when.day.toString().padLeft(2, '0');
+  final mm = when.month.toString().padLeft(2, '0');
+  final yyyy = when.year.toString();
+  return '$dd.$mm.$yyyy';
+}
+
 class FolioRule extends StatelessWidget {
   final DateTime date;
   final int edition;
@@ -101,56 +110,61 @@ class FolioRule extends StatelessWidget {
         ),
       ),
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s6,
+        horizontal: AppSpacing.s4,
         vertical: AppSpacing.s3,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Left: masthead date (uppercase mono) + edition on the right of date
-          Expanded(
-            child: Row(
-              children: [
-                Text(
-                  _formatMasthead(date),
+      // LayoutBuilder so we can swap to a compact masthead on narrow
+      // screens and keep EDITION Nº + dot from being squeezed off —
+      // turtling the layout when needed beats truncating or wrapping.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 360;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  isNarrow
+                      ? _formatMastheadCompact(date)
+                      : _formatMasthead(date),
                   style: AppType.folioTop(color: top).copyWith(
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
-          ),
-          // Center-right: edition number "EDITION Nº 0047"
-          Text(
-            'EDITION  ${edition.toString().padLeft(4, '0')}',
-            style: AppType.folioTop(color: bottom),
-          ),
-          const SizedBox(width: AppSpacing.s3),
-          // Right-side content: counts + interactive dot
-          Text(
-            '$articleCount curated',
-            style: AppType.folioTop(color: top).copyWith(
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s3),
-          Semantics(
-            button: true,
-            label: hasUnread
-                ? 'Jump to first unread. $unreadCount unread.'
-                : 'No unread.',
-            child: GestureDetector(
-              onTap: onTapDot,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 14,
-                height: 14,
-                alignment: Alignment.center,
-                child: _AnimatedDot(active: hasUnread, color: accent),
               ),
-            ),
-          ),
-        ],
+              const SizedBox(width: AppSpacing.s2),
+              Text(
+                'EDITION  ${edition.toString().padLeft(4, '0')}',
+                style: AppType.folioTop(color: bottom),
+              ),
+              const SizedBox(width: AppSpacing.s3),
+              Text(
+                '$articleCount curated',
+                style: AppType.folioTop(color: top).copyWith(
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s3),
+              Semantics(
+                button: true,
+                label: hasUnread
+                    ? 'Jump to first unread. $unreadCount unread.'
+                    : 'No unread.',
+                child: GestureDetector(
+                  onTap: onTapDot,
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: _AnimatedDot(active: hasUnread, color: accent),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

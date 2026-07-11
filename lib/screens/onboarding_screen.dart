@@ -160,7 +160,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildBottomBar() {
-    final canContinue = _step != 2 || _pickedSources.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.s6, 0, AppSpacing.s6, AppSpacing.s6),
@@ -178,7 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           const Spacer(),
           FilledButton(
-            onPressed: canContinue ? _next : null,
+            onPressed: _next,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
@@ -187,11 +186,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             child: Text(
-              _step == 2
-                  ? (_pickedSources.isNotEmpty
+              _step < 2
+                  ? 'CONTINUE'
+                  : (_pickedSources.isNotEmpty
                       ? 'ADD ${_pickedSources.length}  ·  CONTINUE'
-                      : 'PICK ONE TO CONTINUE')
-                  : 'CONTINUE',
+                      : 'CONTINUE WITHOUT'),
               style: AppType.labelLarge(color: Colors.white)
                   .copyWith(letterSpacing: 1.2),
             ),
@@ -209,23 +208,28 @@ class _StepDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(total, (i) {
-        final active = i <= step;
-        return AnimatedContainer(
-          duration: AppMotion.fast,
-          margin: const EdgeInsets.only(right: AppSpacing.s2),
-          width: active ? 20 : 8,
-          height: 4,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.primary
-                : AppColors.primary.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        );
-      }),
+    // Reserve a fixed slot so the dots don't collapse to zero width on
+    // animation transitions.
+    return SizedBox(
+      height: 16,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(total, (i) {
+          final active = i <= step;
+          return AnimatedContainer(
+            duration: AppMotion.fast,
+            margin: const EdgeInsets.only(right: AppSpacing.s2),
+            width: active ? 20 : 8,
+            height: 4,
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primary
+                  : AppColors.primary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          );
+        }),
+      ),
     );
   }
 }
