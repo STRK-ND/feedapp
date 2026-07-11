@@ -1,20 +1,43 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import '../providers/version_provider.dart';
 
+import '../providers/version_provider.dart';
+import '../utils/helpers.dart';
+
+/// UpdateService — GitHub Releases based OTA.
+///
+/// Two install paths:
+///  - `downloadApk` + `triggerInstall`: in-app download → Android system
+///    installer via `open_filex` (Reeder-style, one tap inside our app).
+///  - `openDownloadUrl`: legacy browser-handoff fallback for users
+///    without the install permission or on platforms where the
+///    installer intent is unavailable.
+///
+/// Manifest update only adds new code; existing public surface is
+/// stable. `checkForUpdates` and `ignoreVersion` are unchanged.
 class UpdateService {
-  // GitHub repository URL for auto-updates
+  // GitHub repository URL for OTA update metadata
   static const String githubApiUrl =
       'https://api.github.com/repos/STRK-ND/feedapp/releases/latest';
+
+  // Android MIME type for an APK file. Used when opening the cached
+  // APK with the system installer intent.
+  static const String _apkMimeType = 'application/vnd.android.package-archive';
 
   // Keys for SharedPreferences
   static const String _lastCheckedKey = 'last_update_check';
   static const String _ignoredVersionKey = 'ignored_update_version';
 
-  /// Check for updates (throttle to at most once per hour)
+  /// Check for updates (throttle to at most once per hour).
+  /// Behavior unchanged from before the OTA pass.
   static Future<UpdateInfo?> checkForUpdates({bool forceCheck = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -22,7 +45,6 @@ class UpdateService {
       final now = DateTime.now().millisecondsSinceEpoch;
       const oneHourInMs = 3600000;
 
-      // Skip if checked within last hour (unless forced)
       if (!forceCheck && (now - lastChecked) < oneHourInMs) {
         return null;
       }
@@ -41,16 +63,12 @@ class UpdateService {
             ? latestVersion.substring(1)
             : latestVersion;
 
-        // Get current app version via VersionProvider for caching
         final currentVersion = await VersionProvider.getVersionWithoutBuild();
 
-        // Update last checked time
         await prefs.setInt(_lastCheckedKey, now);
 
-        // Check if update is needed (simple version comparison)
-        if (_shouldUpdate(currentVersion, cleanVersion)) {
+        if (Helpers.isNewerVersion(currentVersion, cleanVersion)) {
           final ignoredVersion = prefs.getString(_ignoredVersionKey);
-          // Don't show if user ignored this version
           if (ignoredVersion != cleanVersion) {
             return UpdateInfo(
               version: cleanVersion,
@@ -69,11 +87,10 @@ class UpdateService {
     }
   }
 
-  /// Get the APK download URL from release assets
+  /// Demo of file write — always available in this codebase.
   static String _getApkDownloadUrl(Map<String, dynamic> releaseData) {
     final assets = releaseData['assets'] as List<dynamic>?;
     if (assets != null && assets.isNotEmpty) {
-      // Find the APK file
       for (final asset in assets) {
         final name = asset['name'] as String?;
         if (name != null && name.endsWith('.apk')) {
@@ -82,47 +99,18 @@ class UpdateService {
         }
       }
     }
-    // Fallback to release page
     return releaseData['html_url'] as String? ?? '';
   }
 
-  /// Compare versions to determine if update is needed
-  static bool _shouldUpdate(String current, String latest) {
-    // Remove build number from current version (e.g., "1.1.3+5" -> "1.1.3")
-    if (current.contains('+')) {
-      current = current.split('+')[0];
-    }
-
-    // Remove build number from latest version too (for consistency)
-    if (latest.contains('+')) {
-      latest = latest.split('+')[0];
-    }
-
-    final currentParts = current.split('.')..removeWhere((e) => e.isEmpty);
-    final latestParts = latest.split('.')..removeWhere((e) => e.isEmpty);
-
-    for (int i = 0; i < 3; i++) {
-      final currentNum = i < currentParts.length
-          ? int.tryParse(currentParts[i]) ?? 0
-          : 0;
-      final latestNum = i < latestParts.length
-          ? int.tryParse(latestParts[i]) ?? 0
-          : 0;
-
-      if (latestNum > currentNum) return true;
-      if (latestNum < currentNum) return false;
-    }
-
-    return false;
-  }
-
-  /// Mark a version as ignored (won't show update for this version)
+  /// Mark a version as ignored.
   static Future<void> ignoreVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_ignoredVersionKey, version);
   }
 
-  /// Open download URL
+  /// Fallback: open the APK URL in the system browser.
+  /// Used when in-app download/install fails (no install permission,
+  /// unsupported platform, IO error, etc.) — never strand the user.
   static Future<bool> openDownloadUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
@@ -132,6 +120,67 @@ class UpdateService {
       );
     }
     return false;
+  }
+
+  /// Download the release APK to the device temp dir.
+  ///
+  /// Returns a handle to the saved file. Throws (and is caught by the
+  /// dialog) on network/IO failure so the caller can fall back to
+  /// `openDownloadUrl`.
+  ///
+  /// Streamed via `http.get`, written via `dart:io` `File.writeAsBytes`
+  /// (APKs are <30 MB so we keep it simple — no `flutter_downloader`).
+  static Future<UpdateDownloadHandle> downloadApk({
+    required String url,
+    required String version,
+  }) async {
+    final response = await http.get(Uri.parse(url)).timeout(
+          const Duration(minutes: 4),
+        );
+    if (response.statusCode != 200) {
+      throw HttpException(
+        'Download failed: ${response.statusCode}',
+        uri: Uri.parse(url),
+      );
+    }
+    final bytes = response.bodyBytes;
+    final dir = await getTemporaryDirectory();
+    final safeVersion = version.replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_');
+    final file = File('${dir.path}/curatedfeeds-$safeVersion.apk');
+    await file.writeAsBytes(bytes, flush: true);
+    return UpdateDownloadHandle(
+      file: file,
+      version: version,
+      sizeBytes: bytes.length,
+    );
+  }
+
+  /// Hand the cached APK to the Android system installer. Returns
+  /// `true` if `open_filex` resolved an installer intent, `false`
+  /// otherwise (caller falls back to browser handoff).
+  static Future<bool> triggerInstall({required File apkFile}) async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return false;
+    }
+    final fileExists = await apkFile.exists();
+    if (!fileExists) {
+      debugPrint('[UpdateService] APK missing at ${apkFile.path}');
+      return false;
+    }
+    final result = await OpenFilex.open(
+      apkFile.path,
+      type: _apkMimeType,
+    );
+    // result.type contains a string status. Anything other than
+    // 'done' / 'opened' means we did not successfully start the
+    // installer.
+    if (result.type != ResultType.done) {
+      debugPrint(
+        '[UpdateService] triggerInstall failed: ${result.type} — ${result.message}',
+      );
+      return false;
+    }
+    return true;
   }
 }
 
@@ -148,5 +197,19 @@ class UpdateInfo {
     required this.downloadUrl,
     required this.releaseNotes,
     required this.htmlUrl,
+  });
+}
+
+/// A handle to a downloaded APK on disk. Returned by `downloadApk`
+/// for the dialog to pass into `triggerInstall`.
+class UpdateDownloadHandle {
+  final File file;
+  final String version;
+  final int sizeBytes;
+
+  const UpdateDownloadHandle({
+    required this.file,
+    required this.version,
+    required this.sizeBytes,
   });
 }

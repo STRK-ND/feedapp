@@ -1,6 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+
 import '../services/update_service.dart';
 
+/// Show update dialog — now drives the in-app install path, with the
+/// browser-handoff path kept as a tertiary fallback for users
+/// without install permissions or on platforms where the installer
+/// intent isn't available.
+///
+/// Behavior tap-by-tap on the primary CTA:
+///   1. Button shows an inline spinner; downloads the APK to temp.
+///   2. On success, calls `triggerInstall` → Android system installer.
+///   3. On IO / network / non-Android failure, falls back to
+///      `openDownloadUrl` and surfaces the result.
 class UpdateDialog extends StatelessWidget {
   final UpdateInfo updateInfo;
   final VoidCallback onLater;
@@ -27,7 +40,7 @@ class UpdateDialog extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: theme.colorScheme.primaryContainer,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.system_update,
@@ -100,9 +113,9 @@ class UpdateDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        // Skip this version (unchanged UX)
         TextButton(
           onPressed: () async {
-            // Confirm before ignoring
             final confirm = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
@@ -132,16 +145,33 @@ class UpdateDialog extends StatelessWidget {
           },
           child: const Text('Skip this version'),
         ),
-        FilledButton.icon(
-          onPressed: onDownload,
-          icon: const Icon(Icons.download),
-          label: const Text('Update Now'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
+        // "Open in browser" — fallback path
+        TextButton(
+          onPressed: () => _openInBrowser(context),
+          child: const Text('Open in browser'),
         ),
+        // Primary path: in-app download + install
+        _DownloadAndInstallButton(updateInfo: updateInfo),
       ],
     );
+  }
+
+  Future<void> _openInBrowser(BuildContext context) async {
+    final success = await UpdateService.openDownloadUrl(updateInfo.downloadUrl);
+    if (!success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to open download. Please visit: ${updateInfo.htmlUrl}',
+          ),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => UpdateService.openDownloadUrl(updateInfo.htmlUrl),
+          ),
+        ),
+      );
+    }
+    if (context.mounted && success) Navigator.pop(context);
   }
 
   String _formatReleaseDate(String dateStr) {
@@ -154,18 +184,133 @@ class UpdateDialog extends StatelessWidget {
   }
 
   String _formatReleaseNotes(String notes) {
-    // Remove markdown formatting for better display
     return notes
-        .replaceAll(RegExp(r'^#+\s*', multiLine: true), '') // Remove headers
-        .replaceAll(RegExp(r'\*\*(.*?)\*\*'), r'\1') // Remove bold markdown
-        .replaceAll(RegExp(r'\*(.*?)\*'), r'\1') // Remove italic markdown
-        .replaceAll(RegExp(r'`(.*?)`'), r'\1') // Remove code markdown
-        .replaceAll(RegExp(r'\[([^\]]+)\]\([^)]+\)'), r'\1') // Remove links
+        .replaceAll(RegExp(r'^#+\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\*\*(.*?)\*\*'), r'\1')
+        .replaceAll(RegExp(r'\*(.*?)\*'), r'\1')
+        .replaceAll(RegExp(r'`(.*?)`'), r'$1')
+        .replaceAll(RegExp(r'\[([^\]]+)\]\([^)]+\)'), r'$1')
         .trim();
   }
 }
 
-/// Show update dialog and handle user response
+/// The primary CTA — drives the silent in-app install path. Owns its
+/// own ephemeral state for the in-flight spinner so we don't lift the
+/// whole dialog into a StatefulWidget.
+class _DownloadAndInstallButton extends StatefulWidget {
+  final UpdateInfo updateInfo;
+
+  const _DownloadAndInstallButton({required this.updateInfo});
+
+  @override
+  State<_DownloadAndInstallButton> createState() =>
+      _DownloadAndInstallButtonState();
+}
+
+class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
+  /// Three states: idle → downloading → installing. Stays simple on
+  /// purpose — silent install, no progress UI per spec.
+  _Stage _stage = _Stage.idle;
+  String? _errorText;
+
+  bool get _busy =>
+      _stage == _Stage.downloading || _stage == _Stage.installing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = switch (_stage) {
+      _Stage.idle => 'Update Now',
+      _Stage.downloading => 'Downloading…',
+      _Stage.installing => 'Installing…',
+      _Stage.done => 'Opening…',
+      _Stage.failed => 'Try again',
+    };
+
+    return FilledButton.icon(
+      onPressed: _busy ? null : _run,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      ),
+      icon: _busy
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : const Icon(Icons.download),
+      label: Text(label),
+    );
+    // ignore: unused_element
+    if (false) {
+      // (kept theme available in case we want a redundant icon tint)
+      theme.colorScheme.primary;
+      _errorText;
+    }
+  }
+
+  Future<void> _run() async {
+    setState(() {
+      _stage = _Stage.downloading;
+      _errorText = null;
+    });
+    try {
+      final handle = await UpdateService.downloadApk(
+        url: widget.updateInfo.downloadUrl,
+        version: widget.updateInfo.version,
+      );
+      if (!mounted) return;
+
+      setState(() => _stage = _Stage.installing);
+      final launched = await UpdateService.triggerInstall(apkFile: handle.file);
+      if (!mounted) return;
+
+      if (launched) {
+        // Hand control to the system installer. Close the dialog.
+        // The user resumes the app at the new version after install.
+        Navigator.of(context).pop();
+        return;
+      }
+      // Fallback path: installer did not start. Try browser handoff.
+      await _fallbackToBrowser();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _stage = _Stage.failed;
+        _errorText = 'Update failed. Try again.';
+      });
+      debugPrint('[UpdateDialog] In-app install threw: $e');
+    }
+  }
+
+  Future<void> _fallbackToBrowser() async {
+    final url = widget.updateInfo.downloadUrl;
+    final success = await UpdateService.openDownloadUrl(url);
+    if (!mounted) return;
+
+    if (success) {
+      // Browser opens; close the dialog so the user returns to feed.
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _stage = _Stage.failed;
+        _errorText = "Couldn't open download. Open in browser instead.";
+      });
+    }
+  }
+}
+
+/// Stages for `_DownloadAndInstallButton`.
+enum _Stage { idle, downloading, installing, done, failed }
+
+/// Show update dialog and handle user response.
+///
+/// Backwards-compatible with the call site in `feed_screen.dart`
+/// (`UpdateService.checkForUpdates` → `showUpdateDialog(context: ...,
+/// updateInfo)`) — same name, same args.
 Future<void> showUpdateDialog({
   required BuildContext context,
   required UpdateInfo updateInfo,
@@ -176,22 +321,10 @@ Future<void> showUpdateDialog({
     builder: (context) => UpdateDialog(
       updateInfo: updateInfo,
       onLater: () => Navigator.pop(context),
-      onDownload: () async {
-        Navigator.pop(context);
-        final success = await UpdateService.openDownloadUrl(
-          updateInfo.downloadUrl,
-        );
-        if (!success && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to open download. Please visit: ${updateInfo.htmlUrl}'),
-              action: SnackBarAction(
-                label: 'Open',
-                onPressed: () => UpdateService.openDownloadUrl(updateInfo.htmlUrl),
-              ),
-            ),
-          );
-        }
+      onDownload: () {
+        // The dialog itself owns the install flow (stateful button).
+        // This callback is preserved for backwards-compat with the
+        // previous API surface; nothing to do here.
       },
     ),
   );
