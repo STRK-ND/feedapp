@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,11 +12,16 @@ import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
+import '../services/settings_service.dart';
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
+import '../utils/reader_theme.dart';
+import 'reader_controls.dart';
 
 /// Expanded article card bottom sheet/modal widget
-/// Features: Glassmorphism, hero image fade-in transitions
+/// Features: Glassmorphism, hero image fade-in transitions,
+/// reader-mode controls (theme swatches + Aa panel)
 class ExpandedArticleCard extends StatefulWidget {
   final Article article;
   final VoidCallback onClose;
@@ -35,39 +42,80 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   bool _isLoadingContent = false;
   String? _fullContent;
 
+  // Reader preferences local state (initialized from settings).
+  ReaderTheme _readerTheme = ReaderTheme.defaultTheme;
+  double _fontSize = 16;
+  double _lineHeight = 1.6;
+  bool _widenMeasure = false;
+
   @override
   void initState() {
     super.initState();
     _initContent();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final settings = getIt<SettingsService>();
+    final prefs = await settings.getReadingPreferences();
+    if (!mounted) return;
+    setState(() {
+      _readerTheme = prefs.theme;
+      _fontSize = prefs.fontSize;
+      _lineHeight = prefs.lineHeight;
+      _widenMeasure = prefs.widenMeasure;
+    });
+  }
+
+  Future<void> _persistTheme(ReaderTheme t) async {
+    final settings = getIt<SettingsService>();
+    await settings.setReaderTheme(t);
+    setState(() => _readerTheme = t);
+  }
+
+  Future<void> _persistFontSize(double v) async {
+    final settings = getIt<SettingsService>();
+    await settings.setReaderFontSize(v);
+    setState(() => _fontSize = v);
+  }
+
+  Future<void> _persistLineHeight(double v) async {
+    final settings = getIt<SettingsService>();
+    await settings.setReaderLineHeight(v);
+    setState(() => _lineHeight = v);
+  }
+
+  Future<void> _persistWiden(bool v) async {
+    final settings = getIt<SettingsService>();
+    await settings.setWidenMeasure(v);
+    setState(() => _widenMeasure = v);
   }
 
   Future<void> _initContent() async {
     // Check if we already have cached full content
     if (widget.article.fetchedFullContent != null) {
-      setState(() {
-        _fullContent = widget.article.fetchedFullContent;
-      });
+      if (mounted) {
+        setState(() {
+          _fullContent = widget.article.fetchedFullContent;
+        });
+      }
       return;
     }
 
     // Try to fetch full content only if RSS content is short
     if (widget.article.fullContent.length < 200) {
-      // Call async method with proper error handling
-      _fetchFullContent().catchError((error) {
-        if (mounted) {
-          setState(() {
-            _fullContent = widget.article.fullContent;
-          });
-        }
-      });
+      await _fetchFullContent();
     } else {
-      setState(() {
-        _fullContent = widget.article.fullContent;
-      });
+      if (mounted) {
+        setState(() {
+          _fullContent = widget.article.fullContent;
+        });
+      }
     }
   }
 
   Future<void> _fetchFullContent() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingContent = true;
     });
@@ -76,6 +124,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       final content = await getIt<ArticleContentService>().fetchArticleContent(
         widget.article.link,
       );
+      if (!mounted) return;
       setState(() {
         _fullContent = content;
         _isLoadingContent = false;
@@ -84,6 +133,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       // Cache the fetched content in the article
       widget.article.fetchedFullContent = content;
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _fullContent = widget.article.fullContent;
         _isLoadingContent = false;
@@ -116,43 +166,45 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   }
 
   Widget _buildImagePlaceholder(double height, double borderRadius) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
-      child: const Center(
+      child: Center(
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
         ),
       ),
     );
   }
 
   Widget _buildImageError(double height, double borderRadius) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 20),
-          const Icon(
+          Icon(
             Icons.broken_image_outlined,
             size: 32,
-            color: AppColors.textTertiary,
+            color: colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 8),
           Text(
             'Image unavailable',
             style: GoogleFonts.dmSans(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
@@ -192,6 +244,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                 padding: const EdgeInsets.all(12),
                 style: IconButton.styleFrom(
                   backgroundColor: color.withValues(alpha: 0.08),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppCardStyles.buttonRadius,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -199,8 +256,8 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         }
 
         return Dismissible(
-          direction: DismissDirection.down,
-          key: const Key('article_modal'),
+          direction: DismissDirection.vertical,
+          key: Key('article_modal_${widget.article.id}'),
           onDismissed: (_) => widget.onClose(),
           child: DraggableScrollableSheet(
             initialChildSize: 1.0,
@@ -228,29 +285,34 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            decoration: AppCardStyles.chipDecoration(
-                              sourceColor,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(source.icon, size: 14, color: sourceColor),
-                                const SizedBox(width: 8),
-                                Text(
-                                  source.name,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: sourceColor,
-                                    letterSpacing: 0.2,
+                          Flexible(
+                            child: Container(
+                              decoration: AppCardStyles.chipDecoration(
+                                sourceColor,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(source.icon, size: 14, color: sourceColor),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      source.name,
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: sourceColor,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           Row(
@@ -379,6 +441,19 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 ],
                               ),
                             ),
+                            const SizedBox(height: AppSpacing.s2),
+                            // Reader-mode controls: theme swatches + Aa.
+                            ReaderControls(
+                              currentTheme: _readerTheme,
+                              fontSize: _fontSize,
+                              lineHeight: _lineHeight,
+                              widenMeasure: _widenMeasure,
+                              onTheme: _persistTheme,
+                              onFontSize: _persistFontSize,
+                              onLineHeight: _persistLineHeight,
+                              onWidenMeasure: _persistWiden,
+                            ),
+                            const SizedBox(height: AppSpacing.s5),
                             Text(
                               widget.article.title,
                               style: GoogleFonts.playfairDisplay(
@@ -393,9 +468,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             Text(
                               widget.article.description,
                               style: GoogleFonts.dmSans(
-                                fontSize: 16,
+                                fontSize: _fontSize,
                                 color: colorScheme.onSurface,
-                                height: 1.7,
+                                height: _lineHeight,
                                 letterSpacing: 0.1,
                               ),
                             ),
@@ -432,9 +507,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               Text(
                                 _fullContent!,
                                 style: GoogleFonts.dmSans(
-                                  fontSize: 15,
+                                  fontSize: _fontSize - 1,
                                   color: colorScheme.onSurfaceVariant,
-                                  height: 1.8,
+                                  height: _lineHeight + 0.1,
                                   letterSpacing: 0.05,
                                 ),
                               ),

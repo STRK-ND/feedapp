@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
@@ -9,22 +9,25 @@ import '../repositories/article_repository.dart';
 import '../services/storage_service.dart';
 import '../services/settings_service.dart';
 import '../services/update_service.dart';
-import '../providers/version_provider.dart';
+import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
 import '../services/analytics_service.dart';
 import '../widgets/card_stack.dart';
+import '../widgets/continuous_feed_list.dart';
 import '../widgets/expanded_article_card.dart';
+import '../widgets/folio_rule.dart';
 import '../widgets/update_dialog.dart';
 import '../widgets/bento_saved_articles.dart';
+import '../widgets/shimmer_loading.dart';
+import '../widgets/grain_overlay.dart';
 import '../utils/constants.dart';
-import '../utils/helpers.dart';
+import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
 import 'settings_screen.dart';
 
-/// Main RSS Feed Screen
-/// [showSavedArticles] - when true, displays saved articles instead of feed
+/// Main RSS Feed Screen - Card view only
 class RssFeedScreen extends StatefulWidget {
   final bool showSavedArticles;
 
@@ -34,13 +37,11 @@ class RssFeedScreen extends StatefulWidget {
   State<RssFeedScreen> createState() => _RssFeedScreenState();
 }
 
-class _RssFeedScreenState extends State<RssFeedScreen>
-    with TickerProviderStateMixin {
+class _RssFeedScreenState extends State<RssFeedScreen> {
   List<Article> _articles = [];
   List<Article> _savedArticles = [];
   List<Article> _displayedArticles = [];
   String _selectedFilter = 'All';
-  ViewMode _viewMode = ViewMode.cards;
   int _selectedTab = 0;
   bool _isLoading = false;
   String? _errorMessage;
@@ -48,44 +49,47 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   bool _isOnline = true;
   bool _isSearchActive = false;
   String _searchQuery = '';
+  String _viewMode = 'stack'; // 'stack' or 'continuous'
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _autoRefreshTimer;
-
-  late AnimationController _fabController;
-  late AnimationController _staggerController;
+  Timer? _searchDebounceTimer;
+  Timer? _saveDebounceTimer;
 
   final List<String> _categories = AppConfig.categories;
-  final StorageService _storage = StorageService();
-  final ArticleRepository _articleRepository = ArticleRepository();
-  final SettingsService _settingsService = SettingsService();
+  final Connectivity _connectivity = Connectivity();
+  final StorageService _storage = getIt<StorageService>();
+  final ArticleRepository _articleRepository = getIt<ArticleRepository>();
+  final SettingsService _settingsService = getIt<SettingsService>();
 
   int get _unreadCount => _articles.where((a) => !a.isRead).length;
+  TextTheme get _textTheme => Theme.of(context).textTheme;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.showSavedArticles ? 1 : 0;
     _loadData();
-    _loadViewMode();
     _checkConnectivity();
     _checkForUpdates();
+    _loadViewMode();
+  }
 
-    _fabController = AnimationController(
-      vsync: this,
-      duration: AppCardStyles.emphasisDuration,
-    );
-    _staggerController = AnimationController(
-      vsync: this,
-      duration: AppCardStyles.staggerDuration,
-    );
-    _fabController.forward();
+  Future<void> _loadViewMode() async {
+    final mode = await _settingsService.getFeedViewMode();
+    if (!mounted) return;
+    setState(() => _viewMode = mode);
+  }
+
+  Future<void> _toggleViewMode() async {
+    final next = _viewMode == 'stack' ? 'continuous' : 'stack';
+    setState(() => _viewMode = next);
+    await _settingsService.setFeedViewMode(next);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final settings = context.read<SettingsNotifier>();
-    // Only set up timer once initially or when settings actually change
     final shouldRefresh = _autoRefreshTimer == null ||
         settings.autoRefresh != _lastAutoRefresh ||
         settings.refreshInterval != _lastRefreshInterval;
@@ -110,55 +114,31 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   @override
-  void didUpdateWidget(RssFeedScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Only reload if transitioning TO saved view (was not saved view before)
-    if (!oldWidget.showSavedArticles && widget.showSavedArticles) {
-      _loadSavedArticlesOnly();
-    }
-  }
-
-  Future<void> _loadSavedArticlesOnly() async {
-    final savedArticles = await _storage.loadSavedArticles();
-    if (mounted) {
-      setState(() {
-        _savedArticles = savedArticles;
-      });
-    }
-  }
-
-  @override
   void dispose() {
-    // Memory leak fix: Cancel subscription explicitly
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
     _saveDebounceTimer?.cancel();
-    _fabController.dispose();
-    _staggerController.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _checkConnectivity() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
+    final connectivityResult = await _connectivity.checkConnectivity();
+    if (!mounted) return;
     setState(() {
       _isOnline = connectivityResult.contains(ConnectivityResult.none) == false;
     });
 
     await _connectivitySubscription?.cancel();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
       results,
-    ) async {
-      final wasOffline = !_isOnline;
+    ) {
+      if (!mounted) return;
       setState(() {
         _isOnline = results.contains(ConnectivityResult.none) == false;
       });
 
-      // Automatically refresh when coming back online
       if (_isOnline && _articles.isNotEmpty) {
-        // Replay any pending offline mutations before refreshing
-        if (wasOffline) {
-          await _articleRepository.replayOutbox();
-        }
         _refreshFeeds();
       }
     });
@@ -166,10 +146,17 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   Future<void> _loadData() async {
     try {
-      final maxArticles = await _settingsService.getMaxArticles();
-      final articles = await _storage.loadArticles();
-      final savedArticles = await _storage.loadSavedArticles();
-      final lastRefresh = await _storage.loadLastRefreshTime();
+      final results = await Future.wait([
+        _settingsService.getMaxArticles(),
+        _storage.loadArticles(),
+        _storage.loadSavedArticles(),
+        _storage.loadLastRefreshTime(),
+      ]);
+
+      final maxArticles = results[0] as int;
+      final articles = results[1] as List<Article>;
+      final savedArticles = results[2] as List<Article>;
+      final lastRefresh = results[3] as DateTime?;
 
       if (mounted) {
         setState(() {
@@ -180,8 +167,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         });
       }
 
-      _staggerController.forward();
-      _refreshFeeds();
+      if (_isOnline) _refreshFeeds();
     } catch (e) {
       ErrorHandler.logError('Failed to load data', error: e);
       if (mounted) {
@@ -194,50 +180,36 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     }
   }
 
-  Future<void> _loadViewMode() async {
-    final viewModeString = await _storage.loadViewMode();
-    if (viewModeString != null && mounted) {
-      setState(() {
-        _viewMode = viewModeString == 'list' ? ViewMode.list : ViewMode.cards;
-      });
-    }
-  }
-
-  Future<void> _saveViewMode() async {
-    await _storage.saveViewMode(_viewMode == ViewMode.list ? 'list' : 'cards');
-  }
-
   Future<void> _checkForUpdates() async {
-    // Delay check to avoid showing on first launch
-    await Future.delayed(const Duration(seconds: 2));
-
+    await Future<void>.delayed(Duration.zero); // yield to frame, then check
     if (!mounted) return;
 
     final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
 
     if (mounted && updateInfo != null) {
-      if (context.mounted) {
-        await showUpdateDialog(context: context, updateInfo: updateInfo);
-      }
+      await showUpdateDialog(context: context, updateInfo: updateInfo);
     }
   }
 
-  Future<void> _saveArticles() async {
-    try {
-      await _storage.saveArticles(_articles);
-      await _storage.saveSavedArticles(_savedArticles);
-      await _storage.saveLastRefreshTime(_lastRefreshTime);
-    } catch (e) {
-      ErrorHandler.logError('Failed to save articles', error: e);
-    }
+  void _saveArticles() {
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        await _storage.saveArticles(_articles);
+        await _storage.saveSavedArticles(_savedArticles);
+        await _storage.saveLastRefreshTime(_lastRefreshTime);
+      } catch (e) {
+        ErrorHandler.logError('Failed to save articles', error: e);
+      }
+    });
   }
 
   Future<void> _refreshFeeds() async {
     debugPrint('[Feed] Starting refresh...');
     await AnalyticsService.logFeedRefresh();
 
-    // Check if offline
-    final connectivityResult = await Connectivity().checkConnectivity();
+    final connectivityResult = await _connectivity.checkConnectivity();
+    if (!mounted) return;
     debugPrint('[Feed] Connectivity result: $connectivityResult');
 
     if (connectivityResult.contains(ConnectivityResult.none)) {
@@ -257,7 +229,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     try {
       final result = await _articleRepository.fetchNewArticles();
+      if (!mounted) return;
       final maxArticles = await _settingsService.getMaxArticles();
+      if (!mounted) return;
 
       if (result.isSuccess) {
         final newArticles = (result.data ?? []).take(maxArticles).toList();
@@ -272,6 +246,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _isLoading = false;
         });
 
+        // Bump the editorial edition number on every successful refresh.
+        EditionState.current = await _settingsService.bumpEditionNumber();
+        if (mounted) setState(() {});
+
         debugPrint(
           '[Feed] Refresh complete. Total articles: ${_articles.length}',
         );
@@ -285,6 +263,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     } catch (e) {
       debugPrint('[Feed] ERROR during refresh: $e');
       ErrorHandler.logError('Failed to refresh feeds', error: e);
+      if (!mounted) return;
       setState(() {
         _errorMessage = ErrorHandler.getUserMessage(e);
         _isLoading = false;
@@ -293,21 +272,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   void _onSwipeRight(int index) {
-    if (index >= _displayedArticles.length) {
-      print('Warning: Invalid index in _onSwipeRight: $index');
-      return;
-    }
+    if (index >= _displayedArticles.length) return;
 
     final article = _displayedArticles[index];
     final articleIndex = _articles.indexWhere((a) => a.id == article.id);
 
-    if (articleIndex == -1) {
-      print('Warning: Article not found in main list: ${article.id}');
-      return;
-    }
+    if (articleIndex == -1) return;
 
     setState(() {
-      // Create new list to trigger rebuild
       _savedArticles = List.from(_savedArticles);
       _articles[articleIndex].isSaved = true;
 
@@ -320,23 +292,16 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     });
 
     _saveArticles();
-
-    _showSnackBar('Article saved', AppColors.success);
+    _showSnackBar('Article saved');
   }
 
   void _onSwipeLeft(int index) {
-    if (index >= _displayedArticles.length) {
-      print('Warning: Invalid index in _onSwipeLeft: $index');
-      return;
-    }
+    if (index >= _displayedArticles.length) return;
 
     final article = _displayedArticles[index];
     final articleIndex = _articles.indexWhere((a) => a.id == article.id);
 
-    if (articleIndex == -1) {
-      print('Warning: Article not found in main list: ${article.id}');
-      return;
-    }
+    if (articleIndex == -1) return;
 
     setState(() {
       _articles[articleIndex].isRead = true;
@@ -345,21 +310,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     });
 
     _saveArticles();
-
-    _showSnackBar('Article marked as read', AppColors.textSecondary);
+    _showSnackBar('Article marked as read');
   }
 
-  Timer? _saveDebounceTimer;
-
   void _onToggleSave(Article article) {
-    // Debounce rapid save operations (300ms)
-    if (_saveDebounceTimer?.isActive ?? false) {
-      return;
-    }
-    _saveDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _saveArticles();
-    });
-
     setState(() {
       article.isSaved = !article.isSaved;
 
@@ -367,43 +321,32 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         if (!_savedArticles.any((a) => a.id == article.id)) {
           _savedArticles = [article, ..._savedArticles];
         }
+        ErrorHandler.addBreadcrumb('Article saved: ${article.title}',
+            category: 'feed');
       } else {
-        _savedArticles = _savedArticles
-            .where((a) => a.id != article.id)
-            .toList();
-      }
-    });
-  }
-
-    setState(() {
-      if (_selectedTab == 1) {
-        _savedArticles = _savedArticles.where((a) => a.isSaved).toList();
+        _savedArticles =
+            _savedArticles.where((a) => a.id != article.id).toList();
+        ErrorHandler.addBreadcrumb('Article unsaved: ${article.title}',
+            category: 'feed');
       }
     });
   }
 
   void _onTapCard(int index) {
-    if (index >= _displayedArticles.length) {
-      print('Warning: Invalid index in _onTapCard: $index');
-      return;
-    }
+    if (index >= _displayedArticles.length) return;
 
     final article = _displayedArticles[index];
     final articleIndex = _articles.indexWhere((a) => a.id == article.id);
 
-    if (articleIndex == -1) {
-      print('Warning: Article not found in main list: ${article.id}');
-      return;
-    }
+    if (articleIndex == -1) return;
+    if (articleIndex >= _articles.length) return;
+
     AnalyticsService.logArticleOpen(
       articleId: article.id,
       title: article.title,
     );
-
-    if (articleIndex >= _articles.length) {
-      print('Warning: Article index out of bounds: $articleIndex');
-      return;
-    }
+    ErrorHandler.addBreadcrumb('Article opened: ${article.title}',
+        category: 'navigation');
 
     setState(() {
       _articles[articleIndex].isRead = true;
@@ -430,13 +373,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         : _savedArticles;
 
     if (_selectedFilter != 'All' && _selectedTab == 0) {
+      final rssService = getIt<RssFeedService>();
       articles = articles.where((a) {
-        final source = getIt<RssFeedService>().getSourceById(a.sourceId);
+        final source = rssService.getSourceById(a.sourceId);
         return source?.category == _selectedFilter;
       }).toList();
     }
 
-    // Apply search filter
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       articles = articles
@@ -452,23 +395,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     return articles;
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.dmSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.1,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onInverseSurface,
           ),
         ),
-        backgroundColor: AppColors.surface,
+        backgroundColor: colorScheme.inverseSurface,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: color.withValues(alpha: 0.2), width: 1),
         ),
         elevation: 8,
         duration: const Duration(milliseconds: 2000),
@@ -477,15 +419,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Widget _buildEmptyState() {
-    final icon = _selectedTab == 0
-        ? (_viewMode == ViewMode.cards
-              ? Icons.style_outlined
-              : Icons.inbox_outlined)
-        : Icons.bookmark_outline_rounded;
-
-    final title = _selectedTab == 0
-        ? (_viewMode == ViewMode.cards ? 'No articles' : 'No articles yet')
-        : 'No saved articles';
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSearchEmpty = _isSearchActive && _searchQuery.isNotEmpty;
+    final icon = isSearchEmpty
+        ? Icons.search_off_rounded
+        : _selectedTab == 0
+            ? Icons.style_outlined
+            : Icons.bookmark_outline_rounded;
+    final title = isSearchEmpty
+        ? 'No results for "$_searchQuery"'
+        : _selectedTab == 0
+            ? 'No articles'
+            : 'No saved articles';
 
     return Center(
       child: Column(
@@ -494,78 +439,55 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
               border: Border.all(
-                color: AppColors.divider.withValues(alpha: 0.3),
+                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
             child: Semantics(
               label: title,
-              child: Icon(icon, size: 72, color: AppColors.textTertiary),
+              child: Icon(icon, size: 72, color: colorScheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 24),
           Text(
             _errorMessage ?? title,
-            style: GoogleFonts.dmSans(
+            style: _textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface,
               fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.2,
             ),
+            textAlign: TextAlign.center,
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _refreshFeeds,
+            FilledButton.icon(
+              onPressed: _refreshFeeds,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          button: true,
-                          label: 'Retry loading feeds',
-                          child: Icon(
-                            Icons.refresh_rounded,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Theme.of(context).colorScheme.onSurface,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Retry',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Theme.of(context).colorScheme.onSurface,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
+            ),
+          ] else if (isSearchEmpty) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _searchQuery = '';
+                  _isSearchActive = false;
+                  _displayedArticles = _getFilteredArticles();
+                });
+              },
+              icon: const Icon(Icons.clear_rounded, size: 18),
+              label: const Text('Clear search'),
             ),
           ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
             const SizedBox(height: 12),
@@ -574,11 +496,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               child: Text(
                 'Tap the refresh button to load articles',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                  letterSpacing: 0.1,
+                style: _textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -589,236 +508,103 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Semantics(
-            label: 'Loading feeds',
-            child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              strokeWidth: 3,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Loading feeds...',
-            style: GoogleFonts.dmSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.1,
-            ),
-          ),
-        ],
-      ),
-    );
+    // Use shimmer skeleton instead of basic spinner
+    return const FeedLoadingSkeleton();
   }
 
   Widget _buildCardView() {
-    return CardStack(
-      articles: _displayedArticles,
-      onSwipeRight: _onSwipeRight,
-      onSwipeLeft: _onSwipeLeft,
-      onTap: _onTapCard,
-      emptyState: _buildEmptyState(),
-      isFilterActive: _selectedFilter != 'All',
-    );
-  }
-
-  Widget _buildListView() {
-    if (_displayedArticles.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return RefreshIndicator(
-      color: AppColors.primary,
-      backgroundColor: AppColors.surface,
-      strokeWidth: 2.5,
-      onRefresh: _isLoading ? () async {} : () async {
-        await _refreshFeeds();
-      },
-      child: ListView.builder(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-        itemCount: _displayedArticles.length,
-        itemBuilder: (context, index) {
-          final article = _displayedArticles[index];
-          final source =
-              getIt<RssFeedService>().getSourceById(article.sourceId) ??
-              RssFeedService.predefinedSources.first;
-          final sourceColor = source.color;
-
-          return AnimatedBuilder(
-            animation: _staggerController,
-            builder: (context, child) {
-              final delay = index * 0.04;
-              final animation = CurvedAnimation(
-                parent: _staggerController,
-                curve: Interval(
-                  delay.clamp(0.0, 0.8),
-                  (delay + 0.15).clamp(0.1, 1.0),
-                  curve: Curves.easeOutQuart,
-                ),
-              );
-
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.2),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: Semantics(
-              button: true,
-              label:
-                  '${article.title}, from ${article.sourceName}, published ${Helpers.formatTimeAgo(article.pubDate)}',
-              child: GestureDetector(
-                onTap: () => _onTapCard(index),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: sourceColor.withValues(alpha: 0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        // Refreshing banner when loading with cached content
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _isLoading && _articles.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
                       border: Border.all(
-                        color: AppColors.divider.withValues(alpha: 0.5),
+                        color: colorScheme.primary.withValues(alpha: 0.25),
                         width: 1,
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: sourceColor.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Semantics(
-                                  label: source.name,
-                                  child: Icon(
-                                    source.icon,
-                                    size: 14,
-                                    color: sourceColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  source.name,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: sourceColor,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ],
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              colorScheme.primary,
                             ),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  article.title,
-                                  style: GoogleFonts.playfairDisplay(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                    height: 1.3,
-                                    letterSpacing: -0.2,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  article.description,
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                    height: 1.5,
-                                    letterSpacing: 0.05,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Semantics(
-                                      label:
-                                          'Published ${Helpers.formatTimeAgo(article.pubDate)}',
-                                      child: Icon(
-                                        Icons.schedule_outlined,
-                                        size: 12,
-                                        color: AppColors.textTertiary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      Helpers.formatTimeAgo(article.pubDate),
-                                      style: GoogleFonts.dmSans(
-                                        fontSize: 12,
-                                        color: AppColors.textTertiary,
-                                        letterSpacing: 0.1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Refreshing feeds...',
+                          style: _textTheme.labelLarge?.copyWith(
+                            color: colorScheme.onPrimaryContainer,
+                            fontSize: 13,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        // Card stack content
+        Expanded(
+          child: _displayedArticles.isEmpty && !_isLoading
+              ? _buildEmptyState()
+              : (_viewMode == 'stack'
+                  ? CardStack(
+                      articles: _displayedArticles,
+                      onSwipeRight: _onSwipeRight,
+                      onSwipeLeft: _onSwipeLeft,
+                      onTap: _onTapCard,
+                      emptyState: _buildEmptyState(),
+                      isFilterActive: _selectedFilter != 'All',
+                    )
+                  : ContinuousFeedList(
+                      articles: _displayedArticles,
+                      onTap: _onTapCard,
+                    )),
+        ),
+      ],
     );
   }
 
+  Future<void> _refreshSavedArticles() async {
+    final savedArticles = await _storage.loadSavedArticles();
+    if (mounted) {
+      setState(() {
+        _savedArticles = savedArticles;
+      });
+    }
+  }
+
   Widget _buildSavedArticlesView() {
-    return BentoSavedArticlesGrid(
-      articles: _savedArticles,
-      onTap: (index) => _onTapSavedArticle(index),
-      onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
-      onDismiss: (index) => _removeSavedArticle(index),
-      isEmpty: _savedArticles.isEmpty,
+    final colorScheme = Theme.of(context).colorScheme;
+    return RefreshIndicator(
+      color: colorScheme.primary,
+      backgroundColor: colorScheme.surface,
+      strokeWidth: 2.5,
+      onRefresh: _refreshSavedArticles,
+      child: BentoSavedArticlesGrid(
+        articles: _savedArticles,
+        onTap: (index) => _onTapSavedArticle(index),
+        onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
+        onDismiss: (index) => _removeSavedArticle(index),
+        isEmpty: _savedArticles.isEmpty,
+      ),
     );
   }
 
@@ -830,7 +616,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       _savedArticles = _savedArticles.where((a) => a.id != article.id).toList();
     });
     _saveArticles();
-    _showSnackBar('Article removed from saved', AppColors.textSecondary);
+    _showSnackBar('Article removed from saved');
   }
 
   void _onTapSavedArticle(int index) {
@@ -859,234 +645,89 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     );
   }
 
-  Widget _buildSettingsView() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-      children: [
-        _buildSettingsSection('About', [
-          _buildSettingsItem(
-            icon: Icons.info_outline_rounded,
-            title: 'Version',
-            subtitle: _buildVersionWidget(),
-            trailing: null,
-            onTap: null,
-          ),
-        ]),
-        const SizedBox(height: 20),
-        _buildSettingsSection('Appearance', [
-          _buildSettingsItem(
-            icon: Icons.view_column_outlined,
-            title: 'View Mode',
-            subtitle: Text(
-              _viewMode == ViewMode.cards ? 'Card View' : 'List View',
-            ),
-            trailing: Icon(
-              _viewMode == ViewMode.cards
-                  ? Icons.style_outlined
-                  : Icons.list_outlined,
-              color: AppColors.textTertiary,
-            ),
-            onTap: () {
-              setState(() {
-                _viewMode = _viewMode == ViewMode.cards
-                    ? ViewMode.list
-                    : ViewMode.cards;
-              });
-              _saveViewMode();
-            },
-          ),
-        ]),
-        const SizedBox(height: 20),
-        _buildSettingsSection('Data', [
-          _buildSettingsItem(
-            icon: Icons.bookmark_outline_rounded,
-            title: 'Saved Articles',
-            subtitle: Text('${_savedArticles.length} articles saved'),
-            trailing: null,
-            onTap: null,
-          ),
-        ]),
-        const SizedBox(height: 20),
-        _buildSettingsSection('Support', [
-          _buildSettingsItem(
-            icon: Icons.refresh_rounded,
-            title: 'Refresh Feeds',
-            subtitle: const Text('Pull down to refresh or tap here'),
-            trailing: null,
-            onTap: _isLoading ? null : _refreshFeeds,
-          ),
-        ]),
-      ],
-    );
-  }
-
-  Widget _buildSettingsSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            title,
-            style: GoogleFonts.dmSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingsItem({
-    required IconData icon,
-    required String title,
-    Widget? subtitle,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.divider.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, size: 20, color: AppColors.primary),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (subtitle != null) ...[
-                      DefaultTextStyle(
-                        style: GoogleFonts.dmSans(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        child: subtitle,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) trailing,
-              if (onTap != null) ...[
-                if (trailing == null)
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.textTertiary,
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build version widget that dynamically fetches from VersionProvider
-  Widget _buildVersionWidget() {
-    return FutureBuilder<String>(
-      future: VersionProvider.getVersionWithBuild(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
-          return Text(snapshot.data!);
-        }
-        return const Text('Loading...');
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appBarTitleColor = colorScheme.onSurface;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? null : colorScheme.surface,
-        gradient: isDark
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                stops: [0.0, 0.6, 1.0],
-                colors: [
-                  Color(0xFF1A1B4D),
-                  Color(0xFF2D2F73),
-                  Color(0xFF4A3B5C),
-                ],
-              )
-            : null,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? null : colorScheme.surface,
+            gradient: isDark
+                ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    stops: [0.0, 0.6, 1.0],
+                    colors: [
+                      ThemeProvider.darkGradientStart,
+                      ThemeProvider.darkGradientMid,
+                      ThemeProvider.darkGradientEnd,
+                    ],
+                  )
+                : null,
+          ),
+        ),
+        const GrainOverlay(),
+        Scaffold(
+          backgroundColor: Colors.transparent,
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
+          backgroundColor: colorScheme.surface.withValues(alpha: isDark ? 0.0 : 1.0),
+          elevation: isDark ? 0 : 2,
+          shadowColor: isDark ? null : colorScheme.shadow,
           title: Text(
             _selectedTab == 0
                 ? 'Curated Feeds'
                 : _selectedTab == 1
-                ? 'Saved'
-                : 'Settings',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.onSurface,
-              letterSpacing: -0.5,
+                    ? 'Saved'
+                    : 'Settings',
+            style: _textTheme.headlineMedium?.copyWith(
+              fontSize: 24,
+              color: appBarTitleColor,
             ),
           ),
           actions: [
+            // View-mode toggle (Stack / Continuous) — feed tab only.
+            if (_selectedTab == 0)
+              Semantics(
+                button: true,
+                label: _viewMode == 'stack'
+                    ? 'Switch to continuous list'
+                    : 'Switch to card stack',
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: IconButton(
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      _toggleViewMode();
+                    },
+                    tooltip: _viewMode == 'stack'
+                        ? 'Continuous'
+                        : 'Card stack',
+                    icon: Icon(
+                      _viewMode == 'stack'
+                          ? Icons.view_agenda_outlined
+                          : Icons.crop_square,
+                      color: appBarTitleColor,
+                    ),
+                  ),
+                ),
+              ),
             if (_selectedTab == 0 && _articles.isNotEmpty)
               Container(
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsets.only(right: 8),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: colorScheme.primary.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),
@@ -1096,20 +737,16 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       label: '$_unreadCount unread articles',
                       child: Icon(
                         Icons.article_outlined,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.9),
+                        size: 16,
+                        color: appBarTitleColor.withValues(alpha: 0.85),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
                       '$_unreadCount',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurface,
-                        letterSpacing: 0.2,
+                      style: _textTheme.labelLarge?.copyWith(
+                        fontSize: 14,
+                        color: appBarTitleColor,
                       ),
                     ),
                   ],
@@ -1120,9 +757,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 button: true,
                 label: _isLoading ? 'Loading' : 'Refresh feeds',
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.only(right: 8),
                   child: IconButton(
-                    onPressed: _isLoading ? null : _refreshFeeds,
+                    onPressed: _isLoading ? null : () {
+                      HapticFeedback.lightImpact();
+                      _refreshFeeds();
+                    },
                     icon: _isLoading
                         ? SizedBox(
                             width: 20,
@@ -1130,16 +770,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).colorScheme.onSurface,
+                                appBarTitleColor,
                               ),
                             ),
                           )
                         : Icon(
                             Icons.refresh_rounded,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Theme.of(context).colorScheme.onSurface,
+                            color: appBarTitleColor,
                           ),
                   ),
                 ),
@@ -1148,9 +785,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               button: true,
               label: _isSearchActive ? 'Close search' : 'Search articles',
               child: Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 8),
                 child: IconButton(
                   onPressed: () {
+                    HapticFeedback.lightImpact();
                     setState(() {
                       _isSearchActive = !_isSearchActive;
                       if (!_isSearchActive) {
@@ -1160,12 +798,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     });
                   },
                   icon: Icon(
-                    _isSearchActive
-                        ? Icons.close_rounded
-                        : Icons.search_rounded,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.onSurface,
+                    _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
+                    color: appBarTitleColor,
                   ),
                 ),
               ),
@@ -1174,15 +808,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               button: true,
               label: 'More options',
               child: Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 8),
                 child: PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.onSurface,
+                    color: appBarTitleColor,
                   ),
-                  color: AppColors.surface,
+                  color: colorScheme.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -1201,19 +833,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'You\'re using the latest version!',
+                                "You're using the latest version!",
                               ),
                             ),
                           );
                         }
                       }
-                    } else if (value == 'toggle_view') {
-                      setState(() {
-                        _viewMode = _viewMode == ViewMode.cards
-                            ? ViewMode.list
-                            : ViewMode.cards;
-                      });
-                      await _saveViewMode();
                     } else if (value == 'settings') {
                       Navigator.push(
                         context,
@@ -1223,8 +848,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       );
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
                       value: 'check_updates',
                       child: Row(
                         children: [
@@ -1234,31 +859,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'settings',
                       child: Row(
                         children: [
                           Icon(Icons.settings),
                           SizedBox(width: 12),
                           Text('Settings'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'toggle_view',
-                      child: Row(
-                        children: [
-                          Icon(
-                            _viewMode == ViewMode.cards
-                                ? Icons.view_list
-                                : Icons.grid_view,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _viewMode == ViewMode.cards
-                                ? 'Switch to List View'
-                                : 'Switch to Card View',
-                          ),
                         ],
                       ),
                     ),
@@ -1271,7 +878,28 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         body: SafeArea(
           child: Column(
             children: [
-              // Search bar
+              // Folio Rule — signature masthead. Only on the feed tab.
+              if (_selectedTab == 0)
+                FolioRule(
+                  date: DateTime.now(),
+                  edition: EditionState.current,
+                  articleCount: _displayedArticles.length,
+                  unreadCount: _unreadCount,
+                  onTapDot: _unreadCount > 0 ? () {
+                    // In continuous mode, scroll to first unread. In stack
+                    // mode, no-op (the stack front is implicitly first).
+                    if (_viewMode == 'stack') {
+                      // First article is always the front card, but if it's
+                      // already read, the swipe-left to dismiss leaves the
+                      // next as front. We don't auto-advance here — the dot
+                      // exists to indicate "there's unread", not to drive.
+                      _showSnackBar(
+                        '$_unreadCount articles waiting. Swipe left to dismiss.',
+                      );
+                    }
+                  } : null,
+                ),
+              // Search bar - theme-aware styling
               if (_isSearchActive)
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1280,35 +908,36 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   ),
                   child: TextField(
                     autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'Search articles, sources, or content...',
-                      hintStyle: GoogleFonts.dmSans(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 15,
+                    textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search articles, sources, or content...',
+                    hintStyle: _textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 15,
+                    ),
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant,
+                        width: 1,
                       ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.1),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant,
+                        width: 1,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                      borderSide: BorderSide(
+                        color: colorScheme.primary,
+                        width: 2,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
+                    ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? Semantics(
                               button: true,
@@ -1316,13 +945,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               child: IconButton(
                                 icon: Icon(
                                   Icons.clear_rounded,
-                                  color:
-                                      Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? Colors.white
-                                      : Theme.of(context).colorScheme.onSurface,
+                                  color: appBarTitleColor,
                                 ),
                                 onPressed: () {
+                                  _searchDebounceTimer?.cancel();
                                   setState(() {
                                     _searchQuery = '';
                                     _displayedArticles = _getFilteredArticles();
@@ -1332,25 +958,31 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             )
                           : null,
                     ),
-                    style: GoogleFonts.dmSans(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSurface,
+                    style: _textTheme.bodyLarge?.copyWith(
+                      color: appBarTitleColor,
                       fontSize: 16,
                     ),
                     onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                        _displayedArticles = _getFilteredArticles();
-                      });
+                      _searchDebounceTimer?.cancel();
+                      _searchDebounceTimer = Timer(
+                        const Duration(milliseconds: 250),
+                        () {
+                          if (mounted) {
+                            setState(() {
+                              _searchQuery = value;
+                              _displayedArticles = _getFilteredArticles();
+                            });
+                          }
+                        },
+                      );
                     },
                   ),
                 ),
 
-              // Category filter chips for feeds tab (hidden when search is active)
+              // Category filter chips for feeds tab
               if (_selectedTab == 0 &&
                   !_isSearchActive &&
-                  (_articles.isNotEmpty || _isLoading == false)) ...[
+                  (_articles.isNotEmpty || _isLoading)) ...[
                 Container(
                   height: 50,
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1361,9 +993,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     itemBuilder: (context, index) {
                       final category = _categories[index];
                       final isSelected = _selectedFilter == category;
-                      final color = category == 'All'
-                          ? colorScheme.primary
-                          : getCategoryColor(category);
 
                       return Padding(
                         padding: const EdgeInsets.only(right: 10),
@@ -1373,13 +1002,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           selected: isSelected,
                           child: InkWell(
                             onTap: () {
+                              HapticFeedback.selectionClick();
                               setState(() {
                                 _selectedFilter = category;
                                 _displayedArticles = _getFilteredArticles();
                               });
                             },
-                            borderRadius: BorderRadius.circular(20),
-                            splashColor: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                            splashColor: colorScheme.primary.withValues(alpha: 0.08),
                             child: AnimatedContainer(
                               duration: AppCardStyles.quickDuration,
                               padding: const EdgeInsets.symmetric(
@@ -1388,29 +1018,23 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? color
-                                    : Colors.white.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
+                                    ? colorScheme.primary
+                                    : colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
                                 border: Border.all(
                                   color: isSelected
-                                      ? color
-                                      : Colors.white.withValues(alpha: 0.2),
+                                      ? colorScheme.primary
+                                      : colorScheme.outlineVariant,
                                   width: 1,
                                 ),
                               ),
                               child: Text(
                                 category,
-                                style: GoogleFonts.dmSans(
-                                  color:
-                                      Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? Colors.white
-                                      : Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
+                                style: _textTheme.labelLarge?.copyWith(
+                                  color: isSelected
+                                      ? colorScheme.onPrimary
+                                      : colorScheme.onSurfaceVariant,
                                   fontSize: 14,
-                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ),
@@ -1435,13 +1059,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       Icon(
                         Icons.search_rounded,
                         size: 16,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
-                        style: GoogleFonts.dmSans(
-                          color: Colors.white.withValues(alpha: 0.7),
+                        style: _textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),
@@ -1458,10 +1082,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.2),
+                    color: colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
+                      color: colorScheme.error.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -1470,16 +1094,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       Icon(
                         Icons.cloud_off_rounded,
                         size: 16,
-                        color: Colors.orange,
+                        color: colorScheme.error,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Offline - Showing cached content',
-                          style: GoogleFonts.dmSans(
+                          style: _textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onErrorContainer,
                             fontSize: 13,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -1491,72 +1114,27 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
               // Content
               Expanded(
-                child: _isLoading
-                    ? _buildLoadingState()
-                    : RefreshIndicator(
-                        color: AppColors.primary,
-                        backgroundColor: AppColors.surface,
-                        strokeWidth: 2.5,
-                        onRefresh: _isLoading
-                            ? () async {}
-                            : () async {
-                                await _refreshFeeds();
-                              },
-                        child: _selectedTab == 0
-                            ? (_viewMode == ViewMode.cards
-                                  ? _buildCardView()
-                                  : _buildListView())
-                            : _selectedTab == 1
-                            ? _buildSavedArticlesView()
-                            : _buildSettingsView(),
-                      ),
+                child: RefreshIndicator(
+                  color: colorScheme.primary,
+                  backgroundColor: colorScheme.surface,
+                  strokeWidth: 2.5,
+                  onRefresh: _isLoading
+                      ? () async {}
+                      : () async {
+                          await _refreshFeeds();
+                        },
+                  child: _isLoading && _articles.isEmpty
+                      ? _buildLoadingState()
+                      : _selectedTab == 0
+                          ? _buildCardView()
+                          : _buildSavedArticlesView(),
+                ),
               ),
             ],
           ),
         ),
-        floatingActionButton: _selectedTab == 0 && !_isSearchActive
-            ? Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Semantics(
-                  button: true,
-                  label: _viewMode == ViewMode.cards
-                      ? 'Switch to list view'
-                      : 'Switch to card view',
-                  child: FloatingActionButton.small(
-                    heroTag: 'view_mode',
-                    onPressed: () {
-                      setState(() {
-                        _viewMode = _viewMode == ViewMode.cards
-                            ? ViewMode.list
-                            : ViewMode.cards;
-                      });
-                      _saveViewMode();
-                    },
-                    backgroundColor: AppColors.surface,
-                    elevation: 0,
-                    child: Icon(
-                      _viewMode == ViewMode.cards
-                          ? Icons.view_list_rounded
-                          : Icons.grid_view_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              )
-            : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
+      ],
     );
   }
 }

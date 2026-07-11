@@ -8,7 +8,10 @@ import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
+import '../repositories/article_repository.dart';
 import '../utils/constants.dart';
+import '../di/service_locator.dart';
+import 'sources_screen.dart' show SourcesScreen;
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -20,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late StorageService _storageService;
+  late SettingsService _settingsService;
   bool _isLoading = true;
 
   // Settings values
@@ -33,30 +37,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _storageService = StorageService();
+    _storageService = getIt<StorageService>();
+    _settingsService = getIt<SettingsService>();
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
-    await SettingsService().initializeDefaults();
+    await _settingsService.initializeDefaults();
 
-    final articles = await _storageService.loadArticles();
-    final savedArticlesList = await _storageService.loadSavedArticles();
-    final themeMode = await SettingsService().getThemeMode();
-    final inAppNotifs = await SettingsService().getInAppNotificationsEnabled();
-    final notificationsEnabled = await SettingsService()
-        .getNotificationsEnabled();
-    final newArticleNotifs = await SettingsService()
-        .getNewArticleNotifications();
+    // Batch all storage reads in parallel
+    final results = await Future.wait([
+      _storageService.loadArticles(),
+      _storageService.loadSavedArticles(),
+      _settingsService.getThemeMode(),
+      _settingsService.getInAppNotificationsEnabled(),
+      _settingsService.getNotificationsEnabled(),
+      _settingsService.getNewArticleNotifications(),
+    ]);
 
     if (mounted) {
       setState(() {
-        _themeMode = themeMode;
-        _notificationsEnabled = notificationsEnabled;
-        _newArticleNotifs = newArticleNotifs;
-        _inAppNotifsEnabled = inAppNotifs;
-        _cachedArticles = articles.length;
-        _savedArticles = savedArticlesList.length;
+        _cachedArticles = (results[0] as List).length;
+        _savedArticles = (results[1] as List).length;
+        _themeMode = results[2] as ThemeMode;
+        _inAppNotifsEnabled = results[3] as bool;
+        _notificationsEnabled = results[4] as bool;
+        _newArticleNotifs = results[5] as bool;
         _isLoading = false;
       });
     }
@@ -66,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() => _themeMode = mode);
     final themeProvider = context.read<ThemeProvider>();
-    await SettingsService().setThemeMode(mode);
+    await _settingsService.setThemeMode(mode);
     if (mounted) {
       await themeProvider.setThemeMode(mode);
     }
@@ -87,7 +93,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Clear'),
           ),
         ],
@@ -97,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true && mounted) {
       final messenger = ScaffoldMessenger.of(context);
       await _storageService.clearAll();
+      getIt<ArticleRepository>().clearCache();
       if (!mounted) return;
       setState(() {
         _cachedArticles = 0;
@@ -129,7 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           'Refresh Interval',
-          style: GoogleFonts.lexend(
+          style: GoogleFonts.dmSans(
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -147,7 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: interval,
               child: Text(
                 '$interval min',
-                style: GoogleFonts.lexend(
+                style: GoogleFonts.dmSans(
                   color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
                   fontSize: 14,
                 ),
@@ -179,16 +188,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         title: Text(
           'Settings',
-          style: GoogleFonts.lexend(
+          style: GoogleFonts.playfairDisplay(
             fontSize: 24,
             fontWeight: FontWeight.w700,
             color: colorScheme.onSurface,
+            letterSpacing: -0.3,
           ),
         ),
         centerTitle: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
         children: [
           _buildSectionHeader('Appearance'),
           _buildSettingsCard([
@@ -228,7 +238,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _notificationsEnabled,
               onChanged: (value) async {
                 setState(() => _notificationsEnabled = value);
-                await SettingsService().setNotificationsEnabled(value);
+                await _settingsService.setNotificationsEnabled(value);
               },
             ),
             if (_notificationsEnabled) ...[
@@ -240,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: _newArticleNotifs,
                 onChanged: (value) async {
                   setState(() => _newArticleNotifs = value);
-                  await SettingsService().setNewArticleNotifications(value);
+                  await _settingsService.setNewArticleNotifications(value);
                 },
                 indented: true,
               ),
@@ -253,7 +263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   setState(() => _inAppNotifsEnabled = value);
                   InAppNotificationManager().setEnabled(value);
-                  await SettingsService().setInAppNotificationsEnabled(value);
+                  await _settingsService.setInAppNotificationsEnabled(value);
                 },
                 indented: true,
               ),
@@ -288,6 +298,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ]),
           const SizedBox(height: 24),
+          _buildSectionHeader('Sources'),
+          _buildSettingsCard([
+            _buildActionTile(
+              icon: Icons.rss_feed_outlined,
+              title: 'Manage sources',
+              subtitle: 'Subscribe, browse, and unsubscribe',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SourcesScreen()),
+                );
+              },
+            ),
+          ]),
+          const SizedBox(height: 24),
           _buildSectionHeader('Storage & Data'),
           _buildSettingsCard([
             _buildInfoTile(
@@ -306,29 +331,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.delete_outline_rounded,
               title: 'Clear Cache',
               subtitle: 'Remove all cached data',
-              iconColor: AppColors.error,
+              iconColor: colorScheme.error,
               onTap: _clearCache,
             ),
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('About'),
           _buildSettingsCard([
-            _buildInfoTile(
-              icon: Icons.info_outline_rounded,
-              title: 'App Version',
-              value: 'v${AppConfig.appVersion}',
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                ),
+                child: Icon(Icons.info_outline_rounded, size: 20, color: colorScheme.onPrimaryContainer),
+              ),
+              title: Text('App Version', style: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+              trailing: FutureBuilder<String>(
+                future: AppConfig.getVersion(),
+                builder: (context, snapshot) => Text(
+                  'v${snapshot.data ?? '...'}',
+                  style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.primary),
+                ),
+              ),
             ),
             _buildDivider(),
             _buildActionTile(
               icon: Icons.code_outlined,
               title: 'Open Source Licenses',
               subtitle: 'View third-party licenses',
-              onTap: () {
-                showLicensePage(
-                  context: context,
-                  applicationName: 'Curated Feeds',
-                  applicationVersion: AppConfig.appVersion,
-                );
+              onTap: () async {
+                final version = await AppConfig.getVersion();
+                if (context.mounted) {
+                  showLicensePage(
+                    context: context,
+                    applicationName: 'Curated Feeds',
+                    applicationVersion: version,
+                  );
+                }
               },
             ),
           ]),
@@ -359,12 +402,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Padding(
       padding: const EdgeInsets.only(left: 8, bottom: 12),
       child: Text(
-        title.toUpperCase(),
-        style: GoogleFonts.lexend(
+        title,
+        style: GoogleFonts.dmSans(
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: Theme.of(context).textTheme.bodyMedium?.color?.withAlpha(153),
-          letterSpacing: 1.5,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -426,13 +469,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         title,
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
           color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -440,7 +483,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       subtitle: Text(
         subtitle,
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 12,
           color: textTheme.bodyMedium?.color,
         ),
@@ -470,13 +513,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
       ),
       title: Text(
         title,
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
           color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -484,7 +527,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Text(
         value,
-        style: GoogleFonts.lexend(fontSize: 14, color: colorScheme.primary),
+        style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.primary),
       ),
     );
   }
@@ -508,7 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: iconColor != null
               ? iconColor.withAlpha(38)
               : colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(
           icon,
@@ -518,7 +561,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       title: Text(
         title,
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
           color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -526,7 +569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       subtitle: Text(
         subtitle,
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 12,
           color: textTheme.bodyMedium?.color,
         ),
@@ -548,7 +591,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(
           _getThemeIcon(_themeMode),
@@ -558,7 +601,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       title: Text(
         'Theme',
-        style: GoogleFonts.lexend(
+        style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
           color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -575,7 +618,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: ThemeMode.system,
             child: Text(
               'System',
-              style: GoogleFonts.lexend(
+              style: GoogleFonts.dmSans(
                 color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
               ),
             ),
@@ -584,7 +627,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: ThemeMode.light,
             child: Text(
               'Light',
-              style: GoogleFonts.lexend(
+              style: GoogleFonts.dmSans(
                 color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
               ),
             ),
@@ -593,7 +636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: ThemeMode.dark,
             child: Text(
               'Dark',
-              style: GoogleFonts.lexend(
+              style: GoogleFonts.dmSans(
                 color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
               ),
             ),
@@ -617,7 +660,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           height: 40,
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
           ),
           child: Icon(
             Icons.format_list_numbered,
@@ -627,7 +670,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           'Max Articles',
-          style: GoogleFonts.lexend(
+          style: GoogleFonts.dmSans(
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
@@ -645,7 +688,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: max,
               child: Text(
                 '$max',
-                style: GoogleFonts.lexend(
+                style: GoogleFonts.dmSans(
                   color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
                   fontSize: 14,
                 ),

@@ -1,51 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-/// Theme mode storage keys
-class ThemeKeys {
-  static const String themeMode = 'theme_mode';
-  static const String primaryColor = 'primary_color';
-}
-
-/// Notification settings keys
-class NotificationKeys {
-  static const String notificationsEnabled = 'notifications_enabled';
-  static const String newArticleNotifs = 'new_article_notifs';
-  static const String savedArticleNotifs = 'saved_article_notifs';
-  static const String inAppNotificationsEnabled =
-      'in_app_notifications_enabled';
-}
-
-/// App settings keys
-class AppSettingsKeys {
-  static const String autoRefresh = 'auto_refresh';
-  static const String refreshInterval = 'refresh_interval';
-  static const String maxArticles = 'max_articles';
-  static const String offlineMode = 'offline_mode';
-  static const String showImages = 'show_images';
-  static const String dataSaverMode = 'data_saver_mode';
-}
+import '../utils/reader_theme.dart';
 
 /// App Settings Service - manages all app preferences using SharedPreferences
 class SettingsService {
   late SharedPreferences _prefs;
-  bool _isInitialized = false;
+  Future<SharedPreferences>? _initFuture;
 
   /// Initialize SharedPreferences
   Future<void> init() async {
-    if (_isInitialized) return;
-    _prefs = await SharedPreferences.getInstance();
-    _isInitialized = true;
+    _prefs = await (_initFuture ??= SharedPreferences.getInstance());
+  }
+
+  /// Generic getter for boolean values
+  Future<bool> _getBool(String key, bool defaultValue) async {
+    await init();
+    return _prefs.getBool(key) ?? defaultValue;
+  }
+
+  /// Generic setter for boolean values
+  Future<void> _setBool(String key, bool value) async {
+    await init();
+    await _prefs.setBool(key, value);
+  }
+
+  /// Generic getter for string values
+  Future<String?> _getString(String key) async {
+    await init();
+    return _prefs.getString(key);
+  }
+
+  /// Generic setter for string values
+  Future<void> _setString(String key, String value) async {
+    await init();
+    await _prefs.setString(key, value);
   }
 
   // ============================================
   // THEME SETTINGS
   // ============================================
 
-  /// Get current theme mode
   Future<ThemeMode> getThemeMode() async {
-    await init();
-    final value = _prefs.getString(ThemeKeys.themeMode);
+    final value = await _getString('theme_mode');
     switch (value) {
       case 'light':
         return ThemeMode.light;
@@ -56,41 +52,28 @@ class SettingsService {
     }
   }
 
-  /// Set theme mode
   Future<void> setThemeMode(ThemeMode mode) async {
-    await init();
-    String value;
-    switch (mode) {
-      case ThemeMode.light:
-        value = 'light';
-        break;
-      case ThemeMode.dark:
-        value = 'dark';
-        break;
-      case ThemeMode.system:
-        value = 'system';
-        break;
-    }
-    await _prefs.setString(ThemeKeys.themeMode, value);
+    final value = switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    };
+    await _setString('theme_mode', value);
   }
 
-  /// Get primary color
   Future<Color> getPrimaryColor() async {
-    await init();
-    final value = _prefs.getString(ThemeKeys.primaryColor);
+    final value = await _getString('primary_color');
     if (value != null) {
       try {
         return Color(int.parse(value.replaceFirst('#', '0xFF')));
       } catch (_) {}
     }
-    return const Color(0xFF1A1B4D);
+    return const Color(0xFFC4944E);
   }
 
-  /// Set primary color
   Future<void> setPrimaryColor(Color color) async {
-    await init();
-    await _prefs.setString(
-      ThemeKeys.primaryColor,
+    await _setString(
+      'primary_color',
       '#${color.toARGB32().toRadixString(16).substring(2)}',
     );
   }
@@ -99,176 +82,149 @@ class SettingsService {
   // NOTIFICATION SETTINGS
   // ============================================
 
-  /// Get notifications enabled status
-  Future<bool> getNotificationsEnabled() async {
-    await init();
-    return _prefs.getString(NotificationKeys.notificationsEnabled) == 'true';
-  }
+  Future<bool> getNotificationsEnabled() => _getBool('notifications_enabled', true);
+  Future<void> setNotificationsEnabled(bool enabled) => _setBool('notifications_enabled', enabled);
 
-  /// Set notifications enabled
-  Future<void> setNotificationsEnabled(bool enabled) async {
-    await init();
-    await _prefs.setString(
-      NotificationKeys.notificationsEnabled,
-      enabled.toString(),
-    );
-  }
+  Future<bool> getNewArticleNotifications() => _getBool('new_article_notifs', true);
+  Future<void> setNewArticleNotifications(bool enabled) => _setBool('new_article_notifs', enabled);
 
-  /// Get new article notifications
-  Future<bool> getNewArticleNotifications() async {
-    await init();
-    return _prefs.getString(NotificationKeys.newArticleNotifs) == 'true';
-  }
-
-  /// Set new article notifications
-  Future<void> setNewArticleNotifications(bool enabled) async {
-    await init();
-    await _prefs.setString(
-      NotificationKeys.newArticleNotifs,
-      enabled.toString(),
-    );
-  }
-
-  /// Get saved article notifications
-  Future<bool> getSavedArticleNotifications() async {
-    await init();
-    return _prefs.getString(NotificationKeys.savedArticleNotifs) == 'true';
-  }
-
-  /// Set saved article notifications
-  Future<void> setSavedArticleNotifications(bool enabled) async {
-    await init();
-    await _prefs.setString(
-      NotificationKeys.savedArticleNotifs,
-      enabled.toString(),
-    );
-  }
-
-  /// Get in-app notifications enabled
-  Future<bool> getInAppNotificationsEnabled() async {
-    await init();
-    return _prefs.getString(NotificationKeys.inAppNotificationsEnabled) !=
-        'false';
-  }
-
-  /// Set in-app notifications enabled
-  Future<void> setInAppNotificationsEnabled(bool enabled) async {
-    await init();
-    await _prefs.setString(
-      NotificationKeys.inAppNotificationsEnabled,
-      enabled.toString(),
-    );
-  }
+  Future<bool> getInAppNotificationsEnabled() => _getBool('in_app_notifications_enabled', true);
+  Future<void> setInAppNotificationsEnabled(bool enabled) => _setBool('in_app_notifications_enabled', enabled);
 
   // ============================================
   // APP SETTINGS
   // ============================================
 
-  /// Get auto refresh enabled
-  Future<bool> getAutoRefresh() async {
-    await init();
-    final value = _prefs.getString(AppSettingsKeys.autoRefresh);
-    return value != 'false';
-  }
+  Future<bool> getAutoRefresh() => _getBool('auto_refresh', true);
+  Future<void> setAutoRefresh(bool enabled) => _setBool('auto_refresh', enabled);
 
-  /// Set auto refresh
-  Future<void> setAutoRefresh(bool enabled) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.autoRefresh, enabled.toString());
-  }
-
-  /// Get refresh interval in minutes
   Future<int> getRefreshInterval() async {
-    await init();
-    final value = _prefs.getString(AppSettingsKeys.refreshInterval);
+    final value = await _getString('refresh_interval');
     return int.tryParse(value ?? '30') ?? 30;
   }
 
-  /// Set refresh interval
-  Future<void> setRefreshInterval(int minutes) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.refreshInterval, minutes.toString());
-  }
+  Future<void> setRefreshInterval(int minutes) => _setString('refresh_interval', minutes.toString());
 
-  /// Get max articles to cache
   Future<int> getMaxArticles() async {
-    await init();
-    final value = _prefs.getString(AppSettingsKeys.maxArticles);
+    final value = await _getString('max_articles');
     return int.tryParse(value ?? '500') ?? 500;
   }
 
-  /// Set max articles
-  Future<void> setMaxArticles(int count) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.maxArticles, count.toString());
+  Future<void> setMaxArticles(int count) => _setString('max_articles', count.toString());
+
+  Future<bool> getShowImages() => _getBool('show_images', true);
+  Future<void> setShowImages(bool enabled) => _setBool('show_images', enabled);
+
+  Future<bool> getDataSaverMode() => _getBool('data_saver_mode', false);
+  Future<void> setDataSaverMode(bool enabled) => _setBool('data_saver_mode', enabled);
+
+  // ============================================
+  // DESIGN v2 PREFERENCES
+  // Added in the redesign pass.
+  // ============================================
+
+  /// First-launch onboarding gate.
+  Future<bool> getHasCompletedOnboarding() =>
+      _getBool('onboarding_complete', false);
+  Future<void> setHasCompletedOnboarding(bool value) =>
+      _setBool('onboarding_complete', value);
+
+  /// Feed view mode: 'stack' (one card at a time, swipe) or
+  /// 'continuous' (vertical list, time-grouped).
+  Future<String> getFeedViewMode() async {
+    final value = await _getString('feed_view_mode');
+    return value == 'continuous' ? 'continuous' : 'stack';
+  }
+  Future<void> setFeedViewMode(String mode) =>
+      _setString('feed_view_mode', mode);
+
+  /// Editorial edition counter — increments on each successful refresh.
+  Future<int> getEditionNumber() async {
+    final value = await _getString('edition_number');
+    return int.tryParse(value ?? '1') ?? 1;
+  }
+  Future<void> setEditionNumber(int value) =>
+      _setString('edition_number', value.toString());
+  Future<int> bumpEditionNumber() async {
+    final current = await getEditionNumber();
+    final next = current + 1;
+    await setEditionNumber(next);
+    return next;
   }
 
-  /// Get offline mode preference
-  Future<bool> getOfflineMode() async {
-    await init();
-    return _prefs.getString(AppSettingsKeys.offlineMode) == 'true';
+  // Reading preferences (passed through to ReaderPreferences).
+  Future<ReaderTheme> getReaderTheme() async {
+    final value = await _getString('reader_theme');
+    return ReaderTheme.values.firstWhere(
+      (t) => t.name == value,
+      orElse: () => ReaderTheme.defaultTheme,
+    );
   }
+  Future<void> setReaderTheme(ReaderTheme value) =>
+      _setString('reader_theme', value.name);
 
-  /// Set offline mode
-  Future<void> setOfflineMode(bool enabled) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.offlineMode, enabled.toString());
+  Future<double> getReaderFontSize() async {
+    final value = await _getString('reader_font_size');
+    return double.tryParse(value ?? '16') ?? 16;
   }
+  Future<void> setReaderFontSize(double value) =>
+      _setString('reader_font_size', value.toString());
 
-  /// Get show images preference
-  Future<bool> getShowImages() async {
-    await init();
-    return _prefs.getString(AppSettingsKeys.showImages) != 'false';
+  Future<double> getReaderLineHeight() async {
+    final value = await _getString('reader_line_height');
+    return double.tryParse(value ?? '1.6') ?? 1.6;
   }
+  Future<void> setReaderLineHeight(double value) =>
+      _setString('reader_line_height', value.toString());
 
-  /// Set show images
-  Future<void> setShowImages(bool enabled) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.showImages, enabled.toString());
-  }
+  Future<bool> getMonoDatelinesEnabled() =>
+      _getBool('mono_datelines', true);
+  Future<void> setMonoDatelinesEnabled(bool value) =>
+      _setBool('mono_datelines', value);
 
-  /// Get data saver mode
-  Future<bool> getDataSaverMode() async {
-    await init();
-    return _prefs.getString(AppSettingsKeys.dataSaverMode) == 'true';
-  }
+  Future<bool> getWidenMeasure() => _getBool('widen_measure', false);
+  Future<void> setWidenMeasure(bool value) => _setBool('widen_measure', value);
 
-  /// Set data saver mode
-  Future<void> setDataSaverMode(bool enabled) async {
-    await init();
-    await _prefs.setString(AppSettingsKeys.dataSaverMode, enabled.toString());
+  Future<ReaderTheme> getReaderThemeOrDefault() async => getReaderTheme();
+  Future<ReadingPreferences> getReadingPreferences() async {
+    return ReadingPreferences(
+      theme: await getReaderTheme(),
+      fontSize: await getReaderFontSize(),
+      lineHeight: await getReaderLineHeight(),
+      monoDatelines: await getMonoDatelinesEnabled(),
+      widenMeasure: await getWidenMeasure(),
+    );
   }
 
   // ============================================
   // DEFAULT SETTINGS
   // ============================================
 
-  /// Initialize default settings
   Future<void> initializeDefaults() async {
     await init();
 
-    if (_prefs.getString(ThemeKeys.themeMode) == null) {
+    if (_prefs.getString('theme_mode') == null) {
       await setThemeMode(ThemeMode.system);
     }
-    if (_prefs.getString(NotificationKeys.notificationsEnabled) == null) {
+    if (!_prefs.containsKey('notifications_enabled')) {
       await setNotificationsEnabled(true);
     }
-    if (_prefs.getString(NotificationKeys.newArticleNotifs) == null) {
+    if (!_prefs.containsKey('new_article_notifs')) {
       await setNewArticleNotifications(true);
     }
-    if (_prefs.getString(NotificationKeys.inAppNotificationsEnabled) == null) {
+    if (!_prefs.containsKey('in_app_notifications_enabled')) {
       await setInAppNotificationsEnabled(true);
     }
-    if (_prefs.getString(AppSettingsKeys.autoRefresh) == null) {
+    if (!_prefs.containsKey('auto_refresh')) {
       await setAutoRefresh(true);
     }
-    if (_prefs.getString(AppSettingsKeys.refreshInterval) == null) {
+    if (_prefs.getString('refresh_interval') == null) {
       await setRefreshInterval(30);
     }
-    if (_prefs.getString(AppSettingsKeys.maxArticles) == null) {
+    if (_prefs.getString('max_articles') == null) {
       await setMaxArticles(500);
     }
-    if (_prefs.getString(AppSettingsKeys.showImages) == null) {
+    if (!_prefs.containsKey('show_images')) {
       await setShowImages(true);
     }
   }

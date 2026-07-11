@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
 import '../utils/constants.dart';
-import 'feed_screen.dart';
-import 'settings_screen.dart';
-import '../providers/theme_provider.dart';
-import '../providers/settings_notifier.dart';
-import '../providers/feed_provider.dart';
+import '../widgets/folio_rule.dart';
+import 'curated_feeds_app.dart';
+import 'onboarding_screen.dart';
 import '../repositories/article_repository.dart';
 import '../services/settings_service.dart';
 import '../services/notification_service.dart';
 import '../services/analytics_service.dart';
-import '../widgets/in_app_notification_banner.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -48,24 +43,45 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _controller.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final disableAnimations = MediaQuery.disableAnimationsOf(context);
+      if (disableAnimations) {
+        _controller.value = 1.0;
+      } else {
+        _controller.forward();
+      }
+    });
     _initializeApp();
   }
 
   Future<void> _initializeApp() async {
     final startTime = DateTime.now();
-    const minDuration = Duration(seconds: 5);
+    const minDuration = Duration(milliseconds: 1200);
 
     if (!mounted) return;
 
-    await Firebase.initializeApp();
-    await setupServiceLocator();
-    await NotificationService().initialize();
+    try {
+      await Firebase.initializeApp();
+      await setupServiceLocator();
+      await NotificationService().initialize();
 
-    final articleRepository = getIt<ArticleRepository>();
-    final feedProvider = FeedProvider(articleRepository: articleRepository);
-    await feedProvider.init();
-    await AnalyticsService.logAppOpen();
+      final articleRepository = getIt<ArticleRepository>();
+      final settingsService = getIt<SettingsService>();
+      await settingsService.init();
+      // Pre-load articles into repository cache
+      await Future.wait([
+        articleRepository.fetchSavedArticles(),
+        articleRepository.fetchAllArticles(),
+        AnalyticsService.logAppOpen(),
+      ]);
+
+      // Hydrate the in-process editorial edition counter from prefs.
+      FolioRuleBootstrap.hydrate(settingsService);
+    } catch (e) {
+      debugPrint('[Splash] Initialization error: $e');
+      // Continue to main screen even if init fails — app can still work with cache
+    }
 
     if (!mounted) return;
 
@@ -76,10 +92,31 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
+    // Route: first-launch → onboarding. After onboarding or on subsequent
+    // launches → Curated Feeds main app.
+    final onboardingDone =
+        await getIt<SettingsService>().getHasCompletedOnboarding();
+
+    if (!mounted) return;
+
+    if (!onboardingDone) {
+      await Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const OnboardingScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+      return;
+    }
+
     await Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            CuratedFeedsApp(feedProvider: feedProvider),
+            const CuratedFeedsApp(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -96,13 +133,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
-      body: Center(
-        child: AnimatedBuilder(
+      backgroundColor: colorScheme.surface,
+      body: Semantics(
+        label: 'Curated Feeds',
+        child: Center(
+          child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
             return Opacity(
@@ -126,30 +164,66 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.article_rounded,
-                        size: 64,
-                        color: Colors.white,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                width: 3,
+                              ),
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 22,
+                            bottom: 22,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
                     Text(
                       AppConfig.appName,
-                      style: GoogleFonts.lexend(
+                      style: GoogleFonts.playfairDisplay(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        color: colorScheme.onSurface,
                         letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Your curated feed',
-                      style: TextStyle(
+                      style: GoogleFonts.dmSans(
                         fontSize: 14,
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : AppColors.textSecondary,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 48),
@@ -170,184 +244,11 @@ class _SplashScreenState extends State<SplashScreen>
           },
         ),
       ),
-    );
-  }
-}
-
-class CuratedFeedsApp extends StatelessWidget {
-  final FeedProvider feedProvider;
-
-  const CuratedFeedsApp({super.key, required this.feedProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<SettingsService>(create: (_) => getIt<SettingsService>()),
-        ChangeNotifierProvider<ThemeProvider>(
-          create: (context) {
-            final provider = ThemeProvider(getIt<SettingsService>());
-            provider.init();
-            return provider;
-          },
-        ),
-        ChangeNotifierProvider<SettingsNotifier>(
-          create: (context) {
-            final provider = SettingsNotifier(getIt<SettingsService>());
-            provider.loadSettings();
-            return provider;
-          },
-        ),
-        ChangeNotifierProvider<FeedProvider>.value(value: feedProvider),
-      ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: AppConfig.appName,
-            debugShowCheckedModeBanner: false,
-            theme: themeProvider.lightTheme,
-            darkTheme: themeProvider.darkTheme,
-            themeMode: themeProvider.themeMode,
-            home: const MainNavigation(),
-            builder: (context, child) {
-              return InAppNotificationOverlay(child: child!);
-            },
-          );
-        },
       ),
     );
   }
 }
 
-class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
-
-  @override
-  State<MainNavigation> createState() => _MainNavigationState();
-}
-
-class _MainNavigationState extends State<MainNavigation> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const RssFeedScreen(),
-    const SavedArticlesScreen(),
-    const SettingsScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.backgroundDark : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              width: 1,
-            ),
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.article_outlined,
-                  selectedIcon: Icons.article,
-                  label: 'Feed',
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.bookmark_outline_rounded,
-                  selectedIcon: Icons.bookmark_rounded,
-                  label: 'Saved',
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings,
-                  label: 'Settings',
-                  isDark: isDark,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData selectedIcon,
-    required String label,
-    required bool isDark,
-  }) {
-    final isSelected = _selectedIndex == index;
-    final selectedColor = AppColors.primary;
-    final unselectedColor = AppColors.textSecondary;
-    final color = isSelected ? selectedColor : unselectedColor;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() => _selectedIndex = index);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? selectedColor.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              scale: isSelected ? 1.1 : 1.0,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutBack,
-              child: Icon(
-                isSelected ? selectedIcon : icon,
-                color: color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class SavedArticlesScreen extends StatelessWidget {
-  const SavedArticlesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const RssFeedScreen(showSavedArticles: true);
-  }
-}
+// CuratedFeedsApp + MainNavigation + SavedArticlesScreen live in
+// curated_feeds_app.dart (extracted so onboarding can route to them
+// without crossing splash).
