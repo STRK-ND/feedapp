@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -37,7 +38,8 @@ class RssFeedScreen extends StatefulWidget {
   State<RssFeedScreen> createState() => _RssFeedScreenState();
 }
 
-class _RssFeedScreenState extends State<RssFeedScreen> {
+class _RssFeedScreenState extends State<RssFeedScreen>
+    with WidgetsBindingObserver {
   List<Article> _articles = [];
   List<Article> _savedArticles = [];
   List<Article> _displayedArticles = [];
@@ -45,6 +47,7 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   int _selectedTab = 0;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _autoRefreshEnabled = true; // lifted by lifecycle observer
   DateTime? _lastRefreshTime;
   bool _isOnline = true;
   bool _isSearchActive = false;
@@ -54,6 +57,13 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   Timer? _autoRefreshTimer;
   Timer? _searchDebounceTimer;
   Timer? _saveDebounceTimer;
+  // Single-flight guard for refresh calls (manually tap, connectivity
+  // tick, auto-refresh tick can all fire close together). Drains the
+  // call heap to one in-flight; the rest become no-ops.
+  Future<void>? _refreshInFlight;
+  // Time of last successful refresh; suppresses repeat calls within
+  // this window even when no current in-flight call exists.
+  DateTime? _lastRefreshAt;
 
   final List<String> _categories = AppConfig.categories;
   final Connectivity _connectivity = Connectivity();
@@ -68,10 +78,34 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   void initState() {
     super.initState();
     _selectedTab = widget.showSavedArticles ? 1 : 0;
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
     _checkConnectivity();
     _checkForUpdates();
     _loadViewMode();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _autoRefreshEnabled = true;
+        _connectivitySubscription?.resume();
+        _armAutoRefresh();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _autoRefreshEnabled = false;
+        _autoRefreshTimer?.cancel();
+        _autoRefreshTimer = null;
+        _connectivitySubscription?.pause();
+        break;
+      case AppLifecycleState.detached:
+        // App is on its way out; nothing to do.
+        break;
+    }
   }
 
   Future<void> _loadViewMode() async {
@@ -107,18 +141,44 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
 
   void _setupAutoRefresh(SettingsNotifier settings) {
     _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
     _lastAutoRefresh = settings.autoRefresh;
     _lastRefreshInterval = settings.refreshInterval;
-    if (settings.autoRefresh && settings.refreshInterval > 0) {
-      _autoRefreshTimer = Timer.periodic(
-        Duration(minutes: settings.refreshInterval),
-        (_) => _refreshFeeds(),
-      );
+    if (!_autoRefreshEnabled || !settings.autoRefresh || settings.refreshInterval <= 0) {
+      return;
     }
+    // Single-shot schedule — does NOT keep firing while the app is
+    // backgrounded. _restartAutoRefresh() is called from the
+    // lifecycle observer's resume hook (see `_handleLifecycle`).
+    _armAutoRefresh();
+  }
+
+  /// Schedule a single auto-refresh timer; used both at startup and on
+  /// resume. We don't use `Timer.periodic` directly because the Dart
+  /// isolate still has to drain the timer queue on resume — pausing
+  /// the schedule lets us avoid spurious refreshes the moment the
+  /// user comes back.
+  void _armAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    final settings = context.read<SettingsNotifier>();
+    if (!settings.autoRefresh || settings.refreshInterval <= 0) return;
+    if (!_autoRefreshEnabled || !mounted) return;
+    _autoRefreshTimer = Timer(
+      Duration(minutes: settings.refreshInterval),
+      _onAutoRefreshFired,
+    );
+  }
+
+  void _onAutoRefreshFired() {
+    if (!mounted) return;
+    _refreshFeeds().whenComplete(() {
+      if (mounted) _armAutoRefresh();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
     _saveDebounceTimer?.cancel();
@@ -209,8 +269,37 @@ class _RssFeedScreenState extends State<RssFeedScreen> {
   }
 
   Future<void> _refreshFeeds() async {
+    // Single-flight + short minimum-interval guard. Connectivity
+    // changes, manual taps, and auto-refresh can all trigger this
+    // method back-to-back — coalesce into one network call per
+    // ~10 seconds to avoid burn-on-mobile-radios.
+    final existing = _refreshInFlight;
+    if (existing != null) {
+      debugPrint('[Feed] Refresh already in flight; awaiting result.');
+      await existing;
+      return;
+    }
+    final last = _lastRefreshAt;
+    if (last != null &&
+        DateTime.now().difference(last).inSeconds < 10) {
+      debugPrint('[Feed] Refresh skipped (within 10s min interval).');
+      return;
+    }
+
+    final completer = Completer<void>();
+    _refreshInFlight = completer.future;
+    try {
+      await _performRefresh();
+    } finally {
+      _refreshInFlight = null;
+      if (!completer.isCompleted) completer.complete();
+    }
+  }
+
+  Future<void> _performRefresh() async {
     debugPrint('[Feed] Starting refresh...');
     await AnalyticsService.logFeedRefresh();
+    _lastRefreshAt = DateTime.now();
 
     final connectivityResult = await _connectivity.checkConnectivity();
     if (!mounted) return;

@@ -1,16 +1,13 @@
-# myapp
+# Curated Feeds
 
-A new Flutter project.
+Curated Feeds is an Android-only RSS reader for power readers. It treats
+your feed like a daily paper — one article per screen to triage, mono
+datelines, hairlines instead of filled bars, time-grouped sections
+instead of an infinite scroll.
 
-## Getting Started
+Built with Flutter. Targets Android only — no iOS, macOS, Linux,
+Windows, or web builds.
 
-This project is a starting point for a Flutter application.
+## License
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+See `CHANGELOG.md` for the per-version changelog.

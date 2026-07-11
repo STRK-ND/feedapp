@@ -1,6 +1,11 @@
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-/// Custom cache manager for image caching with size limits
+/// Image cache manager.
+///
+/// Tuned for an Android-only reader with 7 sources and ~500 articles
+/// in cache: 4-day stale window, 80 objects total. Smaller than the
+/// `flutter_cache_manager` defaults (7 days / 200) to limit on-disk
+/// size and battery use the prune step entails.
 class AppCacheManager extends CacheManager {
   static const String key = 'appImageCache';
   static AppCacheManager? _instance;
@@ -14,8 +19,8 @@ class AppCacheManager extends CacheManager {
       : super(
           Config(
             key,
-            stalePeriod: const Duration(days: 7),
-            maxNrOfCacheObjects: 200,
+            stalePeriod: const Duration(days: 4),
+            maxNrOfCacheObjects: 80,
             repo: JsonCacheInfoRepository(databaseName: key),
             fileSystem: IOFileSystem(key),
             fileService: HttpFileService(),
@@ -23,7 +28,7 @@ class AppCacheManager extends CacheManager {
         );
 }
 
-/// Cache manager for APK downloads
+/// APK cache manager (1-day expiry, 5 objects)
 class ApkCacheManager extends CacheManager {
   static const String key = 'apkCache';
   static ApkCacheManager? _instance;
