@@ -29,16 +29,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late SettingsService _settingsService;
   bool _isLoading = true;
 
-  // Settings values
-  ThemeMode _themeMode = ThemeMode.system;
+  // Live prefs (theme, body font, edition, view mode, reader prefs)
+  // are read from SettingsNotifier inside the body Consumer. These
+  // mirror-fields only retain what SettingsNotifier does not own —
+  // currently only the three notification toggles + the cached/saved
+  // counts that surface from storage.
   bool _notificationsEnabled = true;
   bool _newArticleNotifs = true;
   bool _inAppNotifsEnabled = true;
   int _cachedArticles = 0;
   int _savedArticles = 0;
-  ReadingPreferences _readerPrefs = const ReadingPreferences();
-  int _edition = 1;
-  String _bodyFont = 'dm';
 
   @override
   void initState() {
@@ -51,43 +51,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     await _settingsService.initializeDefaults();
 
-    // Batch all storage reads in parallel
+    // Batch all storage reads in parallel. Theme/reader/edition/body
+    // font/etc. live in SettingsNotifier — we don't need to mirror them
+    // here.
     final results = await Future.wait([
       _storageService.loadArticles(),
       _storageService.loadSavedArticles(),
-      _settingsService.getThemeMode(),
       _settingsService.getInAppNotificationsEnabled(),
       _settingsService.getNotificationsEnabled(),
       _settingsService.getNewArticleNotifications(),
-      _settingsService.getReadingPreferences(),
-      _settingsService.getEditionNumber(),
-      _settingsService.getBodyFont(),
     ]);
 
     if (mounted) {
       setState(() {
         _cachedArticles = (results[0] as List).length;
         _savedArticles = (results[1] as List).length;
-        _themeMode = results[2] as ThemeMode;
-        _inAppNotifsEnabled = results[3] as bool;
-        _notificationsEnabled = results[4] as bool;
-        _newArticleNotifs = results[5] as bool;
-        _readerPrefs = results[6] as ReadingPreferences;
-        _edition = results[7] as int;
-        _bodyFont = results[8] as String;
+        _inAppNotifsEnabled = results[2] as bool;
+        _notificationsEnabled = results[3] as bool;
+        _newArticleNotifs = results[4] as bool;
         _isLoading = false;
       });
     }
-  }
-
-  Future<void> _saveThemeMode(ThemeMode mode) async {
-    if (!mounted) return;
-    setState(() => _themeMode = mode);
-    // The SettingsNotifier is the single write-path for app pref
-    // changes; it persists to SettingsService and notifies listeners
-    // (ThemeProvider included) so all surfaces that read from the
-    // observer update without a refresh.
-    await context.read<SettingsNotifier>().setThemeMode(mode);
   }
 
   Future<void> _clearCache() async {
@@ -129,58 +113,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildIntervalSelector() {
+  Widget _buildIntervalSelector(SettingsNotifier settings) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    return Consumer<SettingsNotifier>(
-      builder: (context, settings, _) => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.timer_outlined,
-            size: 20,
-            color: colorScheme.onPrimaryContainer,
-          ),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(12),
         ),
-        title: Text(
-          'Refresh Interval',
-          style: GoogleFonts.dmSans(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-          ),
+        child: Icon(
+          Icons.timer_outlined,
+          size: 20,
+          color: colorScheme.onPrimaryContainer,
         ),
-        trailing: DropdownButton<int>(
-          value: [15, 30, 60, 120].contains(settings.refreshInterval)
-              ? settings.refreshInterval
-              : 30,
-          dropdownColor: colorScheme.surface,
-          underline: const SizedBox.shrink(),
-          icon: Icon(Icons.expand_more, color: colorScheme.primary),
-          items: [15, 30, 60, 120].map((interval) {
-            return DropdownMenuItem(
-              value: interval,
-              child: Text(
-                '$interval min',
-                style: GoogleFonts.dmSans(
-                  color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-                  fontSize: 14,
-                ),
+      ),
+      title: Text(
+        'Refresh Interval',
+        style: GoogleFonts.dmSans(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+        ),
+      ),
+      trailing: DropdownButton<int>(
+        value: [15, 30, 60, 120].contains(settings.refreshInterval)
+            ? settings.refreshInterval
+            : 30,
+        dropdownColor: colorScheme.surface,
+        underline: const SizedBox.shrink(),
+        icon: Icon(Icons.expand_more, color: colorScheme.primary),
+        items: [15, 30, 60, 120].map((interval) {
+          return DropdownMenuItem(
+            value: interval,
+            child: Text(
+              '$interval min',
+              style: GoogleFonts.dmSans(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                fontSize: 14,
               ),
-            );
-          }).toList(),
-          onChanged: (value) async {
-            if (value != null) {
-              await settings.setRefreshInterval(value);
-            }
-          },
-        ),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) async {
+          if (value != null) {
+            await settings.setRefreshInterval(value);
+          }
+        },
       ),
     );
   }
@@ -193,60 +175,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'Settings',
-          style: GoogleFonts.playfairDisplay(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
-            letterSpacing: -0.3,
+    // The whole screen reacts to SettingsNotifier — theme picker hover,
+    // Reading rows, Edition counter — so values reflect the moment,
+    // not the moment the user landed on the screen.
+    return Consumer<SettingsNotifier>(
+      builder: (context, notifier, _) {
+        final themeMode = notifier.themeMode;
+        final edition = notifier.edition;
+        final prefs = notifier.readingPrefs;
+        final bodyFont = prefs.bodyFont;
+        final lineHeight = prefs.lineHeight.toStringAsFixed(2);
+        final fontSizePt = '${prefs.fontSize.round()} pt';
+        final cachedArticles = _cachedArticles;
+        final savedArticles = _savedArticles;
+
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Text(
+              'Settings',
+              style: AppType.headlineSmall(),
+            ),
+            centerTitle: false,
           ),
-        ),
-        centerTitle: false,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-        children: [
-          _buildSectionHeader('Appearance'),
-          _buildSettingsCard([
-            _buildThemeSelector(),
-            _buildDivider(),
-            Consumer<SettingsNotifier>(
-              builder: (context, settings, _) => _buildSwitchTile(
-                icon: Icons.image_outlined,
-                title: 'Show Images',
-                subtitle: 'Display article images in feed',
-                value: settings.showImages,
-                onChanged: (value) async {
-                  await settings.setShowImages(value);
-                },
-              ),
-            ),
-            _buildDivider(),
-            Consumer<SettingsNotifier>(
-              builder: (context, settings, _) => _buildSwitchTile(
-                icon: Icons.data_saver_off_outlined,
-                title: 'Data Saver',
-                subtitle: 'Reduce data usage by limiting image quality',
-                value: settings.dataSaverMode,
-                onChanged: (value) async {
-                  await settings.setDataSaverMode(value);
-                },
-              ),
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Notifications'),
-          _buildSettingsCard([
-            _buildSwitchTile(
-              icon: Icons.notifications_outlined,
-              title: 'Push Notifications',
-              subtitle: 'Receive notifications for new content',
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+            children: [
+              _buildSectionHeader('Appearance'),
+              _buildSettingsCard([
+                _buildThemeSelector(themeMode),
+                _buildDivider(),
+                _buildSwitchTile(
+                  icon: Icons.image_outlined,
+                  title: 'Show Images',
+                  subtitle: 'Display article images in feed',
+                  value: notifier.showImages,
+                  onChanged: notifier.setShowImages,
+                ),
+                _buildDivider(),
+                _buildSwitchTile(
+                  icon: Icons.data_saver_off_outlined,
+                  title: 'Data Saver',
+                  subtitle: 'Reduce data usage by limiting image quality',
+                  value: notifier.dataSaverMode,
+                  onChanged: notifier.setDataSaverMode,
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Notifications'),
+              _buildSettingsCard([
+                _buildSwitchTile(
+                  icon: Icons.notifications_outlined,
+                  title: 'Push Notifications',
+                  subtitle: 'Receive notifications for new content',
               value: _notificationsEnabled,
               onChanged: (value) async {
                 setState(() => _notificationsEnabled = value);
@@ -284,30 +267,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           _buildSectionHeader('Feed Settings'),
           _buildSettingsCard([
-            Consumer<SettingsNotifier>(
-              builder: (context, settings, _) => _buildSwitchTile(
-                icon: Icons.refresh_outlined,
-                title: 'Auto Refresh',
-                subtitle: 'Automatically refresh feeds in background',
-                value: settings.autoRefresh,
-                onChanged: (value) async {
-                  await settings.setAutoRefresh(value);
-                },
-              ),
+            _buildSwitchTile(
+              icon: Icons.refresh_outlined,
+              title: 'Auto Refresh',
+              subtitle: 'Automatically refresh feeds in background',
+              value: notifier.autoRefresh,
+              onChanged: notifier.setAutoRefresh,
             ),
-            Consumer<SettingsNotifier>(
-              builder: (context, settings, _) {
-                if (!settings.autoRefresh) return const SizedBox.shrink();
-                return Column(
-                  children: [
-                    _buildDivider(),
-                    _buildIntervalSelector(),
-                    _buildDivider(),
-                    _buildMaxArticlesSelector(),
-                  ],
-                );
-              },
-            ),
+            if (notifier.autoRefresh) ...[
+              _buildDivider(),
+              _buildIntervalSelector(notifier),
+              _buildDivider(),
+              _buildMaxArticlesSelector(notifier),
+            ],
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Sources'),
@@ -332,25 +304,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildInfoTile(
               icon: Icons.text_fields_outlined,
               title: 'Body font',
-              value: _bodyFont == 'lora' ? 'Lora' : 'DM Sans',
+              value: bodyFont == 'lora' ? 'Lora' : 'DM Sans',
             ),
             _buildDivider(),
             _buildInfoTile(
               icon: Icons.format_line_spacing_outlined,
               title: 'Line height',
-              value: _readerPrefs.lineHeight.toStringAsFixed(2),
+              value: lineHeight,
             ),
             _buildDivider(),
             _buildInfoTile(
               icon: Icons.format_size_outlined,
               title: 'Font size',
-              value: '${_readerPrefs.fontSize.round()} pt',
+              value: fontSizePt,
             ),
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Edition'),
           _buildSettingsCard([
-            _buildEditionRow(),
+            _buildEditionRow(edition),
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Storage & Data'),
@@ -358,13 +330,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildInfoTile(
               icon: Icons.cached_outlined,
               title: 'Cached Articles',
-              value: '$_cachedArticles articles',
+              value: '$cachedArticles articles',
             ),
             _buildDivider(),
             _buildInfoTile(
               icon: Icons.bookmark_outline_rounded,
               title: 'Saved Articles',
-              value: '$_savedArticles articles',
+              value: '$savedArticles articles',
             ),
             _buildDivider(),
             _buildActionTile(
@@ -417,6 +389,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Support'),
+          _buildSectionHeader('Support'),
           _buildSettingsCard([
             _buildActionTile(
               icon: Icons.bug_report_outlined,
@@ -436,6 +409,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+        },
+      );
   }
 
   Widget _buildSectionHeader(String title) {
@@ -481,27 +456,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openReaderSheet() async {
-    // For now, show a small sheet that opens the same controls as on the
-    // article — full integration would put this through the navigation
-    // stack, but for Settings we keep it as a quick bottom sheet so the
-    // user doesn't have to scroll through an article to reach them.
     final notifier = context.read<SettingsNotifier>();
+    final initial = notifier.readingPrefs;
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SettingsReaderSheet(
-        initial: _readerPrefs,
+        initial: initial,
         notifier: notifier,
       ),
     );
-    if (updated == true) {
-      // The notifier already updated its state in flight; just mirror.
-      if (mounted) setState(() => _readerPrefs = notifier.readingPrefs);
-    }
+    // The Consumer wrapping this screen rebuilds on every notify; no
+    // manual setState required.
+    if (updated == true) {/* no-op: Consumer rebuild already updated */}
   }
 
-  Widget _buildEditionRow() {
+  Widget _buildEditionRow(int edition) {
     final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -513,14 +484,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
         child: Text(
-          _edition.toString().padLeft(2, '0').substring(0, 2),
+          edition.toString().padLeft(2, '0').substring(0, 2),
           textAlign: TextAlign.center,
           style: AppType.folioTop(color: AppColors.primary)
               .copyWith(fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       title: Text(
-        'Edition Nº ${_edition.toString().padLeft(4, '0')}',
+        'Edition Nº ${edition.toString().padLeft(4, '0')}',
         style: AppType.titleMedium(color: colorScheme.onSurface),
       ),
       subtitle: Text(
@@ -698,18 +669,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeSelector() {
+  Widget _buildThemeSelector(ThemeMode themeMode) {
     final colorScheme = Theme.of(context).colorScheme;
+    final notifier = context.read<SettingsNotifier>();
     Widget tile({
       required ThemeMode mode,
       required String label,
       required Color ground,
       required Color ink,
     }) {
-      final selected = _themeMode == mode;
+      final selected = themeMode == mode;
       return Expanded(
         child: GestureDetector(
-          onTap: () => _saveThemeMode(mode),
+          onTap: () => notifier.setThemeMode(mode),
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
             duration: AppMotion.fast,
@@ -802,58 +774,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildMaxArticlesSelector() {
+  Widget _buildMaxArticlesSelector(SettingsNotifier settings) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    return Consumer<SettingsNotifier>(
-      builder: (context, settings, _) => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-          ),
-          child: Icon(
-            Icons.format_list_numbered,
-            size: 20,
-            color: colorScheme.onPrimaryContainer,
-          ),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
-        title: Text(
-          'Max Articles',
-          style: GoogleFonts.dmSans(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-          ),
+        child: Icon(
+          Icons.format_list_numbered,
+          size: 20,
+          color: colorScheme.onPrimaryContainer,
         ),
-        trailing: DropdownButton<int>(
-          value: [100, 250, 500, 1000, 2000].contains(settings.maxArticles)
-              ? settings.maxArticles
-              : 500,
-          dropdownColor: colorScheme.surface,
-          underline: const SizedBox.shrink(),
-          icon: Icon(Icons.expand_more, color: colorScheme.primary),
-          items: [100, 250, 500, 1000, 2000].map((max) {
-            return DropdownMenuItem(
-              value: max,
-              child: Text(
-                '$max',
-                style: GoogleFonts.dmSans(
-                  color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
-                  fontSize: 14,
-                ),
+      ),
+      title: Text(
+        'Max Articles',
+        style: GoogleFonts.dmSans(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+        ),
+      ),
+      trailing: DropdownButton<int>(
+        value: [100, 250, 500, 1000, 2000].contains(settings.maxArticles)
+            ? settings.maxArticles
+            : 500,
+        dropdownColor: colorScheme.surface,
+        underline: const SizedBox.shrink(),
+        icon: Icon(Icons.expand_more, color: colorScheme.primary),
+        items: [100, 250, 500, 1000, 2000].map((max) {
+          return DropdownMenuItem(
+            value: max,
+            child: Text(
+              '$max',
+              style: GoogleFonts.dmSans(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                fontSize: 14,
               ),
-            );
-          }).toList(),
-          onChanged: (value) async {
-            if (value != null) {
-              await settings.setMaxArticles(value);
-            }
-          },
-        ),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) async {
+          if (value != null) {
+            await settings.setMaxArticles(value);
+          }
+        },
       ),
     );
   }
