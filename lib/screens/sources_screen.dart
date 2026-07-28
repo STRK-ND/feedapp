@@ -9,9 +9,12 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:xml/xml.dart';
 import '../di/service_locator.dart';
 import '../models/rss_source.dart';
 import '../services/rss_feed_service.dart';
@@ -155,9 +158,30 @@ class _SourcesScreenState extends State<SourcesScreen> {
           ],
           const SizedBox(height: AppSpacing.s12),
           Center(
-            child: Text(
-              'OPML import — coming soon',
-              style: AppType.monoEyebrow(color: AppColors.inkSoft),
+            child: InkWell(
+              onTap: _importOpml,
+              borderRadius: BorderRadius.circular(AppRadius.chip),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s3,
+                  vertical: AppSpacing.s2,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.upload_file_outlined,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.s2),
+                    Text(
+                      'Import OPML',
+                      style: AppType.monoEyebrow(color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -190,6 +214,95 @@ class _SourcesScreenState extends State<SourcesScreen> {
         duration: const Duration(milliseconds: 1800),
       ),
     );
+  }
+
+  /// Pick an .opml / .xml file, extract outline URLs, match them against
+  /// known canonical sources, and subscribe the user to all matches.
+  /// Unknown URLs are skipped (we only support feeds from the canonical
+  /// list — arbitrary custom-source support is out of scope for v1).
+  Future<void> _importOpml() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['opml', 'xml'],
+        withData: false,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) return;
+
+      final text = await File(path).readAsString();
+      final urls = _parseOpmlUrls(text);
+
+      if (urls.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No feed URLs found in OPML file')),
+        );
+        return;
+      }
+
+      // Match OPML URLs to canonical sources (by source.url)
+      final matching = RssFeedService.predefinedSources
+          .where((s) => urls.contains(s.url))
+          .map((s) => s.id)
+          .toSet();
+
+      if (matching.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Found ${urls.length} feed URLs but none match Curated Feeds sources. '
+              'Custom-source support is coming in v1.1.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final merged = {..._subscriptions, ...matching};
+      setState(() => _subscriptions = merged);
+      await getIt<SettingsService>().setSubscribedSourceIds(merged);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported ${matching.length} source(s)'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Import failed: $e')),
+      );
+    }
+  }
+
+  /// Pull every xmlUrl (and htmlUrl as fallback) out of an OPML document.
+  Set<String> _parseOpmlUrls(String opmlText) {
+    final urls = <String>{};
+    try {
+      final doc = XmlDocument.parse(opmlText);
+      for (final outline in doc.findAllElements('outline')) {
+        final xmlUrl = outline.getAttribute('xmlUrl');
+        if (xmlUrl != null && xmlUrl.isNotEmpty) {
+          urls.add(xmlUrl);
+          continue;
+        }
+        final htmlUrl = outline.getAttribute('htmlUrl');
+        if (htmlUrl != null && htmlUrl.isNotEmpty) {
+          urls.add(htmlUrl);
+        }
+      }
+    } catch (e) {
+      // Fallback regex for slightly malformed OPML — grabs xmlUrl attributes.
+      final xmlUrlRe = RegExp(r'xmlUrl="([^"]+)"');
+      for (final m in xmlUrlRe.allMatches(opmlText)) {
+        urls.add(m.group(1)!);
+      }
+    }
+    return urls;
   }
 }
 

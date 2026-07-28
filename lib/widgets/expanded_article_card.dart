@@ -48,6 +48,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   double _fontSize = 16;
   double _lineHeight = 1.6;
   bool _widenMeasure = false;
+  bool _monoDatelines = true;
   String _bodyFont = 'dm';
 
   @override
@@ -66,6 +67,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       _lineHeight = notifier.lineHeight;
       _widenMeasure = notifier.widenMeasure;
       _bodyFont = notifier.bodyFont;
+      _monoDatelines = notifier.monoDatelines;
     });
   }
 
@@ -248,6 +250,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         _lineHeight = settings.lineHeight;
         _widenMeasure = settings.widenMeasure;
         _bodyFont = settings.bodyFont;
+        _monoDatelines = settings.monoDatelines;
 
         final palette = ReaderPalette.forTheme(
           theme: _readerTheme,
@@ -476,12 +479,16 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    Helpers.formatDate(widget.article.pubDate),
-                                    style: GoogleFonts.dmSans(
-                                      fontSize: 13,
-                                      color: palette.soft,
-                                      letterSpacing: 0.1,
+                                    Helpers.formatDate(
+                                      widget.article.pubDate,
                                     ),
+                                    style: (_monoDatelines
+                                            ? GoogleFonts.jetBrainsMono
+                                            : GoogleFonts.dmSans)(
+                                        fontSize: 13,
+                                        color: palette.soft,
+                                        letterSpacing: 0.1,
+                                      ),
                                   ),
                                 ],
                               ),

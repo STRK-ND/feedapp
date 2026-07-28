@@ -433,14 +433,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildDivider(),
             _buildActionTile(
               icon: Icons.bug_report_outlined,
-              title: 'Report bug / Join Community',
-              subtitle: 'Join our WhatsApp group',
+              title: 'Report bug / Feedback',
+              subtitle: 'rajatkashyap7062@gmail.com',
               onTap: () async {
-                final uri = Uri.parse(
-                  'https://chat.whatsapp.com/BoABgXqa64BEtcgNDYaCIt',
+                final uri = Uri(
+                  scheme: 'mailto',
+                  path: 'rajatkashyap7062@gmail.com',
+                  queryParameters: {
+                    'subject': 'Curated Feeds — Feedback',
+                  },
                 );
                 if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  await launchUrl(uri);
+                } else if (context.mounted) {
+                  // No mail client — copy the address to the clipboard so
+                  // the user can paste it anywhere.
+                  await Clipboard.setData(
+                    const ClipboardData(text: 'rajatkashyap7062@gmail.com'),
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Email address copied to clipboard',
+                      ),
+                    ),
+                  );
                 }
               },
             ),
