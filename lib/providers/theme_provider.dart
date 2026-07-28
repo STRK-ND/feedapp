@@ -7,7 +7,7 @@ class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
   ThemeMode _themeMode = ThemeMode.system;
   Color _primaryColor = const Color(0xFFC4944E); // Stitch warm amber
-  Color _accentColor = const Color(0xFFC4944E); // Stitch accent
+  final Color _accentColor = const Color(0xFFC4944E); // Stitch accent
 
   ThemeProvider(this._settingsService);
 
@@ -121,7 +121,7 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
-        iconTheme: IconThemeData(color: _lightTextPrimary),
+        iconTheme: const IconThemeData(color: _lightTextPrimary),
       ),
       cardTheme: CardThemeData(
         color: _lightSurface,
@@ -138,11 +138,11 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: _buildTextTheme(_lightTextPrimary, _lightTextSecondary),
-      dividerTheme: DividerThemeData(
+      dividerTheme: const DividerThemeData(
         color: _lightDivider,
         thickness: 1,
       ),
-      iconTheme: IconThemeData(
+      iconTheme: const IconThemeData(
         color: _lightTextPrimary,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -209,7 +209,7 @@ class ThemeProvider extends ChangeNotifier {
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
-        iconTheme: IconThemeData(color: _darkTextPrimary),
+        iconTheme: const IconThemeData(color: _darkTextPrimary),
       ),
       cardTheme: CardThemeData(
         color: _darkSurface,
@@ -226,11 +226,11 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: _buildTextTheme(_darkTextPrimary, _darkTextSecondary),
-      dividerTheme: DividerThemeData(
+      dividerTheme: const DividerThemeData(
         color: _darkDivider,
         thickness: 1,
       ),
-      iconTheme: IconThemeData(
+      iconTheme: const IconThemeData(
         color: _darkTextPrimary,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

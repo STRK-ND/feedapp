@@ -1,5 +1,5 @@
 /// Stitch Design System Widgets
 /// Export all Stitch-specific widgets for easy importing
+library;
 
-export 'stitch_action_buttons.dart';
 export 'category_badge.dart';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -77,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
       ]);
 
       // Hydrate the in-process editorial edition counter from prefs.
-      FolioRuleBootstrap.hydrate(settingsService);
+      unawaited(FolioRuleBootstrap.hydrate(settingsService));
     } catch (e) {
       debugPrint('[Splash] Initialization error: $e');
       // Continue to main screen even if init fails — app can still work with cache
@@ -198,7 +199,7 @@ class _SplashScreenState extends State<SplashScreen>
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.arrow_forward_rounded,
                                 size: 14,
                                 color: AppColors.primary,

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:sentry/sentry.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// App error severity levels
 enum ErrorSeverity {
@@ -12,6 +12,27 @@ enum ErrorSeverity {
 /// App error handler for consistent error management
 class ErrorHandler {
   ErrorHandler._();
+
+  /// Log a warning
+  static Future<void> logWarning(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? extra,
+  }) async {
+    debugPrint('[WARN] $message');
+    if (error != null) {
+      debugPrint('$error');
+    }
+    if (kReleaseMode) {
+      await _sendToSentry(
+        message: message,
+        error: error,
+        stackTrace: stackTrace,
+        severity: ErrorSeverity.medium,
+      );
+    }
+  }
 
   /// Log an error with severity level and send to Sentry
   static Future<void> logError(
@@ -75,31 +96,6 @@ class ErrorHandler {
     }
   }
 
-  /// Capture a specific exception to Sentry
-  static Future<void> captureException(
-    Object error, {
-    StackTrace? stackTrace,
-    String? reason,
-  }) async {
-    try {
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    } catch (e) {
-      debugPrint('Failed to capture exception to Sentry: $e');
-    }
-  }
-
-  /// Capture a message to Sentry
-  static Future<void> captureMessage(
-    String message, {
-    SentryLevel level = SentryLevel.info,
-  }) async {
-    try {
-      await Sentry.captureMessage(message, level: level);
-    } catch (e) {
-      debugPrint('Failed to capture message to Sentry: $e');
-    }
-  }
-
   /// Add a breadcrumb for user actions
   static void addBreadcrumb(String message, {String? category}) {
     Sentry.addBreadcrumb(
@@ -138,19 +134,23 @@ class ErrorHandler {
       return 'Request timed out. Please try again.';
     }
 
-    if (errorString.contains('401') || errorString.contains('unauthorized')) {
+    if (RegExp(r'\b401\b').hasMatch(errorString) ||
+        errorString.contains('unauthorized')) {
       return 'Access denied. Please try again.';
     }
 
-    if (errorString.contains('429') || errorString.contains('rate limit')) {
+    if (RegExp(r'\b429\b').hasMatch(errorString) ||
+        errorString.contains('rate limit')) {
       return 'Too many requests. Please try again in a moment.';
     }
 
-    if (errorString.contains('404') || errorString.contains('not found')) {
+    if (RegExp(r'\b404\b').hasMatch(errorString) ||
+        errorString.contains('not found')) {
       return 'Resource not found.';
     }
 
-    if (errorString.contains('500') || errorString.contains('server')) {
+    if (RegExp(r'\b5\d{2}\b').hasMatch(errorString) ||
+        errorString.contains('server error')) {
       return 'Server error. Please try again later.';
     }
 
@@ -219,7 +219,10 @@ class Result<T> {
   /// Get data if successful, throw if not
   T get dataOrThrow {
     if (isSuccess) {
-      return data!;
+      if (data == null) {
+        throw Exception(error ?? 'No data available');
+      }
+      return data as T;
     }
     throw Exception(error);
   }

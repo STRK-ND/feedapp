@@ -364,7 +364,7 @@ void main() {
       ];
 
       // Act
-      final query = 'flutter';
+      const query = 'flutter';
       final results = articles.where((a) =>
         a.title.toLowerCase().contains(query.toLowerCase())
       ).toList();
@@ -400,7 +400,7 @@ void main() {
       ];
 
       // Act
-      final query = 'flutter';
+      const query = 'flutter';
       final results = articles.where((a) =>
         a.description.toLowerCase().contains(query.toLowerCase())
       ).toList();
@@ -436,7 +436,7 @@ void main() {
       ];
 
       // Act
-      final query = 'techcrunch';
+      const query = 'techcrunch';
       final results = articles.where((a) =>
         a.sourceName.toLowerCase().contains(query.toLowerCase())
       ).toList();
@@ -462,7 +462,7 @@ void main() {
       ];
 
       // Act
-      final query = '';
+      const query = '';
       final results = articles.where((a) =>
         a.title.toLowerCase().contains(query.toLowerCase())
       ).toList();
@@ -487,7 +487,7 @@ void main() {
       ];
 
       // Act
-      final query = 'flutter';
+      const query = 'flutter';
       final results = articles.where((a) =>
         a.title.toLowerCase().contains(query.toLowerCase())
       ).toList();
@@ -512,7 +512,7 @@ void main() {
       ];
 
       // Act
-      final query = 'python';
+      const query = 'python';
       final results = articles.where((a) =>
         a.title.toLowerCase().contains(query.toLowerCase())
       ).toList();

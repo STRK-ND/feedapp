@@ -8,6 +8,7 @@
 /// `hasCompletedOnboarding` is set true and the user lands in the main app.
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../di/service_locator.dart';
@@ -69,7 +70,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await settings.setHasCompletedOnboarding(true);
     EditionState.current = await settings.getEditionNumber();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    unawaited(Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             const CuratedFeedsApp(),
@@ -77,15 +78,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             FadeTransition(opacity: animation, child: child),
         transitionDuration: AppMotion.base,
       ),
-    );
+    ));
   }
 
   Future<void> _skip() async {
     await getIt<SettingsService>().setHasCompletedOnboarding(true);
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    unawaited(Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const CuratedFeedsApp()),
-    );
+    ));
   }
 
   @override
@@ -256,18 +257,18 @@ class _StepPickRoom extends StatelessWidget {
             'PICK A ROOM',
             style: AppType.monoEyebrow(color: AppColors.inkSoft),
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           Text(
             'How should\nthis feel?',
             style: AppType.displayLarge(color: AppColors.ink)
                 .copyWith(height: 1.05),
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           Text(
             'Three rooms. Pick the one that\nmakes you want to settle in.',
             style: AppType.bodyLarge(color: AppColors.inkSoft),
           ),
-          SizedBox(height: AppSpacing.s8),
+          const SizedBox(height: AppSpacing.s8),
           _RoomSwatch(
             label: 'PAPER',
             description: 'Daytime. Bright. Off-white stock.',
@@ -275,7 +276,7 @@ class _StepPickRoom extends StatelessWidget {
             selected: selected == ThemeMode.light,
             onTap: () => onChange(ThemeMode.light),
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           _RoomSwatch(
             label: 'LAMPLIGHT',
             description: 'After dark. Warm amber. The default.',
@@ -283,7 +284,7 @@ class _StepPickRoom extends StatelessWidget {
             selected: selected == ThemeMode.dark,
             onTap: () => onChange(ThemeMode.dark),
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           _RoomSwatch(
             label: 'FOLLOW YOUR PHONE',
             description: 'Switches with the system.',
@@ -360,10 +361,10 @@ class _RoomSwatch extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (selected)
-                    Icon(Icons.circle, size: 12, color: AppColors.primary),
+                    const Icon(Icons.circle, size: 12, color: AppColors.primary),
                 ],
               ),
-              SizedBox(height: AppSpacing.s4),
+              const SizedBox(height: AppSpacing.s4),
               // Mini poster — sample article headline + dateline.
               Container(
                 padding: const EdgeInsets.all(AppSpacing.s4),
@@ -389,7 +390,7 @@ class _RoomSwatch extends StatelessWidget {
                               ? AppColors.paperOnGroundSoft
                               : AppColors.inkSoft),
                     ),
-                    SizedBox(height: AppSpacing.s2),
+                    const SizedBox(height: AppSpacing.s2),
                     Text(
                       'A heading that earns\nthe reader.',
                       style: AppType.titleLarge(color: ink),
@@ -397,7 +398,7 @@ class _RoomSwatch extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(height: AppSpacing.s3),
+              const SizedBox(height: AppSpacing.s3),
               Text(
                 description,
                 style: AppType.bodyMedium(
@@ -447,13 +448,13 @@ class _StepReaderPrefs extends StatelessWidget {
             'TUNE THE READING',
             style: AppType.monoEyebrow(color: AppColors.inkSoft),
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           Text(
             'Make it\ncomfortable.',
             style: AppType.displayLarge(color: AppColors.ink)
                 .copyWith(height: 1.05),
           ),
-          SizedBox(height: AppSpacing.s6),
+          const SizedBox(height: AppSpacing.s6),
           // Live preview
           Container(
             padding: const EdgeInsets.all(AppSpacing.s5),
@@ -471,13 +472,13 @@ class _StepReaderPrefs extends StatelessWidget {
                     style: AppType.monoEyebrow(color: AppColors.inkSoft)
                         .copyWith(letterSpacing: 0.6),
                   ),
-                SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   'How a sentence reads at this size.',
                   style: AppType.displayMedium(color: AppColors.ink)
                       .copyWith(fontSize: fontSize, height: lineHeight),
                 ),
-                SizedBox(height: AppSpacing.s3),
+                const SizedBox(height: AppSpacing.s3),
                 Text(
                   'Line-height is the breath between lines. Wider is calmer; tighter accelerates.',
                   style: AppType.bodyMedium(color: AppColors.inkSoft),
@@ -485,7 +486,7 @@ class _StepReaderPrefs extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(height: AppSpacing.s6),
+          const SizedBox(height: AppSpacing.s6),
           _SliderRow(
             label: 'FONT SIZE',
             value: fontSize,
@@ -494,7 +495,7 @@ class _StepReaderPrefs extends StatelessWidget {
             display: '${fontSize.toStringAsFixed(0)} PT',
             onChange: onFont,
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           _SliderRow(
             label: 'LINE HEIGHT',
             value: lineHeight,
@@ -503,7 +504,7 @@ class _StepReaderPrefs extends StatelessWidget {
             display: lineHeight.toStringAsFixed(2),
             onChange: onLine,
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
@@ -609,18 +610,18 @@ class _StepAddSources extends StatelessWidget {
             'PICK A FIRST SOURCE',
             style: AppType.monoEyebrow(color: AppColors.inkSoft),
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           Text(
             'Start with one\nor twenty.',
             style: AppType.displayLarge(color: AppColors.ink)
                 .copyWith(height: 1.05),
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           Text(
             'These are first-issue picks. You can change them any time from Settings.',
             style: AppType.bodyLarge(color: AppColors.inkSoft),
           ),
-          SizedBox(height: AppSpacing.s6),
+          const SizedBox(height: AppSpacing.s6),
           for (final s in _sources) ...[
             _SourceRow(
               id: s.$1,
@@ -630,7 +631,7 @@ class _StepAddSources extends StatelessWidget {
               picked: picked.contains(s.$1),
               onTap: () => onToggle(s.$1),
             ),
-            SizedBox(height: AppSpacing.s2),
+            const SizedBox(height: AppSpacing.s2),
           ],
         ],
       ),
@@ -685,7 +686,7 @@ class _SourceRow extends StatelessWidget {
           child: Row(
             children: [
               Icon(icon, color: AppColors.inkSoft, size: 22),
-              SizedBox(width: AppSpacing.s4),
+              const SizedBox(width: AppSpacing.s4),
               Text(name, style: AppType.titleMedium(color: AppColors.ink)),
               const Spacer(),
               Text(
@@ -693,7 +694,7 @@ class _SourceRow extends StatelessWidget {
                 style: AppType.monoEyebrow(color: AppColors.inkSoft)
                     .copyWith(letterSpacing: 0.6),
               ),
-              SizedBox(width: AppSpacing.s3),
+              const SizedBox(width: AppSpacing.s3),
               AnimatedContainer(
                 duration: AppMotion.fast,
                 width: 18,

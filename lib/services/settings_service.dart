@@ -129,6 +129,11 @@ class SettingsService {
   Future<void> setHasCompletedOnboarding(bool value) =>
       _setBool('onboarding_complete', value);
 
+  /// Lifetime "Pro" purchase flag. No current feature gates on this —
+  /// exists so future features can check it cheaply.
+  Future<bool> getIsPro() => _getBool('is_pro', false);
+  Future<void> setIsPro(bool value) => _setBool('is_pro', value);
+
   /// Feed view mode: 'stack' (one card at a time, swipe) or
   /// 'continuous' (vertical list, time-grouped).
   Future<String> getFeedViewMode() async {

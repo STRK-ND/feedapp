@@ -35,29 +35,4 @@ class PaginatedResponse {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'items': items.map((article) => article.toJson()).toList(),
-      'total': total,
-      'page': page,
-      'pageSize': pageSize,
-      'hasMore': hasMore,
-    };
-  }
-
-  PaginatedResponse copyWith({
-    List<Article>? items,
-    int? total,
-    int? page,
-    int? pageSize,
-    bool? hasMore,
-  }) {
-    return PaginatedResponse(
-      items: items ?? this.items,
-      total: total ?? this.total,
-      page: page ?? this.page,
-      pageSize: pageSize ?? this.pageSize,
-      hasMore: hasMore ?? this.hasMore,
-    );
-  }
 }

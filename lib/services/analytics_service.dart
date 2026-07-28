@@ -106,7 +106,7 @@ class AnalyticsService {
       name: 'error',
       parameters: {
         'error': error,
-        if (stackTrace != null) 'stack_trace': stackTrace,
+        'stack_trace': ?stackTrace,
       },
     );
   }

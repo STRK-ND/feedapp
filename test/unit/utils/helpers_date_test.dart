@@ -84,21 +84,5 @@ void main() {
       });
     });
 
-    group('parseCustomDate', () {
-      test('Should parse "15 Jan 2024" format', () {
-        final result = Helpers.parseCustomDate('Mon, 15 Jan 2024 10:30:00 +0000');
-        expect(result.year, 2024);
-        expect(result.month, 1);
-        expect(result.day, 15);
-      });
-
-      test('Should handle invalid custom date', () {
-        final beforeCall = DateTime.now();
-        final result = Helpers.parseCustomDate('invalid');
-        final afterCall = DateTime.now();
-        expect(result.isAfter(beforeCall.subtract(const Duration(seconds: 1))), true);
-        expect(result.isBefore(afterCall.add(const Duration(seconds: 1))), true);
-      });
-    });
   });
 }

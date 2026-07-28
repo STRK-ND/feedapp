@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 
-/// Stitch-style category badge with uppercase text and rounded pill shape
+/// Stitch-style category badge with clean squared design
 class CategoryBadge extends StatelessWidget {
   final String category;
   final Color? backgroundColor;
@@ -16,19 +16,23 @@ class CategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.primary,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        category.toUpperCase(),
-        style: TextStyle(
-          color: textColor ?? Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: 'Category: $category',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: backgroundColor ?? colorScheme.primary,
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+        ),
+        child: Text(
+          category,
+          style: TextStyle(
+            color: textColor ?? colorScheme.onPrimary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
     );
@@ -43,70 +47,33 @@ class ReadTimeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.15)
-            : Colors.black.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.schedule,
-            size: 12,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.9)
-                : Colors.black.withValues(alpha: 0.6),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$minutes min read',
-            style: TextStyle(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.9)
-                  : Colors.black.withValues(alpha: 0.6),
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: '$minutes min read',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.schedule,
+              size: 12,
+              color: colorScheme.primary,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Source badge for displaying article source
-class SourceBadge extends StatelessWidget {
-  final String sourceName;
-  final Color? backgroundColor;
-  final Color? textColor;
-
-  const SourceBadge({
-    super.key,
-    required this.sourceName,
-    this.backgroundColor,
-    this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.primary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        sourceName,
-        style: TextStyle(
-          color: textColor ?? AppColors.primary,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+            const SizedBox(width: 4),
+            Text(
+              '$minutes min read',
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

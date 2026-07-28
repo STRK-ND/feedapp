@@ -9,11 +9,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
-import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
 import '../utils/design_tokens.dart';
 import 'section_eyebrow.dart';
@@ -41,7 +39,6 @@ class BentoSavedArticlesGrid extends StatefulWidget {
 class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entrance;
-  late ColorScheme _cs;
 
   @override
   void initState() {
@@ -50,12 +47,6 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
       vsync: this,
       duration: AppMotion.base,
     )..forward();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _cs = Theme.of(context).colorScheme;
   }
 
   @override
@@ -141,19 +132,19 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
                 ),
               ),
               alignment: Alignment.center,
-              child: Icon(
+              child: const Icon(
                 Icons.bookmark_outline_rounded,
                 color: AppColors.primary,
                 size: 28,
               ),
             ),
-            SizedBox(height: AppSpacing.s5),
+            const SizedBox(height: AppSpacing.s5),
             Text(
               'Nothing saved yet.',
               style: AppType.headlineSmall(color: ink),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: AppSpacing.s3),
+            const SizedBox(height: AppSpacing.s3),
             Text(
               'Swipe right on the feed to keep\narticles for later.',
               style: AppType.bodyLarge(color: soft),
@@ -279,7 +270,7 @@ class _SavedRow extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: AppSpacing.s2),
+              const SizedBox(height: AppSpacing.s2),
               Text(
                 article.title,
                 style: AppType.titleLarge(color: ink)
@@ -288,7 +279,7 @@ class _SavedRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               if (article.description.isNotEmpty) ...[
-                SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   article.description,
                   style: AppType.bodyMedium(color: soft).copyWith(height: 1.4),
@@ -296,7 +287,7 @@ class _SavedRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              SizedBox(height: AppSpacing.s3),
+              const SizedBox(height: AppSpacing.s3),
               // Hairline.
               SizedBox(
                 height: 0.5,

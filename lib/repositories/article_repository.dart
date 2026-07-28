@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../models/filter_params.dart';
@@ -48,11 +49,11 @@ class ArticleRepository {
 
       return Result.success(articles);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to fetch all articles',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -118,11 +119,11 @@ class ArticleRepository {
 
       return Result.success(mergedArticles);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to fetch new articles',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -142,11 +143,11 @@ class ArticleRepository {
 
       return Result.success(articles);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to fetch saved articles',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -161,7 +162,7 @@ class ArticleRepository {
       final updatedArticle = article.copyWith(isSaved: isSaved);
 
       // Update main articles cache directly without full refresh
-      var articles = _cachedArticles;
+      final articles = _cachedArticles;
       if (articles != null) {
         final index = articles.indexWhere((a) => a.id == article.id);
         if (index != -1) {
@@ -192,11 +193,11 @@ class ArticleRepository {
 
       return Result.success(null);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to toggle save status',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -240,11 +241,11 @@ class ArticleRepository {
       );
       return Result.success(previousReadState);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to mark all as read',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -280,11 +281,11 @@ class ArticleRepository {
       );
       return Result.success(null);
     } catch (e, stackTrace) {
-      ErrorHandler.logError(
+      unawaited(ErrorHandler.logError(
         'Failed to restore read state',
         error: e,
         stackTrace: stackTrace,
-      );
+      ));
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }

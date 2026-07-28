@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../services/update_service.dart';
@@ -227,29 +225,39 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
       _Stage.failed => 'Try again',
     };
 
-    return FilledButton.icon(
-      onPressed: _busy ? null : _run,
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      icon: _busy
-          ? SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : const Icon(Icons.download),
-      label: Text(label),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: _busy ? null : _run,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.download),
+          label: Text(label),
+        ),
+        if (_errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _errorText!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.error),
+            ),
+          ),
+      ],
     );
-    // ignore: unused_element
-    if (false) {
-      // (kept theme available in case we want a redundant icon tint)
-      theme.colorScheme.primary;
-      _errorText;
-    }
   }
 
   Future<void> _run() async {

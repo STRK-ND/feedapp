@@ -47,6 +47,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Signing config & keystore (never commit)
+**/android/key.properties
+**/android/app/upload-keystore.jks
+**/android/app/*.keystore
+**/android/app/*.jks
+
 # Planning directory (not tracked in git per configuration)
 .planning/
 .openspec/
@@ -63,3 +69,13 @@ linux/
 windows/
 macos/
 ios/
+
+# Tool directories
+.gstack/
+.kiro/
+openspec/
+docs/
+
+_build.txt
+_curate_ss.png
+_ss*.png

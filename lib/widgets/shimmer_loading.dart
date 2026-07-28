@@ -54,15 +54,16 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
+        final colorScheme = Theme.of(context).colorScheme;
         return ShaderMask(
           shaderCallback: (bounds) {
             return LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: const [
-                Color(0xFFE5E7EB),
-                Color(0xFFF3F4F6),
-                Color(0xFFE5E7EB),
+              colors: [
+                colorScheme.surfaceContainerHighest,
+                colorScheme.surfaceContainerHigh,
+                colorScheme.surfaceContainerHighest,
               ],
               stops: [0.0, _animation.value.clamp(0.0, 1.0), 1.0],
               transform: _SlidingGradientTransform(_animation.value),
@@ -103,11 +104,12 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.divider,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
@@ -122,15 +124,16 @@ class ArticleCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ShimmerLoading(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: colorScheme.primary.withValues(alpha: 0.04),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -143,17 +146,17 @@ class ArticleCardSkeleton extends StatelessWidget {
             if (isExpanded)
               Container(
                 height: 220,
-                decoration: const BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
               )
             else
               Container(
                 height: 180,
-                decoration: const BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
               ),
 
@@ -163,15 +166,15 @@ class ArticleCardSkeleton extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Source row
-                  Row(
+                  const Row(
                     children: [
-                      const SkeletonBox(
+                      SkeletonBox(
                         width: 80,
                         height: 24,
                         borderRadius: 12,
                       ),
-                      const SizedBox(width: 12),
-                      const SkeletonBox(
+                      SizedBox(width: 12),
+                      SkeletonBox(
                         width: 60,
                         height: 20,
                         borderRadius: 10,
@@ -266,29 +269,29 @@ class ListItemSkeleton extends StatelessWidget {
     return ShimmerLoading(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
+        child: const Row(
           children: [
             // Thumbnail placeholder
-            const SkeletonBox(width: 80, height: 80, borderRadius: 12),
-            const SizedBox(width: 16),
+            SkeletonBox(width: 80, height: 80, borderRadius: 12),
+            SizedBox(width: 16),
 
             // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SkeletonBox(width: 60, height: 18, borderRadius: 8),
-                  const SizedBox(height: 8),
-                  const SkeletonBox(
+                  SkeletonBox(width: 60, height: 18, borderRadius: 8),
+                  SizedBox(height: 8),
+                  SkeletonBox(
                     width: double.infinity,
                     height: 16,
                     borderRadius: 4,
                   ),
-                  const SizedBox(height: 6),
-                  const SkeletonBox(width: 150, height: 14, borderRadius: 4),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 6),
+                  SkeletonBox(width: 150, height: 14, borderRadius: 4),
+                  SizedBox(height: 8),
                   Row(
-                    children: const [
+                    children: [
                       SkeletonBox(width: 80, height: 12, borderRadius: 6),
                       Spacer(),
                       SkeletonBox(width: 24, height: 24, borderRadius: 12),
@@ -305,19 +308,19 @@ class ListItemSkeleton extends StatelessWidget {
 }
 
 /// Feed loading skeleton with multiple list items
+/// Full-screen loading skeleton for card view (default)
 class FeedLoadingSkeleton extends StatelessWidget {
   final int itemCount;
 
-  const FeedLoadingSkeleton({super.key, this.itemCount = 5});
+  const FeedLoadingSkeleton({super.key, this.itemCount = 3});
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: itemCount,
-      separatorBuilder: (_, __) =>
-          const Divider(height: 1, indent: 116, color: AppColors.divider),
-      itemBuilder: (_, __) => const ListItemSkeleton(),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 40),
+        child: CardStackSkeleton(count: itemCount),
+      ),
     );
   }
 }

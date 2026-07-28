@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/constants.dart';
 
-/// Swipeable card widget for article cards
+/// Smooth swipeable card widget for article cards.
+/// Low swipe threshold (~80px) for easy, fluid swiping.
 class SwipeableCard extends StatefulWidget {
   final Widget child;
   final VoidCallback onSwipeRight;
@@ -15,7 +16,7 @@ class SwipeableCard extends StatefulWidget {
     required this.onSwipeRight,
     required this.onSwipeLeft,
     required this.onTap,
-    this.swipeThreshold = 150.0,
+    this.swipeThreshold = 80.0,
     super.key,
   });
 
@@ -25,7 +26,7 @@ class SwipeableCard extends StatefulWidget {
 
 class _SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
-  static const double _rotationFactor = 0.015;
+  static const double _rotationFactor = 0.01;
   late final AnimationController _controller;
   VoidCallback? _animationListener;
 
@@ -40,14 +41,13 @@ class _SwipeableCardState extends State<SwipeableCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 250),
     );
     _controller.addStatusListener(_onAnimationStatusChanged);
   }
 
   @override
   void dispose() {
-    // Memory leak fix: Explicitly remove all listeners before disposing
     if (_animation != null && _animationListener != null) {
       _animation!.removeListener(_animationListener!);
     }
@@ -80,6 +80,7 @@ class _SwipeableCardState extends State<SwipeableCard>
   void _handlePanUpdate(DragUpdateDetails details) {
     if (_isAnimatingOut) return;
     setState(() {
+      // Multiply delta for 1:1 tracking (1px drag = 1px card movement)
       _position += details.delta;
       _rotation = _position.dx * _rotationFactor;
     });
@@ -88,13 +89,19 @@ class _SwipeableCardState extends State<SwipeableCard>
   void _handlePanEnd(DragEndDetails details) {
     if (_isAnimatingOut) return;
 
-    if (_position.dx.abs() > widget.swipeThreshold) {
-      _animateOut();
-    } else {
+    // If drag is primarily vertical, always snap back
+    if (_position.dy.abs() > _position.dx.abs()) {
       _animateBack();
+      return;
     }
 
-    if (_position.dy.abs() > widget.swipeThreshold) {
+    // Use velocity for smarter swipe detection
+    final velocity = details.velocity.pixelsPerSecond.dx.abs();
+    final hasEnoughVelocity = velocity > 600;
+
+    if (_position.dx.abs() > widget.swipeThreshold || hasEnoughVelocity) {
+      _animateOut();
+    } else {
       _animateBack();
     }
   }
@@ -109,23 +116,17 @@ class _SwipeableCardState extends State<SwipeableCard>
   }
 
   void _animateBack() {
-    // Store old animation to remove its listener
     final oldAnimation = _animation;
     final oldListener = _animationListener;
 
-    _animation = Tween<Offset>(
-      begin: _position,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
-
-    _rotationAnimation = Tween<double>(
-      begin: _rotation,
-      end: 0.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    // Reuse existing Tween objects — only change begin values
+    _animation = Tween<Offset>(begin: _position, end: Offset.zero)
+      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _rotationAnimation = Tween<double>(begin: _rotation, end: 0.0)
+      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.reset();
 
-    // Remove old listener if exists to prevent memory leak
     if (oldAnimation != null && oldListener != null) {
       oldAnimation.removeListener(oldListener);
     }
@@ -145,6 +146,7 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
       label:
@@ -163,10 +165,13 @@ class _SwipeableCardState extends State<SwipeableCard>
                 return Container(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
-                  color: AppColors.textSecondary.withValues(
-                    alpha: _position.dx < 0 ? _position.dx.abs() / 600 : 0,
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurfaceVariant.withValues(
+                      alpha: _position.dx < 0 ? _position.dx.abs() / 400 : 0,
+                    ),
+                    borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
                   ),
-                  child: _position.dx < -50
+                  child: _position.dx < -40
                       ? Center(
                           child: Semantics(
                             label: 'Swipe left to dismiss article',
@@ -175,10 +180,10 @@ class _SwipeableCardState extends State<SwipeableCard>
                               child: Icon(
                                 Icons.close_rounded,
                                 size: 80,
-                                color: AppColors.textSecondary.withValues(
-                                  alpha:
-                                      _position.dx.abs().clamp(50.0, 500.0) /
-                                      500.0,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: _position.dx.abs()
+                                      .clamp(40.0, 400.0) /
+                                      400.0,
                                 ),
                               ),
                             ),
@@ -195,10 +200,13 @@ class _SwipeableCardState extends State<SwipeableCard>
                 return Container(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
-                  color: AppColors.success.withValues(
-                    alpha: _position.dx > 0 ? (_position.dx / 600) * 0.15 : 0,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(
+                      alpha: _position.dx > 0 ? (_position.dx / 400) * 0.12 : 0,
+                    ),
+                    borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
                   ),
-                  child: _position.dx > 50
+                  child: _position.dx > 40
                       ? Center(
                           child: Semantics(
                             label: 'Swipe right to save article',
@@ -207,9 +215,9 @@ class _SwipeableCardState extends State<SwipeableCard>
                               child: Icon(
                                 Icons.favorite_rounded,
                                 size: 80,
-                                color: AppColors.accent.withValues(
-                                  alpha:
-                                      _position.dx.clamp(50.0, 500.0) / 500.0,
+                                color: colorScheme.primary.withValues(
+                                  alpha: _position.dx.clamp(40.0, 400.0) /
+                                      400.0,
                                 ),
                               ),
                             ),

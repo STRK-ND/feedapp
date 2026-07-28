@@ -257,9 +257,9 @@ class _AaPanelState extends State<_AaPanel> {
               ),
             ),
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           Text('Type & spacing', style: AppType.titleLarge(color: ink)),
-          SizedBox(height: AppSpacing.s5),
+          const SizedBox(height: AppSpacing.s5),
           // Live preview
           Container(
             padding: const EdgeInsets.all(AppSpacing.s4),
@@ -276,7 +276,7 @@ class _AaPanelState extends State<_AaPanel> {
               ),
             ),
           ),
-          SizedBox(height: AppSpacing.s5),
+          const SizedBox(height: AppSpacing.s5),
           Row(
             children: [
               Text(
@@ -302,7 +302,7 @@ class _AaPanelState extends State<_AaPanel> {
               widget.onFontSize(v);
             },
           ),
-          SizedBox(height: AppSpacing.s2),
+          const SizedBox(height: AppSpacing.s2),
           Row(
             children: [
               Text(
@@ -328,7 +328,7 @@ class _AaPanelState extends State<_AaPanel> {
               widget.onLineHeight(v);
             },
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
@@ -340,13 +340,13 @@ class _AaPanelState extends State<_AaPanel> {
               style: AppType.bodyMedium(color: AppColors.ink),
             ),
             value: _widenMeasure,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             onChanged: (v) {
               setState(() => _widenMeasure = v);
               widget.onWidenMeasure(v);
             },
           ),
-          SizedBox(height: AppSpacing.s3),
+          const SizedBox(height: AppSpacing.s3),
           // Body font — DM Sans (default) vs Lora (editorial contrast).
           Row(
             children: [
@@ -356,7 +356,7 @@ class _AaPanelState extends State<_AaPanel> {
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.s2),
+          const SizedBox(height: AppSpacing.s2),
           _BodyFontSegment(
             value: _bodyFont,
             onChange: (v) {
@@ -457,7 +457,7 @@ class _Segment extends StatelessWidget {
                 sample,
                 style: style.copyWith(fontSize: 22, height: 1.0),
               ),
-              SizedBox(height: AppSpacing.s2),
+              const SizedBox(height: AppSpacing.s2),
               Text(
                 label,
                 style: AppType.monoEyebrow(

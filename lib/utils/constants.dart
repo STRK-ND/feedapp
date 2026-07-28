@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// View mode enum
 enum ViewMode { cards, list }
@@ -9,10 +9,10 @@ class AppColors {
   AppColors._();
 
   // Primary colors - Stitch Design System
-  static const Color primary = Color(0xFFBF83FC); // Purple (Stitch primary)
-  static const Color primary10 = Color(0x1ABF83FC); // 10% opacity
-  static const Color primary5 = Color(0x0DBF83FC); // 5% opacity
-  static const Color background = Color(0xFF1A1423); // Deep purple (dark mode)
+  static const Color primary = Color(0xFFC4944E); // Warm amber (editorial primary)
+  static const Color primary10 = Color(0x1AC4944E); // 10% opacity
+  static const Color primary5 = Color(0x0DC4944E); // 5% opacity
+  static const Color background = Color(0xFF1A1423); // Deep charcoal (dark mode)
   static const Color backgroundLight = Color(0xFFF7F5F8); // Light mode bg
   static const Color backgroundDark = Color(
     0xFF1A1423,
@@ -35,7 +35,6 @@ class AppColors {
 
   // Category colors - News
   static const Color newsPrimary = Color(0xFFDC2626);
-  static const Color newsSecondary = Color(0xFFEF4444);
 
   // Category colors - Science
   static const Color sciencePrimary = Color(0xFF0891B2);
@@ -47,7 +46,6 @@ class AppColors {
 
   // Category colors - Entertainment
   static const Color entertainmentPrimary = Color(0xFF7C3AED);
-  static const Color entertainmentSecondary = Color(0xFFA78BFA);
 
   // Category colors - Gaming
   static const Color gamingPrimary = Color(0xFF8B5CF6);
@@ -60,8 +58,13 @@ class AppConfig {
 
   // App info
   static const String appName = 'Curated Feeds';
-  static const String appVersion = '1.0.0';
-  static const int appBuildNumber = 1;
+  static String? _cachedVersion;
+
+  /// App version — loaded from PackageInfo, falls back to '0.0.0'
+  static Future<String> getVersion() async {
+    _cachedVersion ??= (await PackageInfo.fromPlatform()).version;
+    return _cachedVersion!;
+  }
 
   // Worker API settings
   static String get workerApiUrl =>
@@ -74,7 +77,6 @@ class AppConfig {
 
   // Cache settings
   static const int maxCachedArticles = 1000;
-  static const int maxImageCacheSizeMB = 100;
 
   // XML parsing limits (for security)
   static const int maxXmlSizeBytes = 5 * 1024 * 1024; // 5MB
@@ -93,44 +95,6 @@ class AppConfig {
   ];
 }
 
-/// Get category color by name
-Color getCategoryColor(String category) {
-  switch (category) {
-    case 'Tech':
-      return AppColors.techPrimary;
-    case 'News':
-      return AppColors.newsPrimary;
-    case 'Sports':
-      return AppColors.sportsPrimary;
-    case 'Entertainment':
-      return AppColors.entertainmentPrimary;
-    case 'Gaming':
-      return AppColors.gamingPrimary;
-    default:
-      return AppColors.primary;
-  }
-}
-
-/// Get category icon by name - Travel-style icons
-IconData getCategoryIcon(String category) {
-  switch (category) {
-    case 'All':
-      return Icons.explore_outlined;
-    case 'Tech':
-      return Icons.computer_outlined;
-    case 'News':
-      return Icons.newspaper_outlined;
-    case 'Sports':
-      return Icons.sports_soccer_outlined;
-    case 'Entertainment':
-      return Icons.movie_outlined;
-    case 'Gaming':
-      return Icons.sports_esports_outlined;
-    default:
-      return Icons.label_outline;
-  }
-}
-
 // ============================================================================
 // Hero Tag Helpers
 // ============================================================================
@@ -147,100 +111,20 @@ class AppCardStyles {
   AppCardStyles._();
 
   // Border radius - Stitch Design System
-  static const double cardRadius = 24.0;
-  static const double imageRadius = 20.0;
-  static const double badgeRadius = 16.0;
-  static const double buttonRadius = 999.0; // Full circular
+  static const double cardRadius = 20.0;
+  static const double imageRadius = 16.0;
+  static const double badgeRadius = 10.0;
+  static const double buttonRadius = 14.0;
 
   // Animation durations - Standardized
   static const Duration microDuration = Duration(milliseconds: 150);    // Haptic feedback, instant
   static const Duration quickDuration = Duration(milliseconds: 250);    // Button states
-  static const Duration pressDuration = Duration(milliseconds: 150);    // Press feedback
   static const Duration standardDuration = Duration(milliseconds: 300); // Default UI transitions
   static const Duration fadeInDuration = Duration(milliseconds: 300);   // Image fade
   static const Duration emphasisDuration = Duration(milliseconds: 400); // FAB, bounce
-  static const Duration bounceDuration = Duration(milliseconds: 400);   // Bounce effect
-  static const Duration emphasisSlowDuration = Duration(milliseconds: 500); // Card entrances
-  static const Duration slowDuration = Duration(milliseconds: 600);     // Stagger animations
   static const Duration staggerDuration = Duration(milliseconds: 700);  // Feed stagger
   static const Duration shimmerDuration = Duration(milliseconds: 1500); // Loading shimmer
-  static const Duration splashDuration = Duration(milliseconds: 800);   // Splash animation
   static const Curve bounceCurve = Curves.easeOutBack;
-
-  /// Standard card shadow (with colored accent)
-  static List<BoxShadow> cardShadow(Color sourceColor) => [
-    BoxShadow(
-      color: sourceColor.withValues(alpha: 0.12),
-      blurRadius: 40,
-      offset: const Offset(0, 20),
-      spreadRadius: -8,
-    ),
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
-      blurRadius: 15,
-      offset: const Offset(0, 8),
-    ),
-  ];
-
-  /// Pressed state shadow (reduced depth)
-  static List<BoxShadow> pressedShadow(Color sourceColor) => [
-    BoxShadow(
-      color: sourceColor.withValues(alpha: 0.2),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-    ),
-  ];
-
-  /// Glassmorphism decoration for cards
-  static BoxDecoration glassDecoration({
-    double radius = cardRadius,
-    double opacity = 0.7,
-    double borderOpacity = 0.3,
-  }) {
-    return BoxDecoration(
-      color: Colors.white.withValues(alpha: opacity),
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withValues(alpha: borderOpacity),
-        width: 1,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.08),
-          blurRadius: 20,
-          offset: const Offset(0, 10),
-        ),
-        BoxShadow(
-          color: Colors.white.withValues(alpha: 0.5),
-          blurRadius: 5,
-          offset: const Offset(0, -2),
-        ),
-      ],
-    );
-  }
-
-  /// Glassmorphism for dark mode
-  static BoxDecoration glassDecorationDark({
-    double radius = cardRadius,
-    double opacity = 0.15,
-    double borderOpacity = 0.1,
-  }) {
-    return BoxDecoration(
-      color: const Color(0xFF1A1B2E).withValues(alpha: opacity),
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withValues(alpha: borderOpacity),
-        width: 1,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.3),
-          blurRadius: 20,
-          offset: const Offset(0, 10),
-        ),
-      ],
-    );
-  }
 
   /// Category chip glass effect
   static BoxDecoration chipDecoration(Color color) {
@@ -258,7 +142,7 @@ class AppCardStyles {
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.15),
+          color: AppColors.primary.withValues(alpha: 0.10),
           blurRadius: 40,
           offset: const Offset(0, -20),
         ),
@@ -287,7 +171,6 @@ class BentoGridConfig {
   /// Card aspect ratios
   static const double standardRatio = 1.2; // 1x1 standard
   static const double wideRatio = 0.6; // 2x1 featured
-  static const double tallRatio = 1.8; // 1x2 vertical
 
   /// Breakpoints for responsive columns
   static const int phoneColumns = 2;
@@ -303,56 +186,56 @@ class BentoGridConfig {
   }
 }
 
-/// App-wide text theme
-final appTextTheme = GoogleFonts.lexendTextTheme().copyWith(
-  headlineLarge: GoogleFonts.lexend(
-    fontSize: 48,
-    fontWeight: FontWeight.w700,
-    letterSpacing: -0.5,
-    color: AppColors.textPrimary,
-  ),
-  headlineMedium: GoogleFonts.lexend(
-    fontSize: 32,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.3,
-    color: AppColors.textPrimary,
-  ),
-  headlineSmall: GoogleFonts.lexend(
-    fontSize: 24,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.2,
-    color: AppColors.textPrimary,
-  ),
-  titleLarge: GoogleFonts.lexend(
-    fontSize: 22,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.2,
-    color: AppColors.textPrimary,
-  ),
-  titleMedium: GoogleFonts.lexend(
-    fontSize: 18,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.1,
-    color: AppColors.textPrimary,
-  ),
-  bodyLarge: GoogleFonts.lexend(
-    fontSize: 16,
-    fontWeight: FontWeight.w400,
-    letterSpacing: 0.1,
-    color: AppColors.textPrimary,
-    height: 1.6,
-  ),
-  bodyMedium: GoogleFonts.lexend(
-    fontSize: 14,
-    fontWeight: FontWeight.w400,
-    letterSpacing: 0.1,
-    color: AppColors.textPrimary,
-    height: 1.5,
-  ),
-  labelLarge: GoogleFonts.lexend(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.3,
-    color: AppColors.textPrimary,
-  ),
-);
+// ============================================================================
+// Curved Bottom Navigation Bar Tokens
+// ============================================================================
+
+/// Design tokens for the premium curved bottom navigation bar
+class CurvedNavTokens {
+  CurvedNavTokens._();
+
+  // Dimensions
+  static const double barHeight = 72.0;
+  static const double barRadius = 28.0;
+  static const double barBottomMargin = 16.0;
+  static const double barHorizontalPadding = 16.0;
+  static const double itemPadding = 16.0;
+  static const double iconSize = 24.0;
+  static const double iconScaleSelected = 1.15;
+  static const double labelFontSize = 11.0;
+  static const double indicatorCornerRadius = 14.0;
+  static const double indicatorDomeHeight = 6.0;
+  static const double indicatorTopInset = 6.0;
+  static const double indicatorBottomInset = 6.0;
+
+  // Glassmorphism
+  static const double blurSigmaX = 12.0;
+  static const double blurSigmaY = 12.0;
+
+  // Light mode colors
+  static const Color lightBarFill = Color(0xFFFFFFFF);
+  static const double lightBarFillAlpha = 0.72;
+  static const Color lightBarBorder = Color(0xFFFFFFFF);
+  static const double lightBarBorderAlpha = 0.5;
+  static const Color lightIndicatorFill = AppColors.primary;
+  static const double lightIndicatorFillAlpha = 0.18;
+  static const double lightGlowAlpha = 0.15;
+
+  // Dark mode colors
+  static const Color darkBarFill = Color(0xFF1A1B2E);
+  static const double darkBarFillAlpha = 0.18;
+  static const Color darkBarBorder = Color(0xFFFFFFFF);
+  static const double darkBarBorderAlpha = 0.08;
+  static const Color darkIndicatorFill = AppColors.primary;
+  static const double darkIndicatorFillAlpha = 0.2;
+  static const double darkGlowAlpha = 0.2;
+
+  // Animations
+  static const Duration slideDuration = Duration(milliseconds: 300);
+  static const Duration iconDuration = Duration(milliseconds: 250);
+  static const Duration labelDuration = Duration(milliseconds: 300);
+  static const Curve slideCurve = Curves.easeOutCubic;
+  static const Curve iconCurve = Curves.easeOutBack;
+  static const Curve labelCurve = Curves.easeOutCubic;
+}
+

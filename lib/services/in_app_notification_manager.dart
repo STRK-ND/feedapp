@@ -13,7 +13,7 @@ class InAppNotificationManager extends ChangeNotifier {
   final Map<String, Timer> _dismissTimers = {};
 
   bool _isEnabled = true;
-  Duration _displayDuration = const Duration(seconds: 4);
+  static const Duration displayDuration = Duration(seconds: 4);
 
   List<InAppNotification> get notifications => List.unmodifiable(_notifications);
   Stream<InAppNotification> get notificationStream {
@@ -21,17 +21,10 @@ class InAppNotificationManager extends ChangeNotifier {
     return _notificationStreamController!.stream;
   }
   bool get isEnabled => _isEnabled;
-  Duration get displayDuration => _displayDuration;
 
   /// Enable or disable in-app notifications
   void setEnabled(bool enabled) {
     _isEnabled = enabled;
-    notifyListeners();
-  }
-
-  /// Set display duration for notifications
-  void setDisplayDuration(Duration duration) {
-    _displayDuration = duration;
     notifyListeners();
   }
 
@@ -56,7 +49,7 @@ class InAppNotificationManager extends ChangeNotifier {
     notifyListeners();
 
     // Auto-dismiss after duration - track the timer
-    _dismissTimers[notification.id] = Timer(_displayDuration, () {
+    _dismissTimers[notification.id] = Timer(displayDuration, () {
       _dismissTimers.remove(notification.id);
       dismissNotification(notification.id);
     });

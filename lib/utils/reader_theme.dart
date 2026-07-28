@@ -5,6 +5,7 @@
 /// `sepia` is the warm paperback.
 /// `eInk` is OLED true-black with warm white.
 /// `paper` is the cream-paper light.
+library;
 import 'package:flutter/material.dart';
 import 'design_tokens.dart';
 

@@ -64,7 +64,7 @@ class ListArticleCard extends StatelessWidget {
                       Container(
                         width: 6,
                         height: 6,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
@@ -88,14 +88,14 @@ class ListArticleCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   article.title,
                   style: AppType.titleLarge(color: ink)
                       .copyWith(fontSize: 19, height: 1.22),
                 ),
                 if (article.description.isNotEmpty) ...[
-                  SizedBox(height: AppSpacing.s2),
+                  const SizedBox(height: AppSpacing.s2),
                   Text(
                     article.description,
                     style: AppType.bodyMedium(color: soft),
@@ -103,7 +103,7 @@ class ListArticleCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                SizedBox(height: AppSpacing.s3),
+                const SizedBox(height: AppSpacing.s3),
                 Consumer<SettingsNotifier>(
                   builder: (context, settings, _) {
                     if (!settings.showImages) return const SizedBox.shrink();
@@ -120,14 +120,14 @@ class ListArticleCard extends StatelessWidget {
                           fadeInDuration: AppMotion.base,
                           placeholder: (context, _) =>
                               Container(color: ruleColor),
-                          errorWidget: (context, _, __) =>
+                          errorWidget: (context, _, _) =>
                               Container(color: ruleColor),
                         ),
                       ),
                     );
                   },
                 ),
-                SizedBox(height: AppSpacing.s3),
+                const SizedBox(height: AppSpacing.s3),
                 // Hairline — keep a fixed slot so trailing border aligns.
                 SizedBox(
                   height: 0.5,

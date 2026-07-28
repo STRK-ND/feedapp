@@ -5,12 +5,12 @@ void main() {
   group('Helpers - String Operations', () {
     group('stripHtmlTags', () {
       test('Should remove HTML tags from string', () {
-        final input = '<p>Hello <strong>World</strong></p>';
+        const input = '<p>Hello <strong>World</strong></p>';
         expect(Helpers.stripHtmlTags(input), 'Hello World');
       });
 
       test('Should remove multiple HTML tags', () {
-        final input = '<div><p>Test</p><span>Content</span></div>';
+        const input = '<div><p>Test</p><span>Content</span></div>';
         expect(Helpers.stripHtmlTags(input), 'TestContent');
       });
 
@@ -19,12 +19,12 @@ void main() {
       });
 
       test('Should remove nested tags', () {
-        final input = '<div><p><strong>Bold</strong> text</p></div>';
+        const input = '<div><p><strong>Bold</strong> text</p></div>';
         expect(Helpers.stripHtmlTags(input), 'Bold text');
       });
 
       test('Should preserve text content', () {
-        final input = 'Plain text with <b>bold</b> and <i>italic</i>';
+        const input = 'Plain text with <b>bold</b> and <i>italic</i>';
         expect(Helpers.stripHtmlTags(input), 'Plain text with bold and italic');
       });
     });
@@ -103,28 +103,5 @@ void main() {
       });
     });
 
-    group('generateHash', () {
-      test('Should generate consistent hash for same input', () {
-        final hash1 = Helpers.generateHash('test');
-        final hash2 = Helpers.generateHash('test');
-        expect(hash1, hash2);
-      });
-
-      test('Should generate different hashes for different inputs', () {
-        final hash1 = Helpers.generateHash('test1');
-        final hash2 = Helpers.generateHash('test2');
-        expect(hash1, isNot(hash2));
-      });
-
-      test('Should handle empty string', () {
-        final hash = Helpers.generateHash('');
-        expect(hash, isA<int>());
-      });
-
-      test('Should handle special characters', () {
-        final hash = Helpers.generateHash(r'test!@#$%^&*()');
-        expect(hash, isA<int>());
-      });
-    });
   });
 }

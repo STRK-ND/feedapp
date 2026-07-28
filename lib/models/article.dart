@@ -1,4 +1,5 @@
 /// Article Model
+library;
 import '../utils/helpers.dart';
 
 class Article {
@@ -95,7 +96,7 @@ class Article {
       sourceName: json['sourceName'] as String? ?? 'Unknown Source',
       pubDate: _parsePubDate(json['pubDate']),
       author: json['author'] as String?,
-      imageUrl: json['imageUrl'] as String?,
+      imageUrl: imageUrl,
       sourceCategory: json['sourceCategory'] as String?,
       sourceColor: json['sourceColor'] as String?,
       sourceIcon: json['sourceIcon'] as String?,

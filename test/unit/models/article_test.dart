@@ -56,7 +56,7 @@ void main() {
     });
 
     test('Should create Article from JSON correctly', () {
-      final timestamp = 1705314600000;
+      const timestamp = 1705314600000;
 
       final json = {
         'id': 'test-id-2',

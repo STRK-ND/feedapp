@@ -98,7 +98,7 @@ class FolioRule extends StatelessWidget {
     final top = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
     final bottom = isDark ? AppColors.paperOnGround : AppColors.ink;
     final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
-    final accent = AppColors.primary;
+    const accent = AppColors.primary;
     final hasUnread = unreadCount > 0;
 
     return Container(

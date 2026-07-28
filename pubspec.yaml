@@ -27,6 +27,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # In-App Purchase
+  in_app_purchase: ^3.2.0
+
   # Storage
   shared_preferences: ^2.3.4
   flutter_secure_storage: ^10.0.0

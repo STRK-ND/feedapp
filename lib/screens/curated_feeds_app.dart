@@ -149,7 +149,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ));
       }
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBar(const SnackBar(
         content: Text("Couldn't auto-update. Tap the update banner."),
       ));
       debugPrint('[MainNavigation] auto-update threw: $e');

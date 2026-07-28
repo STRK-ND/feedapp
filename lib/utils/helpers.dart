@@ -131,77 +131,40 @@ class Helpers {
     return false;
   }
 
-  /// Parse a custom date format (e.g., "15 Jan 2024")
-  static DateTime parseCustomDate(String dateStr) {
-    final months = {
-      'Jan': 1,
-      'Feb': 2,
-      'Mar': 3,
-      'Apr': 4,
-      'May': 5,
-      'Jun': 6,
-      'Jul': 7,
-      'Aug': 8,
-      'Sep': 9,
-      'Oct': 10,
-      'Nov': 11,
-      'Dec': 12,
-    };
-
-    final parts = dateStr.split(' ');
-    if (parts.length >= 5) {
-      try {
-        final day = int.parse(parts[1].replaceAll(',', ''));
-        final month = months[parts[2]];
-        final year = int.parse(parts[3]);
-        return DateTime(year, month ?? 1, day);
-      } catch (e) {
-        return DateTime.now();
-      }
-    }
-    return DateTime.now();
-  }
-
-  /// Parse date, trying ISO format first, falls back to custom format
+  /// Parse date, trying ISO format first, falls back to null
   static DateTime parseDate(String dateString) {
-    try {
-      return DateTime.parse(dateString);
-    } catch (e) {
-      try {
-        return parseCustomDate(dateString);
-      } catch (e2) {
-        return DateTime.now();
-      }
-    }
+    return DateTime.tryParse(dateString) ?? DateTime.now();
   }
 
   /// Validate URL format
   static bool isValidUrl(String url) {
-    try {
-      final uri = Uri.parse(url);
-      return uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
-    } catch (e) {
-      return false;
-    }
+    final uri = Uri.tryParse(url);
+    return uri != null && uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
-  /// Generate a hash from a string (for article IDs)
-  static int generateHash(String input) {
-    return _hashCode(input);
-  }
+  /// Compare two semver version strings. Returns true if [latest] > [current].
+  static bool isNewerVersion(String current, String latest) {
+    // Strip build number and 'v' prefix
+    if (current.contains('+')) current = current.split('+')[0];
+    if (latest.contains('+')) latest = latest.split('+')[0];
+    if (latest.startsWith('v')) latest = latest.substring(1);
 
-  static int _hashCode(String string) {
-    var hash = 0xcbf29ce4.toUnsigned(32);
+    final currentParts = current.split('.')..removeWhere((e) => e.isEmpty);
+    final latestParts = latest.split('.')..removeWhere((e) => e.isEmpty);
 
-    for (var i = 0; i < string.length; i++) {
-      final codeUnit = string.codeUnitAt(i);
-      hash = (hash ^ (codeUnit >> 8)).toUnsigned(64);
-      hash = (hash * 0x100000001b3).toUnsigned(64);
-      hash = (hash ^ (codeUnit & 0xFF)).toUnsigned(64);
-      hash = (hash * 0x100000001b3).toUnsigned(64);
+    for (int i = 0; i < 3; i++) {
+      final currentNum = i < currentParts.length
+          ? int.tryParse(currentParts[i]) ?? 0
+          : 0;
+      final latestNum = i < latestParts.length
+          ? int.tryParse(latestParts[i]) ?? 0
+          : 0;
+
+      if (latestNum > currentNum) return true;
+      if (latestNum < currentNum) return false;
     }
 
-    return hash;
+    return false;
   }
 
   /// Filter articles by search query across title, description, and source name

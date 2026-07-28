@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
@@ -20,32 +21,6 @@ class ArticleContentService {
   ArticleContentService({http.Client? httpClient})
       : _httpClient = httpClient ?? http.Client();
 
-  /// Map of domain-specific CSS selectors for article content
-  final Map<String, List<String>> _domainSelectors = {
-    'techcrunch.com': [
-      '.article-entry',
-      'article .entry-content',
-      '.post-content',
-      'article p',
-    ],
-    'theverge.com': [
-      '.c-entry-content',
-      'article .duvet--article-body',
-      '.article-body',
-      '[data-component="ArticleBody"] p',
-    ],
-    'bbc.com': [
-      '.ssrcss-11r1m41-RichTextComponent',
-      'article p',
-      '.story-body p',
-    ],
-    'variety.com': [
-      '.article-content',
-      'article p',
-      '.story-body p',
-    ],
-  };
-
   /// Fetch full article content from URL with images
   Future<ArticleContent> fetchArticleContentWithImages(String url) async {
     debugPrint('[ArticleContent] Fetching content from: $url');
@@ -55,12 +30,14 @@ class ArticleContentService {
           .get(
             Uri.parse(url),
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36',
+              'User-Agent': defaultTargetPlatform == TargetPlatform.android
+                  ? 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'
+                  : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
               'Accept': 'text/html,application/xhtml+xml',
             },
           )
           .timeout(
-            Duration(seconds: AppConfig.rssTimeoutSeconds),
+            const Duration(seconds: AppConfig.rssTimeoutSeconds),
           );
 
       if (response.statusCode != 200) {
@@ -75,24 +52,7 @@ class ArticleContentService {
       final images = _extractImages(document, url);
       debugPrint('[ArticleContent] Found ${images.length} images');
 
-      // Try domain-specific selectors first
-      final uri = Uri.parse(url);
-      final domain = uri.host.replaceFirst('www.', '');
-
-      for (final domainPattern in _domainSelectors.keys) {
-        if (domain.contains(domainPattern)) {
-          final selectors = _domainSelectors[domainPattern]!;
-          for (final selector in selectors) {
-            final content = _extractContentBySelector(document, selector);
-            if (content.isNotEmpty) {
-              debugPrint('[ArticleContent] Found content using selector: $selector');
-              return ArticleContent(text: content, images: images);
-            }
-          }
-        }
-      }
-
-      // Fallback: Try generic selectors
+      // Try generic selectors
       final genericSelectors = [
         'article',
         '[role="article"]',
@@ -134,7 +94,7 @@ class ArticleContentService {
       );
     } catch (e) {
       debugPrint('[ArticleContent] Error fetching content: $e');
-      ErrorHandler.logError('Error fetching article content', error: e);
+      unawaited(ErrorHandler.logError('Error fetching article content', error: e));
       return ArticleContent(
         text: 'Failed to load article content. Please tap "Open in browser" to read the full article.',
         images: [],
@@ -177,10 +137,8 @@ class ArticleContentService {
         
         if (src != null && src.isNotEmpty) {
           // Skip base64 images, tracking pixels, icons
-          if (src.startsWith('data:') || 
-              src.contains('pixel') || 
-              src.contains('icon') ||
-              src.contains('logo') && !src.contains('article')) {
+          if (src.startsWith('data:') ||
+              (src.contains('pixel') || src.contains('icon') || src.contains('logo')) && !src.contains('article')) {
             continue;
           }
 
@@ -217,23 +175,23 @@ class ArticleContentService {
 
     if (elements.isEmpty) return '';
 
-    final textBuilder = StringBuilder();
+    final textBuilder = StringBuffer();
 
     for (final element in elements) {
       // Skip if this is a container element with nested elements
       if (element.children.isNotEmpty) {
-        // Extract text from child elements recursively
-        final text = _extractTextFromElement(element);
-        if (text.isNotEmpty && text.length > 50) {
-          textBuilder.add(text);
-          textBuilder.add('\n\n');
+        // Extract text from child elements recursively, clean once at the end
+        final text = cleanText(_extractTextFromElement(element));
+        if (text.isNotEmpty && text.length > 20) {
+          textBuilder.write(text);
+          textBuilder.write('\n\n');
         }
       } else {
         // Direct text content
         final text = element.text.trim();
-        if (text.isNotEmpty && text.length > 50) {
-          textBuilder.add(text);
-          textBuilder.add('\n\n');
+        if (text.isNotEmpty && text.length > 20) {
+          textBuilder.write(text);
+          textBuilder.write('\n\n');
         }
       }
     }
@@ -243,7 +201,7 @@ class ArticleContentService {
 
   /// Extract clean text from an element, removing unwanted content
   String _extractTextFromElement(dom.Element element) {
-    final textBuilder = StringBuilder();
+    final textBuilder = StringBuffer();
     bool hasContent = false;
 
     // Get all text nodes and paragraph elements
@@ -251,8 +209,8 @@ class ArticleContentService {
       if (node.nodeType == dom.Node.TEXT_NODE) {
         final text = node.text?.trim() ?? '';
         if (text.isNotEmpty) {
-          textBuilder.add(text);
-          textBuilder.add(' ');
+          textBuilder.write(text);
+          textBuilder.write(' ');
           hasContent = true;
         }
       } else if (node is dom.Element) {
@@ -260,35 +218,38 @@ class ArticleContentService {
 
         // Skip these elements
         if (tagName != null && [
-          'script', 'style', 'nav', 'header', 'footer', 
+          'script', 'style', 'nav', 'header', 'footer',
           'aside', 'iframe', 'video', 'audio', 'figure'
         ].contains(tagName)) {
           continue;
         }
 
         // Add paragraph breaks
-        if (tagName == 'p' || tagName == 'div' || 
+        if (tagName == 'p' || tagName == 'div' ||
             (tagName != null && tagName.startsWith('h'))) {
           if (hasContent) {
-            textBuilder.add('\n\n');
+            textBuilder.write('\n\n');
           }
         }
 
         // Recursively process child elements
         final childText = _extractTextFromElement(node);
         if (childText.isNotEmpty) {
-          textBuilder.add(childText);
+          textBuilder.write(childText);
           hasContent = true;
         }
       }
     }
 
-    return cleanText(textBuilder.toString());
+    return textBuilder.toString();
   }
 
   /// Clean extracted text - enhanced to strip HTML, URLs, and RSS artifacts
   String cleanText(String text) {
     if (text.isEmpty) return text;
+
+    // Decode HTML entities first (before stripping tags/URLs)
+    text = _decodeHtmlEntities(text);
 
     // Strip HTML tags using regex
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
@@ -301,9 +262,6 @@ class ArticleContentService {
     text = text.replaceAll(RegExp(r'\[(?:\+ ?|More|Read More)\]'), '');
     text = text.replaceAll(RegExp(r'\[\+\]'), '');
     text = text.replaceAll(RegExp(r'\[MORE\]', caseSensitive: false), '');
-
-    // Decode HTML entities (both named and numeric)
-    text = _decodeHtmlEntities(text);
 
     // Remove extra whitespace
     text = text.replaceAll(RegExp(r'\s+'), ' ');
@@ -377,19 +335,5 @@ class ArticleContentService {
         .replaceAll('&bull;', '•')
         .replaceAll('&middot;', '·')
         .replaceAll('&deg;', '°');
-  }
-}
-
-/// Simple string builder for efficient concatenation
-class StringBuilder {
-  final List<String> _parts = [];
-
-  void add(String part) {
-    _parts.add(part);
-  }
-
-  @override
-  String toString() {
-    return _parts.join('');
   }
 }

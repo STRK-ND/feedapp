@@ -22,7 +22,6 @@ import '../widgets/bento_saved_articles.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/grain_overlay.dart';
 import '../utils/constants.dart';
-import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
@@ -231,9 +230,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         });
       }
 
-      if (_isOnline) _refreshFeeds();
+      if (_isOnline) unawaited(_refreshFeeds());
     } catch (e) {
-      ErrorHandler.logError('Failed to load data', error: e);
+      unawaited(ErrorHandler.logError('Failed to load data', error: e));
       if (mounted) {
         setState(() {
           _articles = [];
@@ -263,7 +262,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         await _storage.saveSavedArticles(_savedArticles);
         await _storage.saveLastRefreshTime(_lastRefreshTime);
       } catch (e) {
-        ErrorHandler.logError('Failed to save articles', error: e);
+        unawaited(ErrorHandler.logError('Failed to save articles', error: e));
       }
     });
   }
@@ -358,7 +357,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       }
     } catch (e) {
       debugPrint('[Feed] ERROR during refresh: $e');
-      ErrorHandler.logError('Failed to refresh feeds', error: e);
+      unawaited(ErrorHandler.logError('Failed to refresh feeds', error: e));
       if (!mounted) return;
       setState(() {
         _errorMessage = ErrorHandler.getUserMessage(e);
@@ -1018,12 +1017,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         }
                       }
                     } else if (value == 'settings') {
-                      Navigator.push(
+                      unawaited(Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const SettingsScreen(),
                         ),
-                      );
+                      ));
                     }
                   },
                   itemBuilder: (context) => const [

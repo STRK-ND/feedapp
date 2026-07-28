@@ -35,7 +35,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
     );
 
     _progressController = AnimationController(
-      duration: const Duration(seconds: 4),
+      duration: InAppNotificationManager.displayDuration,
       vsync: this,
     );
 
@@ -53,7 +53,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
   void _startDismissTimer() {
     _dismissTimer?.cancel();
     _progressController.forward(from: 0);
-    _dismissTimer = Timer(const Duration(seconds: 4), () {
+    _dismissTimer = Timer(InAppNotificationManager.displayDuration, () {
       if (!_isHovering && mounted) {
         _dismiss();
       }
@@ -88,7 +88,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final type = widget.notification.type;
 
     return AnimatedBuilder(
@@ -108,7 +108,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
               onTap: _onTap,
               onHorizontalDragEnd: (details) {
                 if (details.primaryVelocity != null &&
-                    details.primaryVelocity!.abs() > 100) {
+                    details.primaryVelocity!.abs() > 300) {
                   _dismiss();
                 }
               },
@@ -128,24 +128,24 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+                    color: colorScheme.surface,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: type.backgroundColor.withValues(alpha:0.3),
+                        color: type.backgroundColor.withValues(alpha: 0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                         spreadRadius: -4,
                       ),
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.15),
+                        color: type.backgroundColor.withValues(alpha: 0.10),
                         blurRadius: 30,
                         offset: const Offset(0, 12),
                         spreadRadius: -8,
                       ),
                     ],
                     border: Border.all(
-                      color: type.backgroundColor.withValues(alpha:0.2),
+                      color: type.backgroundColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -162,7 +162,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                               value: _isHovering ? null : _progressController.value,
                               backgroundColor: Colors.transparent,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                type.backgroundColor.withValues(alpha:0.6),
+                                type.backgroundColor.withValues(alpha: 0.6),
                               ),
                               minHeight: 3,
                             );
@@ -178,7 +178,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: type.backgroundColor.withValues(alpha:0.15),
+                                  color: type.backgroundColor.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -198,9 +198,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1A1A1A),
+                                        color: colorScheme.onSurface,
                                         height: 1.3,
                                       ),
                                       maxLines: 2,
@@ -212,9 +210,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w400,
-                                        color: isDark
-                                            ? Colors.white70
-                                            : const Color(0xFF666666),
+                                        color: colorScheme.onSurfaceVariant,
                                         height: 1.4,
                                       ),
                                       maxLines: 2,
@@ -226,21 +222,21 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                               // Dismiss button
                               GestureDetector(
                                 onTap: _dismiss,
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha:0.05)
-                                        : Colors.black.withValues(alpha:0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.close,
-                                    color: isDark
-                                        ? Colors.white54
-                                        : Colors.black54,
-                                    size: 16,
+                                child: Semantics(
+                                  button: true,
+                                  label: 'Dismiss notification',
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.close,
+                                      color: colorScheme.onSurfaceVariant,
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
                               ),

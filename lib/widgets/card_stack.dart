@@ -9,7 +9,6 @@ import '../providers/settings_notifier.dart';
 import '../utils/constants.dart';
 import 'swipeable_card.dart';
 import 'stitch/stitch_widgets.dart';
-import '../utils/read_time_calculator.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
 /// Features: Glassmorphism, tactile press, hero image fade-in
@@ -107,20 +106,23 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     int imageMaxWidth,
   ) {
     final sourceCategory = article.sourceCategory ?? 'Technology';
-    final readTime = ReadTimeCalculator.calculateReadTime(article.description);
+    final descText = article.description;
+    final readTime = descText.isEmpty ? 1 : (descText.split(RegExp(r'\s+')).length / 200).ceil().clamp(1, 999);
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = colorScheme.brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: () {
-        if (isFront) {
-          widget.onTap(index);
-        }
-      },
-      child: Container(
+    return Semantics(
+      button: true,
+      label: 'Article: ${article.title}. ${isFront ? 'Tap to read, swipe right to save, swipe left to dismiss.' : ''}',
+      child: GestureDetector(
+        onTap: () {
+          if (isFront) {
+            widget.onTap(index);
+          }
+        },
+        child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
           color: colorScheme.surface,
           boxShadow: [
             BoxShadow(
@@ -131,7 +133,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
           child: AspectRatio(
             aspectRatio: 3 / 4,
             child: Stack(
@@ -147,6 +149,11 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
  fit: BoxFit.cover,
  cacheManager: AppCacheManager(),
  memCacheWidth: imageMaxWidth,
+ placeholder: (context, url) => Container(color: colorScheme.surfaceContainerHighest),
+ errorWidget: (context, url, error) => Container(
+   color: colorScheme.surfaceContainerHighest,
+   child: Icon(Icons.broken_image_outlined, color: colorScheme.onSurfaceVariant),
+ ),
  )
  : Container(color: colorScheme.surfaceContainerHighest),
  ),
@@ -175,12 +182,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         // Title
                         Text(
                           article.title,
-                          style: GoogleFonts.lexend(
+                          style: GoogleFonts.playfairDisplay(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? Colors.white
-                                : colorScheme.onSurface,
+                            color: colorScheme.onSurface,
                             height: 1.2,
                           ),
                           maxLines: 3,
@@ -192,9 +197,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         Text(
                           article.description,
                           style: TextStyle(
-                            color:
-                                (isDark ? Colors.white : colorScheme.onSurface)
-                                    .withValues(alpha: 0.8),
+                            color: colorScheme.onSurface.withValues(alpha: 0.8),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             height: 1.5,
@@ -210,11 +213,13 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 10,
+                              vertical: 15,
                             ),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: BorderRadius.circular(
+                                AppCardStyles.buttonRadius,
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -245,6 +250,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
             ),
           ),
         ),
+      ),
       ),
     );
   }

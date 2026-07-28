@@ -41,22 +41,16 @@ class FilterParams {
     DateTime? since,
     DateTime? until,
     SortOption? sortBy,
-    bool clearCategory = false,
-    bool clearSources = false,
-    bool clearSearch = false,
-    bool clearSince = false,
-    bool clearUntil = false,
-    bool clearSortBy = false,
   }) {
     return FilterParams(
       page: page ?? this.page,
       pageSize: pageSize ?? this.pageSize,
-      category: clearCategory ? null : (category ?? this.category),
-      sources: clearSources ? null : (sources ?? this.sources),
-      searchQuery: clearSearch ? null : (searchQuery ?? this.searchQuery),
-      since: clearSince ? null : (since ?? this.since),
-      until: clearUntil ? null : (until ?? this.until),
-      sortBy: clearSortBy ? null : (sortBy ?? this.sortBy),
+      category: category ?? this.category,
+      sources: sources ?? this.sources,
+      searchQuery: searchQuery ?? this.searchQuery,
+      since: since ?? this.since,
+      until: until ?? this.until,
+      sortBy: sortBy ?? this.sortBy,
     );
   }
 
@@ -90,15 +84,6 @@ class FilterParams {
     }
 
     return params;
-  }
-
-  /// Build a URL with query parameters
-  String buildUrl(String baseUrl) {
-    final params = toQueryParams();
-    if (params.isEmpty) return baseUrl;
-
-    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
-    return uri.toString();
   }
 }
 

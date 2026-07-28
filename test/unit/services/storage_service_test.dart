@@ -1,15 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:curatedfeeds/services/storage_service.dart';
-import 'package:curatedfeeds/services/key_value_storage.dart';
 import 'package:curatedfeeds/models/article.dart';
 
 void main() {
   group('StorageService', () {
     late StorageService service;
-    late MockKeyValueStorage mockStorage;
+    late MockFlutterSecureStorage mockStorage;
 
     setUp(() {
-      mockStorage = MockKeyValueStorage();
+      mockStorage = MockFlutterSecureStorage();
       service = StorageService(storage: mockStorage);
     });
 
@@ -185,14 +186,31 @@ Article _makeArticle({
   );
 }
 
-class MockKeyValueStorage implements KeyValueStorage {
+class MockFlutterSecureStorage implements FlutterSecureStorage {
   final Map<String, String> store = {};
 
   @override
-  Future<String?> read(String key) async => store[key];
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => store[key];
 
   @override
-  Future<void> write(String key, String? value) async {
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
     if (value == null) {
       store.remove(key);
     } else {
@@ -201,12 +219,87 @@ class MockKeyValueStorage implements KeyValueStorage {
   }
 
   @override
-  Future<void> delete(String key) async {
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
     store.remove(key);
   }
 
   @override
-  Future<void> deleteAll() async {
+  Future<void> deleteAll({
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
     store.clear();
   }
+
+  @override
+  Future<Map<String, String>> readAll({
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => Map.from(store);
+
+  @override
+  Future<bool> containsKey({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => store.containsKey(key);
+
+  @override
+  IOSOptions get iOptions => IOSOptions.defaultOptions;
+
+  @override
+  AndroidOptions get aOptions => const AndroidOptions();
+
+  @override
+  LinuxOptions get lOptions => const LinuxOptions();
+
+  @override
+  WebOptions get webOptions => const WebOptions();
+
+  @override
+  MacOsOptions get mOptions => MacOsOptions.defaultOptions;
+
+  @override
+  WindowsOptions get wOptions => const WindowsOptions();
+
+  @override
+  Future<bool?> isCupertinoProtectedDataAvailable() async => false;
+
+  @override
+  Map<String, List<ValueChanged<String?>>> get getListeners => {};
+
+  @override
+  void registerListener({required String key, required ValueChanged<String?> listener}) {}
+
+  @override
+  void unregisterListener({required String key, required ValueChanged<String?> listener}) {}
+
+  @override
+  void unregisterAllListeners() {}
+
+  @override
+  void unregisterAllListenersForKey({required String key}) {}
+
+  @override
+  Stream<bool>? get onCupertinoProtectedDataAvailabilityChanged => null;
 }

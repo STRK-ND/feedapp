@@ -35,6 +35,9 @@ class SettingsNotifier extends ChangeNotifier {
   String _viewMode = 'stack'; // 'stack' | 'continuous'
   int _edition = 1;
 
+  // ----- Monetization -----
+  bool _isPro = false;
+
   SettingsNotifier(this._settingsService);
 
   // Getters
@@ -54,6 +57,7 @@ class SettingsNotifier extends ChangeNotifier {
   String get bodyFont => _bodyFont;
   String get viewMode => _viewMode;
   int get edition => _edition;
+  bool get isPro => _isPro;
 
   ReadingPreferences get readingPrefs => ReadingPreferences(
         theme: _readerTheme,
@@ -86,6 +90,7 @@ class SettingsNotifier extends ChangeNotifier {
       _settingsService.getBodyFont(),
       _settingsService.getFeedViewMode(),
       _settingsService.getEditionNumber(),
+      _settingsService.getIsPro(),
     ]);
 
     _showImages = results[0] as bool;
@@ -102,6 +107,7 @@ class SettingsNotifier extends ChangeNotifier {
     _bodyFont = results[11] as String;
     _viewMode = results[12] as String;
     _edition = results[13] as int;
+    _isPro = results[14] as bool;
 
     try {
       notifyListeners();
@@ -206,6 +212,12 @@ class SettingsNotifier extends ChangeNotifier {
     _edition = next;
     notifyListeners();
     return next;
+  }
+
+  Future<void> setIsPro(bool value) async {
+    _isPro = value;
+    await _settingsService.setIsPro(value);
+    notifyListeners();
   }
 
   /// Reload a single field from the disk and notify — useful when an

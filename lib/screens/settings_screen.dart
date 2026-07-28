@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
-import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
@@ -14,7 +13,7 @@ import '../utils/design_tokens.dart';
 import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
 import 'sources_screen.dart' show SourcesScreen;
-import '../widgets/folio_rule.dart';
+import 'paywall_screen.dart';
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -188,6 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final fontSizePt = '${prefs.fontSize.round()} pt';
         final cachedArticles = _cachedArticles;
         final savedArticles = _savedArticles;
+        final isPro = notifier.isPro;
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -389,8 +389,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('Support'),
-          _buildSectionHeader('Support'),
           _buildSettingsCard([
+            _buildActionTile(
+              icon: Icons.workspace_premium_outlined,
+              title: isPro ? 'Pro' : 'Support the app',
+              subtitle:
+                  isPro ? 'Thanks for your support!' : 'One-time purchase, yours forever',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                );
+              },
+            ),
+            _buildDivider(),
             _buildActionTile(
               icon: Icons.bug_report_outlined,
               title: 'Report bug / Join Community',
@@ -436,7 +447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: AppColors.primary.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
-        child: Icon(
+        child: const Icon(
           Icons.menu_book_outlined,
           size: 20,
           color: AppColors.primary,
@@ -701,7 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label,
                   style: AppType.folioTop(color: AppColors.primary),
                 ),
-                SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: AppSpacing.s2),
                 Row(
                   children: [
                     Container(
@@ -827,17 +838,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
-  IconData _getThemeIcon(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.system:
-        return Icons.brightness_auto_outlined;
-      case ThemeMode.light:
-        return Icons.light_mode_outlined;
-      case ThemeMode.dark:
-        return Icons.dark_mode_outlined;
-    }
-  }
 }
 
 /// Bottom sheet for editing reading preferences from Settings.
@@ -902,9 +902,9 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               ),
             ),
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           Text('Reader preferences', style: AppType.titleLarge(color: ink)),
-          SizedBox(height: AppSpacing.s5),
+          const SizedBox(height: AppSpacing.s5),
           _SliderRow(
             label: 'FONT SIZE',
             value: _fontSize,
@@ -916,7 +916,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               await widget.notifier.setFontSize(v);
             },
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           _SliderRow(
             label: 'LINE HEIGHT',
             value: _lineHeight,
@@ -928,7 +928,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               await widget.notifier.setLineHeight(v);
             },
           ),
-          SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s4),
           Row(
             children: [
               Text(
@@ -941,7 +941,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.s2),
+          const SizedBox(height: AppSpacing.s2),
           Container(
             decoration: BoxDecoration(
               color: AppColors.paperRaised,
@@ -970,7 +970,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               ],
             ),
           ),
-          SizedBox(height: AppSpacing.s5),
+          const SizedBox(height: AppSpacing.s5),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
