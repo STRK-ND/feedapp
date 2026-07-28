@@ -16,11 +16,13 @@ class ReaderControls extends StatelessWidget {
   final double lineHeight;
   final bool widenMeasure;
   final String bodyFont;
+  final bool isPro;
   final ValueChanged<ReaderTheme> onTheme;
   final ValueChanged<double> onFontSize;
   final ValueChanged<double> onLineHeight;
   final ValueChanged<bool> onWidenMeasure;
   final ValueChanged<String> onBodyFont;
+  final ValueChanged<ReaderTheme> onLockedTheme;
 
   const ReaderControls({
     super.key,
@@ -29,11 +31,13 @@ class ReaderControls extends StatelessWidget {
     required this.lineHeight,
     required this.widenMeasure,
     required this.bodyFont,
+    required this.isPro,
     required this.onTheme,
     required this.onFontSize,
     required this.onLineHeight,
     required this.onWidenMeasure,
     required this.onBodyFont,
+    required this.onLockedTheme,
   });
 
   @override
@@ -43,7 +47,9 @@ class ReaderControls extends StatelessWidget {
       children: [
         _ThemeSwatches(
           current: currentTheme,
+          isPro: isPro,
           onChange: onTheme,
+          onLocked: onLockedTheme,
         ),
         _AaButton(
           fontSize: fontSize,
@@ -63,35 +69,56 @@ class ReaderControls extends StatelessWidget {
 
 class _ThemeSwatches extends StatelessWidget {
   final ReaderTheme current;
+  final bool isPro;
   final ValueChanged<ReaderTheme> onChange;
+  final ValueChanged<ReaderTheme> onLocked;
 
-  const _ThemeSwatches({required this.current, required this.onChange});
+  const _ThemeSwatches({
+    required this.current,
+    required this.isPro,
+    required this.onChange,
+    required this.onLocked,
+  });
 
   @override
   Widget build(BuildContext context) {
     Widget swatch(ReaderTheme t, Color c) {
       final selected = current == t;
+      final locked = isReaderThemeLocked(t, isPro);
       return Semantics(
         button: true,
-        label: '${t.label} reader theme',
+        label: locked
+            ? '${t.label} reader theme — Go Pro to unlock'
+            : '${t.label} reader theme',
         selected: selected,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => onChange(t),
-          child: AnimatedContainer(
-            duration: AppMotion.fast,
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: c,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.rule.withValues(alpha: 0.6),
-                width: selected ? 2.5 : 1,
+          onTap: () => locked ? onLocked(t) : onChange(t),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedContainer(
+                duration: AppMotion.fast,
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: c,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.rule.withValues(alpha: 0.6),
+                    width: selected ? 2.5 : 1,
+                  ),
+                ),
               ),
-            ),
+              if (locked)
+                const Icon(
+                  Icons.lock_outline,
+                  size: 12,
+                  color: AppColors.primary,
+                ),
+            ],
           ),
         ),
       );

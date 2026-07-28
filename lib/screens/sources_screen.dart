@@ -2,18 +2,21 @@
 /// import OPML (deferred).
 ///
 /// Reached from Settings → "Manage sources". The top of the screen shows
-/// currently subscribed sources with per-source unread counts and a
-/// long-press to unsubscribe. Below is a "Discover" section grouped by
-/// category with a tappable cell to add a new source.
-///
-/// This addresses the biggest UX gap in the app: previously sources were
-/// hardcoded and there was no way to manage them at all.
+/// subscribed sources; long-press to unsubscribe. Below is a "Discover"
+/// section grouped by category with a tappable cell to add a new source.
+/// Subscriptions persist via SettingsService and are read by FeedScreen to
+/// filter the user's visible feed.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/design_tokens.dart';
+import '../di/service_locator.dart';
 import '../models/rss_source.dart';
+import '../services/rss_feed_service.dart';
+import '../services/settings_service.dart';
+import '../utils/design_tokens.dart';
 
 class SourcesScreen extends StatefulWidget {
   const SourcesScreen({super.key});
@@ -23,13 +26,82 @@ class SourcesScreen extends StatefulWidget {
 }
 
 class _SourcesScreenState extends State<SourcesScreen> {
-  // In-memory subscription set. Real persistence will plug into a
-  // `UserSourceRepository` (deferred); this scaffolds the UI without
-  // rewriting storage today.
-  final _subscriptions = <String>{'the-verge', 'bbc', 'aeon'};
+  Set<String> _subscriptions = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final settings = getIt<SettingsService>();
+    final subs = await settings.getSubscribedSourceIds();
+    if (!mounted) return;
+    setState(() {
+      _subscriptions = subs;
+      _loading = false;
+    });
+  }
+
+  Future<void> _toggle(RssSource s) async {
+    unawaited(HapticFeedback.selectionClick());
+    final next = Set<String>.from(_subscriptions);
+    if (next.contains(s.id)) {
+      next.remove(s.id);
+    } else {
+      next.add(s.id);
+    }
+    setState(() => _subscriptions = next);
+    await getIt<SettingsService>().setSubscribedSourceIds(next);
+  }
+
+  Future<void> _confirmUnsub(RssSource s) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Unsubscribe from ${s.name}?'),
+        content: const Text(
+          'Articles from this source will no longer appear in your feed. '
+          '\n\nYou can re-subscribe any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Unsubscribe'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _toggle(s);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Group canonical sources by category in stable order.
+    final byCategory = <String, List<RssSource>>{};
+    for (final s in RssFeedService.predefinedSources) {
+      byCategory.putIfAbsent(s.category, () => []).add(s);
+    }
+    final categories = byCategory.keys.toList();
+
+    final subscribed = RssFeedService.predefinedSources
+        .where((s) => _subscriptions.contains(s.id))
+        .toList();
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -46,30 +118,36 @@ class _SourcesScreenState extends State<SourcesScreen> {
         children: [
           _buildSectionHeader(
             'SUBSCRIBED',
-            trailing: '${_subscriptions.length} active',
+            trailing: '${subscribed.length} active',
           ),
           const SizedBox(height: AppSpacing.s3),
-          ..._discoverSources
-              .where((s) => _subscriptions.contains(s.id))
-              .map((s) => _SourceTile(
-                    source: s,
-                    unread: _mockUnread(s.id),
-                    isSubscribed: true,
-                    onTap: () => _uncheck(s),
-                    onLongPress: () => _confirmUnsub(s),
-                  )),
+          if (subscribed.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s2, vertical: AppSpacing.s4),
+              child: Text(
+                'No sources yet. Pick from DISCOVER below.',
+                style: AppType.bodyMedium(color: AppColors.inkSoft),
+              ),
+            )
+          else
+            ...subscribed.map((s) => _SourceTile(
+                  source: s,
+                  subtitle: s.category,
+                  isSubscribed: true,
+                  onTap: () => _showFilterHint(s),
+                  onLongPress: () => _confirmUnsub(s),
+                )),
           const SizedBox(height: AppSpacing.s8),
           _buildSectionHeader(
             'DISCOVER',
             trailing: 'tap to add',
           ),
           const SizedBox(height: AppSpacing.s3),
-          for (final category in _categoryOrder) ...[
+          for (final category in categories) ...[
             _CategoryGroup(
               category: category,
-              sources: _discoverSources
-                  .where((s) => s.category == category)
-                  .toList(),
+              sources: byCategory[category]!,
               subscriptions: _subscriptions,
               onToggle: _toggle,
             ),
@@ -105,148 +183,26 @@ class _SourcesScreenState extends State<SourcesScreen> {
     );
   }
 
-  void _toggle(RssSource s) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      if (_subscriptions.contains(s.id)) {
-        _subscriptions.remove(s.id);
-      } else {
-        _subscriptions.add(s.id);
-      }
-    });
-  }
-
-  void _uncheck(RssSource s) {
-    // Tap on subscribed = filter feed to this source (would be wired to
-    // a callback in the real impl).
+  void _showFilterHint(RssSource s) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Filter the feed to "${s.name}" — coming soon'),
+        content: Text('Filtering by "${s.name}" — coming soon'),
         duration: const Duration(milliseconds: 1800),
       ),
     );
   }
-
-  Future<void> _confirmUnsub(RssSource s) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Unsubscribe from ${s.name}?'),
-        content: const Text(
-          'Articles from this source will no longer appear in your feed. '
-          '\n\nYou can re-subscribe any time.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Unsubscribe'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      setState(() => _subscriptions.remove(s.id));
-    }
-  }
 }
-
-int _mockUnread(String id) {
-  // Deterministic-looking fake counts so the design is testable without
-  // wiring real notifications yet.
-  return id.hashCode.abs() % 8;
-}
-
-const _categoryOrder = ['News', 'Tech', 'Essays', 'Politics', 'Daily digest'];
-
-const _discoverSources = [
-  RssSource(
-    id: 'the-verge',
-    name: 'The Verge',
-    url: '',
-    category: 'Tech',
-    color: Color(0xFFFF0000),
-    icon: Icons.privacy_tip_outlined,
-  ),
-  RssSource(
-    id: 'bbc',
-    name: 'BBC News',
-    url: '',
-    category: 'News',
-    color: Color(0xFFE63946),
-    icon: Icons.public,
-  ),
-  RssSource(
-    id: 'aeon',
-    name: 'Aeon',
-    url: '',
-    category: 'Essays',
-    color: Color(0xFF6B7280),
-    icon: Icons.menu_book_outlined,
-  ),
-  RssSource(
-    id: 'reuters',
-    name: 'Reuters',
-    url: '',
-    category: 'News',
-    color: Color(0xFFFF8800),
-    icon: Icons.gavel,
-  ),
-  RssSource(
-    id: 'ars-technica',
-    name: 'Ars Technica',
-    url: '',
-    category: 'Tech',
-    color: Color(0xFF3B82F6),
-    icon: Icons.memory,
-  ),
-  RssSource(
-    id: 'lrb',
-    name: 'LRB Blog',
-    url: '',
-    category: 'Essays',
-    color: Color(0xFFDC2626),
-    icon: Icons.book,
-  ),
-  RssSource(
-    id: 'fivethirtyeight',
-    name: 'FiveThirtyEight',
-    url: '',
-    category: 'Politics',
-    color: Color(0xFF1E40AF),
-    icon: Icons.bar_chart,
-  ),
-  RssSource(
-    id: 'the-browser',
-    name: 'The Browser',
-    url: '',
-    category: 'Daily digest',
-    color: Color(0xFF7C3AED),
-    icon: Icons.language,
-  ),
-  RssSource(
-    id: 'hacker-news',
-    name: 'Hacker News',
-    url: '',
-    category: 'Tech',
-    color: Color(0xFFFB923C),
-    icon: Icons.terminal,
-  ),
-];
 
 class _SourceTile extends StatelessWidget {
   final RssSource source;
-  final int unread;
+  final String subtitle;
   final bool isSubscribed;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   const _SourceTile({
     required this.source,
-    required this.unread,
+    required this.subtitle,
     required this.isSubscribed,
     required this.onTap,
     required this.onLongPress,
@@ -279,7 +235,7 @@ class _SourceTile extends StatelessWidget {
                   Text(source.name, style: AppType.titleMedium()),
                   const SizedBox(height: 2),
                   Text(
-                    '$unread unread',
+                    subtitle,
                     style: AppType.monoDateline(color: AppColors.inkSoft),
                   ),
                 ],
@@ -309,7 +265,7 @@ class _CategoryGroup extends StatelessWidget {
   final String category;
   final List<RssSource> sources;
   final Set<String> subscriptions;
-  final ValueChanged<RssSource> onToggle;
+  final Future<void> Function(RssSource) onToggle;
 
   const _CategoryGroup({
     required this.category,

@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
-import '../utils/constants.dart';
+import '../utils/constants.dart' hide AppColors;
+import '../utils/design_tokens.dart' show AppColors;
 import '../widgets/folio_rule.dart';
 import 'curated_feeds_app.dart';
 import 'onboarding_screen.dart';
@@ -21,44 +23,68 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+    with TickerProviderStateMixin {
+  // Three beat intro: draw (600ms) → reveal (300ms) → subtitle (200ms).
+  // Total ~1.4s. Init code runs in parallel underneath — the animation
+  // is never a loader.
+  late final AnimationController _drawController;
+  late final AnimationController _revealController;
+
+  late final Animation<double> _drawProgress;
+  late final Animation<double> _revealProgress;
+
+  bool _reduceMotion = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _drawController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _revealController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _drawProgress = CurvedAnimation(
+      parent: _drawController,
+      curve: Curves.easeInOutCubic,
+    );
+    _revealProgress = CurvedAnimation(
+      parent: _revealController,
+      curve: Curves.easeOutBack,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final disableAnimations = MediaQuery.disableAnimationsOf(context);
-      if (disableAnimations) {
-        _controller.value = 1.0;
-      } else {
-        _controller.forward();
+      _reduceMotion = MediaQuery.disableAnimationsOf(context);
+      if (_reduceMotion) {
+        _drawController.value = 1.0;
+        _revealController.value = 1.0;
+        return;
       }
+      _drawController.forward();
+      _drawController.addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _revealController.forward();
+        }
+      });
     });
+
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    _drawController.dispose();
+    _revealController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeApp() async {
     final startTime = DateTime.now();
-    const minDuration = Duration(milliseconds: 1200);
+    const minDuration = Duration(milliseconds: 1400);
 
     if (!mounted) return;
 
@@ -93,8 +119,6 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    // Route: first-launch → onboarding. After onboarding or on subsequent
-    // launches → Curated Feeds main app.
     final onboardingDone =
         await getIt<SettingsService>().getHasCompletedOnboarding();
 
@@ -127,129 +151,202 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final background = isDark ? AppColors.ground : AppColors.paper;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: background,
       body: Semantics(
         label: 'Curated Feeds',
         child: Center(
-          child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _fadeAnimation.value,
-              child: Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Pen-stroke folio glyph animation.
+              SizedBox(
+                width: 96,
+                height: 96,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_drawProgress, _revealProgress]),
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: _FolioGlyphPainter(
+                        drawProgress: _drawProgress.value,
+                        revealProgress: _revealProgress.value,
+                        strokeColor: AppColors.primary,
+                        fillColor: AppColors.primary.withValues(alpha: 0.16),
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                width: 3,
-                              ),
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: 22,
-                            bottom: 22,
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 14,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      AppConfig.appName,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Your curated feed',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 48),
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 28),
+              // Wordmark
+              FadeTransition(
+                opacity: _revealProgress,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.3),
+                    end: Offset.zero,
+                  ).animate(_revealProgress),
+                  child: Text(
+                    AppConfig.appName,
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Eyebrow — appears last.
+              AnimatedBuilder(
+                animation: _revealProgress,
+                builder: (context, _) {
+                  final subtitleProgress =
+                      (_revealProgress.value - 0.4).clamp(0.0, 1.0) / 0.6;
+                  return Opacity(
+                    opacity: subtitleProgress,
+                    child: Text(
+                      'YOUR CURATED FEED',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
-// CuratedFeedsApp + MainNavigation + SavedArticlesScreen live in
-// curated_feeds_app.dart (extracted so onboarding can route to them
-// without crossing splash).
+/// Pen-stroke CustomPainter for the folio glyph. 96×96 dp rounded square
+/// with two column divides and small headline/text lines inside.
+///
+/// The animation draws strokes over time using [PathMetric.extractPath]
+/// so it reads as a pen drawing itself.
+class _FolioGlyphPainter extends CustomPainter {
+  _FolioGlyphPainter({
+    required this.drawProgress,
+    required this.revealProgress,
+    required this.strokeColor,
+    required this.fillColor,
+  });
+
+  final double drawProgress; // 0..1 across the stroke phase
+  final double revealProgress; // 0..1 across the fill/scale phase
+  final Color strokeColor;
+  final Color fillColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    // Outer rrect
+    final outerRRect = RRect.fromRectAndRadius(
+      rect.deflate(4),
+      const Radius.circular(22),
+    );
+
+    // Fill — only after the stroke completes.
+    if (revealProgress > 0) {
+      final scale = 0.92 + 0.08 * revealProgress;
+      canvas.save();
+      canvas.translate(size.width / 2, size.height / 2);
+      canvas.scale(scale, scale);
+      canvas.translate(-size.width / 2, -size.height / 2);
+      canvas.drawRRect(
+        outerRRect,
+        Paint()
+          ..color = fillColor
+          ..style = PaintingStyle.fill,
+      );
+      canvas.restore();
+    }
+
+    // Stroke — drawn via path metric extraction for the pen-stroke reveal.
+    final strokePaint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final fullPath = _buildGlyphPath(size);
+    if (drawProgress < 1.0) {
+      for (final metric in fullPath.computeMetrics()) {
+        final extract = metric.extractPath(
+          0,
+          metric.length * drawProgress,
+        );
+        canvas.drawPath(extract, strokePaint);
+      }
+    } else {
+      canvas.drawPath(fullPath, strokePaint);
+    }
+  }
+
+  Path _buildGlyphPath(Size size) {
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    // Outer rounded square
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(4, 4, w - 8, h - 8),
+        const Radius.circular(22),
+      ),
+    );
+
+    // Two column dividers — vertical lines
+    final col1X = w / 3;
+    final col2X = 2 * w / 3;
+    path.moveTo(col1X, 12);
+    path.lineTo(col1X, h - 12);
+    path.moveTo(col2X, 12);
+    path.lineTo(col2X, h - 12);
+
+    // Headline block — left column top (short headline lines)
+    path.moveTo(12, 16);
+    path.lineTo(col1X - 4, 16);
+    path.moveTo(12, 20);
+    path.lineTo(col1X - 6, 20);
+
+    // Three short text lines per column
+    const lineYs = [30.0, 40.0, 50.0];
+    for (final y in lineYs) {
+      // Left
+      path.moveTo(12, y);
+      path.lineTo(col1X - 4, y);
+      // Center
+      path.moveTo(col1X + 4, y);
+      path.lineTo(col2X - 4, y);
+      // Right
+      path.moveTo(col2X + 4, y);
+      path.lineTo(w - 12, y);
+    }
+
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(_FolioGlyphPainter oldDelegate) {
+    return oldDelegate.drawProgress != drawProgress ||
+        oldDelegate.revealProgress != revealProgress ||
+        oldDelegate.strokeColor != strokeColor ||
+        oldDelegate.fillColor != fillColor;
+  }
+}

@@ -11,7 +11,7 @@ import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
-import '../utils/constants.dart';
+import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
 import '../utils/reader_theme.dart';
@@ -70,7 +70,17 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   }
 
   Future<void> _persistTheme(ReaderTheme t) async {
-    await context.read<SettingsNotifier>().setReaderTheme(t);
+    final notifier = context.read<SettingsNotifier>();
+    if (isReaderThemeLocked(t, notifier.isPro)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${t.label} is a Pro theme — Go Pro to unlock'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    await notifier.setReaderTheme(t);
     if (mounted) setState(() => _readerTheme = t);
   }
 
@@ -239,6 +249,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         _widenMeasure = settings.widenMeasure;
         _bodyFont = settings.bodyFont;
 
+        final palette = ReaderPalette.forTheme(
+          theme: _readerTheme,
+          appBrightness: Theme.of(context).brightness,
+        );
+
         Widget buildHeaderButton({
           required IconData icon,
           required VoidCallback onPressed,
@@ -278,7 +293,19 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
             maxChildSize: 1.0,
             builder: (context, scrollController) {
               return Container(
-                decoration: AppCardStyles.bottomSheetDecoration(colorScheme),
+                decoration: BoxDecoration(
+                  color: palette.ground,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.10),
+                      blurRadius: 32,
+                      offset: const Offset(0, -16),
+                    ),
+                  ],
+                ),
                 child: Column(
                   children: [
                     Container(
@@ -286,7 +313,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: colorScheme.outlineVariant,
+                        color: palette.rule,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -372,7 +399,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               buildHeaderButton(
                                 icon: Icons.close_rounded,
                                 onPressed: widget.onClose,
-                                color: colorScheme.onSurfaceVariant,
+                                color: palette.soft,
                                 label: 'Close',
                               ),
                             ],
@@ -380,15 +407,20 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                         ],
                       ),
                     ),
-                    Divider(height: 1, color: colorScheme.outlineVariant),
+                    Divider(height: 1, color: palette.rule),
                     Expanded(
                       child: SingleChildScrollView(
                         controller: scrollController,
                         padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (showImages && widget.article.imageUrl != null)
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: _widenMeasure ? 720 : 960,
+                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (showImages && widget.article.imageUrl != null)
                               ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxWidth: imageMaxWidth,
@@ -440,14 +472,14 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   Icon(
                                     Icons.access_time_rounded,
                                     size: 14,
-                                    color: colorScheme.onSurfaceVariant,
+                                    color: palette.soft,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     Helpers.formatDate(widget.article.pubDate),
                                     style: GoogleFonts.dmSans(
                                       fontSize: 13,
-                                      color: colorScheme.onSurfaceVariant,
+                                      color: palette.soft,
                                       letterSpacing: 0.1,
                                     ),
                                   ),
@@ -462,11 +494,22 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               lineHeight: _lineHeight,
                               widenMeasure: _widenMeasure,
                               bodyFont: _bodyFont,
+                              isPro: settings.isPro,
                               onTheme: _persistTheme,
                               onFontSize: _persistFontSize,
                               onLineHeight: _persistLineHeight,
                               onWidenMeasure: _persistWiden,
                               onBodyFont: _persistBodyFont,
+                              onLockedTheme: (t) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${t.label} is a Pro theme — Go Pro to unlock',
+                                    ),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: AppSpacing.s5),
                             Text(
@@ -474,7 +517,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               style: GoogleFonts.playfairDisplay(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w700,
-                                color: colorScheme.onSurface,
+                                color: palette.text,
                                 height: 1.35,
                                 letterSpacing: -0.4,
                               ),
@@ -484,7 +527,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               widget.article.description,
                               style: _bodyStyle().copyWith(
                                 fontSize: _fontSize,
-                                color: colorScheme.onSurface,
+                                color: palette.text,
                                 height: _lineHeight,
                                 letterSpacing: 0.1,
                               ),
@@ -510,7 +553,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                         'Loading full article...',
                                         style: GoogleFonts.dmSans(
                                           fontSize: 14,
-                                          color: colorScheme.onSurfaceVariant,
+                                          color: palette.soft,
                                         ),
                                       ),
                                     ],
@@ -523,13 +566,15 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 _fullContent!,
                                 style: _bodyStyle().copyWith(
                                   fontSize: _fontSize - 1,
-                                  color: colorScheme.onSurfaceVariant,
+                                  color: palette.soft,
                                   height: _lineHeight + 0.1,
                                   letterSpacing: 0.05,
                                 ),
                               ),
-                            const SizedBox(height: 120),
-                          ],
+                              const SizedBox(height: 120),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),

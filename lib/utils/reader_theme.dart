@@ -96,9 +96,13 @@ class ReaderPalette {
   }
 }
 
+/// Returns true when the given reader theme is gated behind Pro. Free users
+/// can use Default + Paper; Pro unlocks Sepia + E-Ink.
+bool isReaderThemeLocked(ReaderTheme theme, bool isPro) =>
+    !isPro && (theme == ReaderTheme.sepia || theme == ReaderTheme.eInk);
+
 /// Reading preferences persisted via SettingsService (settings_notifier).
-class ReadingPreferences {
-  final ReaderTheme theme;
+class ReadingPreferences {  final ReaderTheme theme;
   final double fontSize; // 14..22
   final double lineHeight; // 1.4..1.8
   final bool monoDatelines;

@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'in_app_notification_manager.dart';
 import '../models/in_app_notification.dart';
 import '../di/service_locator.dart';
+import '../utils/constants.dart';
 import 'settings_service.dart';
 import 'update_service.dart';
 
@@ -22,6 +25,71 @@ class NotificationService {
 
   bool _isInitialized = false;
   String? _fcmToken;
+
+  // ---------------------------------------------------------------------------
+  // Server-side push subscription (worker at AppConfig.workerApiUrl).
+  // Static so unit tests don't need to construct NotificationService (which
+  // eagerly boots Firebase). The FCM token is passed in explicitly, the
+  // http.Client is injectable, and SettingsService supplies prefs.
+  // ---------------------------------------------------------------------------
+
+  /// Re-register the FCM token with the worker. Call this on app start
+  /// when notifications are enabled, and from the Settings toggle
+  /// handler. ponytail: skip onTokenRefresh listener — re-POST on
+  /// initialize() covers rotation idempotently; add when a stale-token
+  /// report actually lands.
+  static Future<void> enablePushNotifications({
+    String? fcmToken,
+    http.Client? httpClient,
+  }) async {
+    final client = httpClient ?? http.Client();
+    final token = fcmToken ?? NotificationService()._fcmToken;
+    if (token == null) {
+      throw StateError('No FCM token available');
+    }
+
+    final settingsService = getIt<SettingsService>();
+    final newArticlesEnabled =
+        await settingsService.getNewArticleNotifications();
+
+    final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
+    final response = await client
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'token': token,
+            'topic': 'new-articles',
+            'preferences': {'newArticles': newArticlesEnabled},
+          }),
+        )
+        .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
+
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Push subscription failed: HTTP ${response.statusCode}',
+      );
+    }
+  }
+
+  /// Remove the FCM token from the worker's subscription store.
+  static Future<void> disablePushNotifications({
+    String? fcmToken,
+    http.Client? httpClient,
+  }) async {
+    final client = httpClient ?? http.Client();
+    final token = fcmToken ?? NotificationService()._fcmToken;
+    if (token == null) return; // nothing to disable
+
+    final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
+    await client
+        .delete(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'token': token}),
+        )
+        .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
+  }
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -45,6 +113,12 @@ class NotificationService {
     // Get FCM token
     _fcmToken = await _firebaseMessaging.getToken();
     debugPrint('[Notification] FCM Token: ${_fcmToken?.substring(0, 20)}...');
+
+    // Re-register with the worker — upsert is idempotent on the server
+    // and covers token rotation, stale data, and uninstall-reinstall.
+    unawaited(NotificationService.enablePushNotifications().catchError((Object e) {
+      debugPrint('[Notification] Failed to register token with worker: $e');
+    }));
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);

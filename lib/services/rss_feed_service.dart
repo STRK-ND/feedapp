@@ -3,6 +3,11 @@ import '../models/article.dart';
 import '../models/rss_source.dart';
 import '../utils/constants.dart';
 
+/// Canonical set of RSS source IDs — shared by settings persistence and
+/// the sources screen so they can't drift apart.
+Set<String> canonicalSourceIds() =>
+    RssFeedService.predefinedSources.map((s) => s.id).toSet();
+
 /// RSS Feed Service for managing predefined RSS source metadata
 class RssFeedService {
   /// Predefined RSS sources as a list (for iteration) - filtered to image-friendly sources

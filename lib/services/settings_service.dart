@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/reader_theme.dart';
+import 'rss_feed_service.dart';
 
 /// App Settings Service - manages all app preferences using SharedPreferences
 class SettingsService {
@@ -133,6 +134,28 @@ class SettingsService {
   /// exists so future features can check it cheaply.
   Future<bool> getIsPro() => _getBool('is_pro', false);
   Future<void> setIsPro(bool value) => _setBool('is_pro', value);
+
+  /// Subscribed RSS source IDs (subset of RssFeedService.predefinedSources).
+  /// Default: all sources. The set of subscribed IDs is the source-of-truth
+  /// for filter — every read/write passes through here.
+  Future<Set<String>> getSubscribedSourceIds() async {
+    await init();
+    final stored = _prefs.getStringList('subscribed_source_ids');
+    if (stored == null) {
+      // First run: subscribe to all sources by default.
+      final all = canonicalSourceIds();
+      await setSubscribedSourceIds(all);
+      return all;
+    }
+    // Defensive: drop IDs that don't exist in the canonical list anymore.
+    final canonical = canonicalSourceIds();
+    return stored.where(canonical.contains).toSet();
+  }
+
+  Future<void> setSubscribedSourceIds(Set<String> ids) async {
+    await init();
+    await _prefs.setStringList('subscribed_source_ids', ids.toList());
+  }
 
   /// Feed view mode: 'stack' (one card at a time, swipe) or
   /// 'continuous' (vertical list, time-grouped).

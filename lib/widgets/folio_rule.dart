@@ -80,6 +80,7 @@ class FolioRule extends StatelessWidget {
   final int edition;
   final int articleCount;
   final int unreadCount;
+  final bool isPro;
   final VoidCallback? onTapDot;
 
   const FolioRule({
@@ -88,6 +89,7 @@ class FolioRule extends StatelessWidget {
     required this.edition,
     required this.articleCount,
     required this.unreadCount,
+    this.isPro = false,
     this.onTapDot,
   });
 
@@ -139,6 +141,26 @@ class FolioRule extends StatelessWidget {
                 'EDITION  ${edition.toString().padLeft(4, '0')}',
                 style: AppType.folioTop(color: bottom),
               ),
+              if (isPro) ...[
+                const SizedBox(width: AppSpacing.s2),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: accent, width: 1),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    'PRO',
+                    style: AppType.folioTop(color: accent).copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: AppSpacing.s3),
               Text(
                 '$articleCount curated',

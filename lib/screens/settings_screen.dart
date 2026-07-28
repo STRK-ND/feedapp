@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +9,7 @@ import '../services/settings_service.dart';
 import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
+import '../services/notification_service.dart';
 import '../repositories/article_repository.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
@@ -232,8 +235,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Receive notifications for new content',
               value: _notificationsEnabled,
               onChanged: (value) async {
+                final previous = _notificationsEnabled;
                 setState(() => _notificationsEnabled = value);
-                await _settingsService.setNotificationsEnabled(value);
+                try {
+                  if (value) {
+                    await NotificationService.enablePushNotifications();
+                  } else {
+                    await NotificationService.disablePushNotifications();
+                  }
+                  await _settingsService.setNotificationsEnabled(value);
+                } catch (_) {
+                  if (!context.mounted) return;
+                  setState(() => _notificationsEnabled = previous);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Could not reach notification server — try again',
+                      ),
+                    ),
+                  );
+                }
               },
             ),
             if (_notificationsEnabled) ...[
@@ -246,6 +267,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   setState(() => _newArticleNotifs = value);
                   await _settingsService.setNewArticleNotifications(value);
+                  // Re-POST prefs to the worker so the server-side row
+                  // reflects the change without a manual toggle of master.
+                  if (_notificationsEnabled) {
+                    unawaited(
+                      NotificationService.enablePushNotifications()
+                          .catchError((Object _) {}),
+                    );
+                  }
                 },
                 indented: true,
               ),

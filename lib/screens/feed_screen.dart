@@ -69,9 +69,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   final StorageService _storage = getIt<StorageService>();
   final ArticleRepository _articleRepository = getIt<ArticleRepository>();
   final SettingsService _settingsService = getIt<SettingsService>();
+  // Subscribed source IDs — loaded from SettingsService. Empty set means
+  // "no filter applied yet" (first run before _loadSubscribedIds returns).
+  Set<String> _subscribedIds = {};
 
   int get _unreadCount => _articles.where((a) => !a.isRead).length;
   TextTheme get _textTheme => Theme.of(context).textTheme;
+
+  Future<void> _loadSubscribedIds() async {
+    final ids = await _settingsService.getSubscribedSourceIds();
+    if (!mounted) return;
+    setState(() {
+      _subscribedIds = ids;
+      _displayedArticles = _getFilteredArticles();
+    });
+  }
 
   @override
   void initState() {
@@ -82,6 +94,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _checkConnectivity();
     _checkForUpdates();
     _loadViewMode();
+    _loadSubscribedIds();
   }
 
   @override
@@ -92,6 +105,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _autoRefreshEnabled = true;
         _connectivitySubscription?.resume();
         _armAutoRefresh();
+        _loadSubscribedIds();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
@@ -409,6 +423,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   void _onToggleSave(Article article) {
+    // Free users cap at AppConfig.freeSavedArticlesCap saved articles;
+    // Pro users are unlimited. Un-saving is always allowed. ponytail:
+    // no retroactive trim on Pro → Free downgrade; user keeps existing
+    // saves and is blocked at the next attempt.
+    final isSaving = !article.isSaved;
+    if (isSaving) {
+      final isPro = context.read<SettingsNotifier>().isPro;
+      if (!isPro && _savedArticles.length >= AppConfig.freeSavedArticlesCap) {
+        _showSnackBar(
+          'Free limit of ${AppConfig.freeSavedArticlesCap} saved articles reached — Go Pro for unlimited saves',
+        );
+        return;
+      }
+    }
+
     setState(() {
       article.isSaved = !article.isSaved;
 
@@ -466,6 +495,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     var articles = _selectedTab == 0
         ? _articles.where((a) => !a.isRead).toList()
         : _savedArticles;
+
+    // Filter by subscribed sources (empty set = no filter applied yet).
+    if (_subscribedIds.isNotEmpty) {
+      articles = articles
+          .where((a) => _subscribedIds.contains(a.sourceId))
+          .toList();
+    }
 
     if (_selectedFilter != 'All' && _selectedTab == 0) {
       final rssService = getIt<RssFeedService>();
@@ -1064,6 +1100,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       edition: settings.edition,
                       articleCount: _displayedArticles.length,
                       unreadCount: _unreadCount,
+                      isPro: settings.isPro,
                       // The amber dot doubles as the "mark all read"
                       // affordance — it ONLY exists when there is
                       // something unread, so tapping it is the

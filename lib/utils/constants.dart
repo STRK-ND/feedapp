@@ -75,6 +75,10 @@ class AppConfig {
   static const int rssTimeoutSeconds = 8;
   static const int maxArticlesPerSource = 20;
 
+  // Pro monetization caps. ponytail: single cap for now — add a
+  // ProLimits class only if a second cap lands.
+  static const int freeSavedArticlesCap = 25;
+
   // Cache settings
   static const int maxCachedArticles = 1000;
 
