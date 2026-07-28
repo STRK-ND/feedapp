@@ -1,0 +1,20 @@
+name = "curated-feeds-worker"
+main = "feed-worker.js"
+compatibility_date = "2026-07-28"
+workers_dev = true
+
+# Observability — structured logs are available via wrangler tail / dashboard.
+[observability.logs]
+enabled = true
+head_sampling_rate = 1.0
+
+# KV namespaces — create with: wrangler kv namespace create ARTICLES_KV
+# Then paste the IDs below. Subscriptions live in the same namespace with
+# a "sub:" key prefix.
+[[kv_namespaces]]
+binding = "ARTICLES_KV"
+id = "5e2bee05f76043c7add1d6b2178dca6d"
+
+# Cron trigger — refreshes feed cache every 5 minutes.
+[triggers]
+crons = ["*/5 * * * *"]
