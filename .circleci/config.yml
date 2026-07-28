@@ -1,0 +1,81 @@
+version: 2.1
+
+orbs:
+  android: circleci/android@3.0.1
+
+executors:
+  flutter:
+    docker:
+      - image: ghcr.io/cirruslabs/flutter:stable
+    resource_class: medium
+    environment:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+jobs:
+  analyze-and-test:
+    executor: flutter
+    steps:
+      - checkout
+      - run:
+          name: flutter pub get
+          command: flutter pub get
+      - run:
+          name: flutter analyze
+          command: flutter analyze
+      - run:
+          name: flutter test
+          command: flutter test --reporter expanded
+      - store_test_results:
+          path: test-results
+
+  build-release:
+    executor: flutter
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: Decode upload keystore
+          command: |
+            echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+      - run:
+          name: Write key.properties
+          command: |
+            cat > android/key.properties <<EOF
+            storePassword=$KEYSTORE_PASSWORD
+            keyPassword=$KEY_PASSWORD
+            keyAlias=$KEY_ALIAS
+            storeFile=upload-keystore.jks
+            EOF
+      - run:
+          name: Write google-services.json
+          command: |
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+      - run:
+          name: flutter pub get
+          command: flutter pub get
+      - run:
+          name: Build release APK
+          command: flutter build apk --release
+      - run:
+          name: Build release AAB
+          command: flutter build appbundle --release
+      - store_artifacts:
+          path: build/app/outputs/flutter-apk/app-release.apk
+          destination: app-release.apk
+      - store_artifacts:
+          path: build/app/outputs/bundle/release/app-release.aab
+          destination: app-release.aab
+
+workflows:
+  main:
+    jobs:
+      - analyze-and-test:
+          filters:
+            tags:
+              only: /.*/
+      - build-release:
+          requires:
+            - analyze-and-test
+          filters:
+            branches:
+              only: master

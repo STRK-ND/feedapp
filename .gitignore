@@ -74,7 +74,6 @@ ios/
 .gstack/
 .kiro/
 openspec/
-docs/
 
 _build.txt
 _curate_ss.png
