@@ -40,12 +40,12 @@ jobs:
       - run:
           name: Write key.properties
           command: |
-            cat > android/key.properties <<EOF
-            storePassword=$KEYSTORE_PASSWORD
-            keyPassword=$KEY_PASSWORD
-            keyAlias=$KEY_ALIAS
-            storeFile=upload-keystore.jks
-            EOF
+            printf '%s\n' \
+              "storePassword=$KEYSTORE_PASSWORD" \
+              "keyPassword=$KEY_PASSWORD" \
+              "keyAlias=$KEY_ALIAS" \
+              "storeFile=upload-keystore.jks" \
+              > android/key.properties
       - run:
           name: Write google-services.json
           command: |
