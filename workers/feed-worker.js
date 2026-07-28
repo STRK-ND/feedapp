@@ -12,7 +12,10 @@
 // No module-scope mutable state: cache + seen-id set both live in KV.
 //
 // Secrets (configure via `wrangler secret put NAME`):
-//   FCM_SERVER_KEY   — optional. If unset, push multicast is silently skipped.
+//   FCM_SERVICE_ACCOUNT  — JSON.stringify of the service account private key
+//                          from Firebase console. Without it, push multicast
+//                          is silently skipped.
+//   FCM_PROJECT_ID       — Firebase project id ("curatedfeeds").
 
 // ---------------------------------------------------------------------------
 // Canonical source list — must stay in sync with
@@ -120,22 +123,25 @@ async function handleSubscribe(request, env) {
     createdAt: Date.now(),
   }));
 
-  // Subscribe the token to the FCM topic. Best-effort: if FCM_SERVER_KEY
-  // isn't configured we keep the record but skip the actual subscription.
-  if (env.FCM_SERVER_KEY) {
-    const resp = await fetch('https://iid.googleapis.com/iid/v1:batchAdd', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `key=${env.FCM_SERVER_KEY}`,
-      },
-      body: JSON.stringify({
-        to: '/topics/new-articles',
-        registration_tokens: [token],
-      }),
-    });
-    if (resp.status !== 200) {
-      console.error('fcm_subscribe_failed', { status: resp.status });
+  // Subscribe the token to the FCM topic. Uses the IID endpoint with an
+  // OAuth2 access token derived from FCM_SERVICE_ACCOUNT.
+  if (env.FCM_SERVICE_ACCOUNT) {
+    const accessToken = await getFcmAccessToken(env);
+    if (accessToken) {
+      const resp = await fetch(
+        `https://iid.googleapis.com/iid/v1/${token}/rel/topics/new-articles`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        },
+      );
+      if (resp.status !== 200) {
+        const text = await resp.text();
+        console.error('fcm_subscribe_failed', { status: resp.status, body: text });
+      }
     }
   }
 
@@ -155,18 +161,24 @@ async function handleUnsubscribe(request, env) {
   }
   await env.ARTICLES_KV.delete(`sub:${token}`);
 
-  if (env.FCM_SERVER_KEY) {
-    await fetch('https://iid.googleapis.com/iid/v1:batchRemove', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `key=${env.FCM_SERVER_KEY}`,
-      },
-      body: JSON.stringify({
-        to: '/topics/new-articles',
-        registration_tokens: [token],
-      }),
-    });
+  if (env.FCM_SERVICE_ACCOUNT) {
+    const accessToken = await getFcmAccessToken(env);
+    if (accessToken) {
+      await fetch(
+        `https://iid.googleapis.com/iid/v1:batchRemove`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            to: '/topics/new-articles',
+            registration_tokens: [token],
+          }),
+        },
+      );
+    }
   }
 
   return json({ ok: true });
@@ -209,8 +221,8 @@ async function refreshArticlesAndMaybeNotify(env) {
     expirationTtl: 24 * 60 * 60,
   });
 
-  if (newIds.length > 0 && env.FCM_SERVER_KEY) {
-    await announceNewArticles(articles.slice(0, 3), env.FCM_SERVER_KEY);
+  if (newIds.length > 0 && env.FCM_SERVICE_ACCOUNT && env.FCM_PROJECT_ID) {
+    await announceNewArticles(articles.slice(0, 3), env);
   }
   return articles;
 }
@@ -350,33 +362,139 @@ function buildArticle(body, source, opts) {
 }
 
 // ---------------------------------------------------------------------------
-// FCM topic multicast — only fires with FCM_SERVER_KEY.
+// FCM HTTP v1 — OAuth2 via service account JWT → fcm.googleapis.com/v1
+// Access tokens cached in KV for 55 min under key `fcm:access-token`.
 // ---------------------------------------------------------------------------
 
-async function announceNewArticles(articles, serverKey) {
+async function announceNewArticles(articles, env) {
   if (articles.length === 0) return;
-  try {
-    await fetch('https://fcm.googleapis.com/fcm/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `key=${serverKey}`,
+  const accessToken = await getFcmAccessToken(env);
+  if (!accessToken) return;
+
+  const projectId = env.FCM_PROJECT_ID;
+  const latestTitle = articles[0]?.title || 'Fresh feed is ready';
+  const message = {
+    message: {
+      topic: 'new-articles',
+      notification: {
+        title: 'New articles just dropped',
+        body: latestTitle,
       },
-      body: JSON.stringify({
-        to: '/topics/new-articles',
-        notification: {
-          title: 'New articles just dropped',
-          body: articles[0]?.title || 'Fresh feed is ready',
+      data: {
+        type: 'new_articles',
+        count: String(articles.length),
+      },
+      android: {
+        priority: 'HIGH',
+      },
+    },
+  };
+
+  try {
+    const resp = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
-        data: {
-          type: 'new_articles',
-          count: String(articles.length),
-        },
-      }),
-    });
+        body: JSON.stringify(message),
+      },
+    );
+    if (resp.status !== 200) {
+      console.error('fcm_send_bad_status', { status: resp.status, body: await resp.text() });
+    }
   } catch (e) {
     console.error('fcm_send_failed', { error: String(e) });
   }
+}
+
+const FCM_TOKEN_CACHE_KEY = 'fcm:access-token';
+const FCM_TOKEN_TTL_SECONDS = 55 * 60; // refresh 5 min before expiry
+
+async function getFcmAccessToken(env) {
+  const cached = await env.ARTICLES_KV.get(FCM_TOKEN_CACHE_KEY, 'json');
+  if (cached?.accessToken && cached?.expiresAt > Date.now() + 60_000) {
+    return cached.accessToken;
+  }
+
+  let sa;
+  try {
+    sa = JSON.parse(env.FCM_SERVICE_ACCOUNT);
+  } catch {
+    console.error('fcm_sa_invalid_json');
+    return null;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64UrlEncode(JSON.stringify({
+    iss: sa.client_email,
+    sub: sa.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    iat: nowSeconds,
+    exp: nowSeconds + 3600,
+  }));
+
+  const signature = await signRs256(`${header}.${payload}`, sa.private_key);
+  const jwt = `${header}.${payload}.${signature}`;
+
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+  if (resp.status !== 200) {
+    console.error('fcm_token_exchange_failed', { status: resp.status, body: await resp.text() });
+    return null;
+  }
+  const data = await resp.json();
+  const expiresAt = Date.now() + (data.expires_in ?? 3600) * 1000;
+
+  await env.ARTICLES_KV.put(FCM_TOKEN_CACHE_KEY, JSON.stringify({
+    accessToken: data.access_token,
+    expiresAt,
+  }), { expirationTtl: FCM_TOKEN_TTL_SECONDS });
+
+  return data.access_token;
+}
+
+// RS256 sign via WebCrypto. Service account `private_key` is a PKCS#8 PEM.
+async function signRs256(input, pemText) {
+  const pem = pemText
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '');
+  const binaryDer = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    new TextEncoder().encode(input),
+  );
+  return base64UrlEncodeBytes(new Uint8Array(sig));
+}
+
+function base64UrlEncode(text) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(text));
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // ---------------------------------------------------------------------------
