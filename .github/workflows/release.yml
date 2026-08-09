@@ -51,8 +51,11 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          sed -i "s/^version: .*/version: $VERSION+$GITHUB_RUN_NUMBER/" pubspec.yaml
-          echo "Synced pubspec version to $VERSION+$GITHUB_RUN_NUMBER"
+          # versionCode must exceed any prior Play upload (local baseline is 22).
+          # Floor the per-run counter at 22 so CI tag releases never regress below it.
+          CODE=$((22 + GITHUB_RUN_NUMBER))
+          sed -i "s/^version: .*/version: $VERSION+$CODE/" pubspec.yaml
+          echo "Synced pubspec version to $VERSION+$CODE"
 
       - run: flutter pub get
       - run: flutter analyze
