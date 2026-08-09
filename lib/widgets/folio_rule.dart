@@ -8,8 +8,8 @@
 ///
 ///   TUESDAY · 08.07.2026      EDITION Nº 0047      •
 ///
-/// The dot at right turns amber when there are unread articles. Tap-to-
-/// scroll to first unread is handled by the parent.
+/// The dot at right turns amber when there are unread articles. Tapping
+/// it is wired by the parent as the "mark all as read" affordance.
 ///
 /// Edition Nº increments on every successful refresh. We expose that via
 /// the [EditionNotifier] (in-process) which the FeedScreen drives when a
@@ -138,7 +138,7 @@ class FolioRule extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.s2),
               Text(
-                'EDITION  ${edition.toString().padLeft(4, '0')}',
+                'EDITION Nº ${edition.toString().padLeft(4, '0')}',
                 style: AppType.folioTop(color: bottom),
               ),
               if (isPro) ...[
@@ -162,7 +162,7 @@ class FolioRule extends StatelessWidget {
               ],
               const SizedBox(width: AppSpacing.s3),
               Text(
-                '$articleCount curated',
+                '$articleCount curated · $unreadCount unread',
                 style: AppType.folioTop(
                   color: top,
                 ).copyWith(letterSpacing: 0.4),
@@ -171,15 +171,23 @@ class FolioRule extends StatelessWidget {
               Semantics(
                 button: true,
                 label: hasUnread
-                    ? 'Jump to first unread. $unreadCount unread.'
+                    ? 'Mark all as read. $unreadCount unread.'
                     : 'No unread.',
                 child: GestureDetector(
                   onTap: onTapDot,
                   behavior: HitTestBehavior.opaque,
+                  // 40×40 hit area so the tiny dot meets a usable touch
+                  // target (spec §10); the visual dot stays 14px.
                   child: SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: _AnimatedDot(active: hasUnread, color: accent),
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: _AnimatedDot(active: hasUnread, color: accent),
+                      ),
+                    ),
                   ),
                 ),
               ),

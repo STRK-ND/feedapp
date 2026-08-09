@@ -212,14 +212,29 @@ class _SplashScreenState extends State<SplashScreen>
                       (_revealProgress.value - 0.4).clamp(0.0, 1.0) / 0.6;
                   return Opacity(
                     opacity: subtitleProgress,
-                    child: Text(
-                      'YOUR CURATED FEED',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurfaceVariant,
-                        letterSpacing: 1.2,
-                      ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'A reading room.',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.onSurfaceVariant,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'EDITION Nº ${EditionState.current.toString().padLeft(4, '0')}',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10,
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.7,
+                            ),
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },

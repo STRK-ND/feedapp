@@ -156,18 +156,19 @@ void main() {
     getIt.reset();
   });
 
-  testWidgets('empty state: no articles in storage renders "No articles"', (
-    tester,
-  ) async {
-    await _pumpFeed(tester, worker: _EmptyWorker());
+  testWidgets(
+    'empty state: no articles in storage renders "The day is quiet."',
+    (tester) async {
+      await _pumpFeed(tester, worker: _EmptyWorker());
 
-    expect(find.text('No articles'), findsOneWidget);
-    expect(
-      find.text('Tap the refresh button to load articles'),
-      findsOneWidget,
-    );
-    expect(find.byType(RefreshIndicator), findsOneWidget);
-  });
+      expect(find.text('The day is quiet.'), findsOneWidget);
+      expect(
+        find.text('Tap the refresh button to load articles'),
+        findsOneWidget,
+      );
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+    },
+  );
 
   testWidgets('error state: refresh failure renders error + Retry button', (
     tester,

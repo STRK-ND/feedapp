@@ -60,7 +60,16 @@ class CuratedFeedsApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             home: const MainNavigation(),
             builder: (context, child) {
-              return InAppNotificationOverlay(child: child!);
+              // Cap system text scaling at 1.4× so large OS fonts can't
+              // break the editorial layouts (spec §10). MediaQuery here is
+              // the one installed by WidgetsApp, above our subtree.
+              final mq = MediaQuery.of(context);
+              return MediaQuery(
+                data: mq.copyWith(
+                  textScaler: mq.textScaler.clamp(maxScaleFactor: 1.4),
+                ),
+                child: InAppNotificationOverlay(child: child!),
+              );
             },
           );
         },

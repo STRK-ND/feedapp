@@ -31,7 +31,16 @@ import 'settings_screen.dart';
 class RssFeedScreen extends StatefulWidget {
   final bool showSavedArticles;
 
-  const RssFeedScreen({super.key, this.showSavedArticles = false});
+  /// When set, the feed is locked to a single source (drill-in from the
+  /// Sources screen). The app bar shows the source name and category
+  /// chips / Folio Rule are hidden so the view reads as a focused list.
+  final String? sourceId;
+
+  const RssFeedScreen({
+    super.key,
+    this.showSavedArticles = false,
+    this.sourceId,
+  });
 
   @override
   State<RssFeedScreen> createState() => _RssFeedScreenState();
@@ -75,6 +84,23 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   int get _unreadCount => _articles.where((a) => !a.isRead).length;
   TextTheme get _textTheme => Theme.of(context).textTheme;
+
+  /// App-bar title. A source drill-in shows the source name so the view
+  /// reads as "the Verge" rather than a generic feed header.
+  String get _appBarTitle {
+    final sourceId = widget.sourceId;
+    if (sourceId != null) {
+      return getIt<RssFeedService>().getSourceById(sourceId)?.name ?? 'Feed';
+    }
+    switch (_selectedTab) {
+      case 1:
+        return 'Saved';
+      case 2:
+        return 'Settings';
+      default:
+        return 'Curated Feeds';
+    }
+  }
 
   Future<void> _loadSubscribedIds() async {
     final ids = await _settingsService.getSubscribedSourceIds();
@@ -514,6 +540,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           .toList();
     }
 
+    // Drill-in from the Sources screen — lock to a single source.
+    if (widget.sourceId != null) {
+      articles = articles.where((a) => a.sourceId == widget.sourceId).toList();
+    }
+
     if (_selectedFilter != 'All' && _selectedTab == 0) {
       final rssService = getIt<RssFeedService>();
       articles = articles.where((a) {
@@ -621,8 +652,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     final title = isSearchEmpty
         ? 'No results for "$_searchQuery"'
         : _selectedTab == 0
-        ? 'No articles'
-        : 'No saved articles';
+        ? 'The day is quiet.'
+        : 'Nothing saved yet.';
 
     return Center(
       child: Column(
@@ -881,11 +912,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             elevation: isDark ? 0 : 2,
             shadowColor: isDark ? null : colorScheme.shadow,
             title: Text(
-              _selectedTab == 0
-                  ? 'Curated Feeds'
-                  : _selectedTab == 1
-                  ? 'Saved'
-                  : 'Settings',
+              _appBarTitle,
               style: _textTheme.headlineMedium?.copyWith(
                 fontSize: 24,
                 color: appBarTitleColor,
@@ -1113,8 +1140,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           body: SafeArea(
             child: Column(
               children: [
-                // Folio Rule — signature masthead. Only on the feed tab.
-                if (_selectedTab == 0)
+                // Folio Rule — signature masthead. Only on the feed tab,
+                // and hidden on a source drill-in (its counts are feed-wide).
+                if (_selectedTab == 0 && widget.sourceId == null)
                   Consumer<SettingsNotifier>(
                     builder: (context, settings, _) {
                       return FolioRule(
@@ -1219,9 +1247,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     ),
                   ),
 
-                // Category filter chips for feeds tab
+                // Category filter chips for feeds tab — hidden on a source
+                // drill-in, which is already a single-category view.
                 if (_selectedTab == 0 &&
                     !_isSearchActive &&
+                    widget.sourceId == null &&
                     (_articles.isNotEmpty || _isLoading)) ...[
                   Container(
                     height: 50,

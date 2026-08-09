@@ -1,9 +1,10 @@
 /// Sources screen — manage subscribed feeds, browse curated sources, and
-/// import OPML (deferred).
+/// import OPML.
 ///
 /// Reached from Settings → "Manage sources". The top of the screen shows
-/// subscribed sources; long-press to unsubscribe. Below is a "Discover"
-/// section grouped by category with a tappable cell to add a new source.
+/// subscribed sources with per-source unread counts; tap a source to open
+/// its feed, long-press to unsubscribe. Below is a "Discover" section
+/// grouped by category with a tappable cell to add a new source.
 /// Subscriptions persist via SettingsService and are read by FeedScreen to
 /// filter the user's visible feed.
 library;
@@ -17,10 +18,12 @@ import 'package:flutter/services.dart';
 import 'package:xml/xml.dart';
 import '../di/service_locator.dart';
 import '../models/rss_source.dart';
+import '../repositories/article_repository.dart';
 import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
+import 'feed_screen.dart';
 
 class SourcesScreen extends StatefulWidget {
   const SourcesScreen({super.key});
@@ -32,6 +35,7 @@ class SourcesScreen extends StatefulWidget {
 class _SourcesScreenState extends State<SourcesScreen> {
   Set<String> _subscriptions = {};
   bool _loading = true;
+  Map<String, int> _unreadBySource = {};
 
   @override
   void initState() {
@@ -42,11 +46,30 @@ class _SourcesScreenState extends State<SourcesScreen> {
   Future<void> _load() async {
     final settings = getIt<SettingsService>();
     final subs = await settings.getSubscribedSourceIds();
+
+    // Per-source unread counts for the subscribed list. Reads the article
+    // cache (hydrated at splash) — a cheap in-memory lookup.
+    final unread = <String, int>{};
+    final articles = await getIt<ArticleRepository>().fetchAllArticles();
+    if (articles.data != null) {
+      for (final a in articles.data!) {
+        if (!a.isRead) {
+          unread[a.sourceId] = (unread[a.sourceId] ?? 0) + 1;
+        }
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _subscriptions = subs;
+      _unreadBySource = unread;
       _loading = false;
     });
+  }
+
+  String _unreadSubtitle(RssSource s) {
+    final count = _unreadBySource[s.id] ?? 0;
+    return count == 0 ? 'All caught up' : '$count unread';
   }
 
   Future<void> _toggle(RssSource s) async {
@@ -139,9 +162,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
             ...subscribed.map(
               (s) => _SourceTile(
                 source: s,
-                subtitle: s.category,
+                subtitle: _unreadSubtitle(s),
                 isSubscribed: true,
-                onTap: () => _showFilterHint(s),
+                onTap: () => _openSource(s),
                 onLongPress: () => _confirmUnsub(s),
               ),
             ),
@@ -159,28 +182,32 @@ class _SourcesScreenState extends State<SourcesScreen> {
           ],
           const SizedBox(height: AppSpacing.s12),
           Center(
-            child: InkWell(
-              onTap: _importOpml,
-              borderRadius: BorderRadius.circular(AppRadius.chip),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s3,
-                  vertical: AppSpacing.s2,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.upload_file_outlined,
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: AppSpacing.s2),
-                    Text(
-                      'Import OPML',
-                      style: AppType.monoEyebrow(color: AppColors.primary),
-                    ),
-                  ],
+            child: Semantics(
+              button: true,
+              label: 'Import OPML file',
+              child: InkWell(
+                onTap: _importOpml,
+                borderRadius: BorderRadius.circular(AppRadius.chip),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s3,
+                    vertical: AppSpacing.s4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.upload_file_outlined,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: AppSpacing.s2),
+                      Text(
+                        'Import OPML',
+                        style: AppType.monoEyebrow(color: AppColors.primary),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -209,13 +236,13 @@ class _SourcesScreenState extends State<SourcesScreen> {
     );
   }
 
-  void _showFilterHint(RssSource s) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Source feed filtering is coming in a future update'),
-        duration: Duration(milliseconds: 1800),
-      ),
-    );
+  /// Open a feed locked to this single source (unread-first, same as the
+  /// main feed tab but filtered by [RssSource.id]).
+  void _openSource(RssSource s) {
+    unawaited(HapticFeedback.selectionClick());
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => RssFeedScreen(sourceId: s.id)));
   }
 
   /// Pick an .opml / .xml file, extract outline URLs, match them against
@@ -335,54 +362,60 @@ class _SourceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s3),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: source.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadius.chip),
+    return Semantics(
+      button: true,
+      label:
+          '${source.name}. $subtitle. Tap to open feed, long-press to '
+          'unsubscribe.',
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s3),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: source.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Icon(source.icon, size: 18, color: source.color),
               ),
-              child: Icon(source.icon, size: 18, color: source.color),
-            ),
-            const SizedBox(width: AppSpacing.s3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(source.name, style: AppType.titleMedium()),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: AppType.monoDateline(color: AppColors.inkSoft),
-                  ),
-                ],
+              const SizedBox(width: AppSpacing.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(source.name, style: AppType.titleMedium()),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppType.monoDateline(color: AppColors.inkSoft),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s2 + 2,
-                vertical: 2,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s2 + 2,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.rule.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Text(
+                  source.category.toUpperCase(),
+                  style: AppType.monoEyebrow(
+                    color: AppColors.inkSoft,
+                  ).copyWith(letterSpacing: 0.6, fontSize: 10),
+                ),
               ),
-              decoration: BoxDecoration(
-                color: AppColors.rule.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(AppRadius.chip),
-              ),
-              child: Text(
-                source.category.toUpperCase(),
-                style: AppType.monoEyebrow(
-                  color: AppColors.inkSoft,
-                ).copyWith(letterSpacing: 0.6, fontSize: 10),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -421,51 +454,62 @@ class _CategoryGroup extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s2,
-              vertical: AppSpacing.s2,
+              vertical: AppSpacing.s3,
             ),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onToggle(s),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: s.color.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(AppRadius.chip),
+            child: Semantics(
+              button: true,
+              selected: subscriptions.contains(s.id),
+              label: subscriptions.contains(s.id)
+                  ? '${s.name}. Subscribed. Tap to unsubscribe.'
+                  : '${s.name}. Tap to subscribe.',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onToggle(s),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: s.color.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                      ),
+                      child: Icon(s.icon, size: 14, color: s.color),
                     ),
-                    child: Icon(s.icon, size: 14, color: s.color),
-                  ),
-                  const SizedBox(width: AppSpacing.s3),
-                  Expanded(
-                    child: Text(
-                      s.name,
-                      style: AppType.titleMedium().copyWith(fontSize: 14),
+                    const SizedBox(width: AppSpacing.s3),
+                    Expanded(
+                      child: Text(
+                        s.name,
+                        style: AppType.titleMedium().copyWith(fontSize: 14),
+                      ),
                     ),
-                  ),
-                  AnimatedContainer(
-                    duration: AppMotion.fast,
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: subscriptions.contains(s.id)
-                          ? AppColors.primary
-                          : Colors.transparent,
-                      border: Border.all(
+                    AnimatedContainer(
+                      duration: AppMotion.fast,
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
                         color: subscriptions.contains(s.id)
                             ? AppColors.primary
-                            : AppColors.rule,
-                        width: 1.5,
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: subscriptions.contains(s.id)
+                              ? AppColors.primary
+                              : AppColors.rule,
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      borderRadius: BorderRadius.circular(4),
+                      alignment: Alignment.center,
+                      child: subscriptions.contains(s.id)
+                          ? const Icon(
+                              Icons.check,
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : null,
                     ),
-                    alignment: Alignment.center,
-                    child: subscriptions.contains(s.id)
-                        ? const Icon(Icons.check, size: 12, color: Colors.white)
-                        : null,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
