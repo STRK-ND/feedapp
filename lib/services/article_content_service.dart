@@ -10,7 +10,7 @@ import '../utils/error_handler.dart';
 class ArticleContent {
   final String text;
   final List<String> images;
-  
+
   ArticleContent({required this.text, required this.images});
 }
 
@@ -19,7 +19,7 @@ class ArticleContentService {
   final http.Client _httpClient;
 
   ArticleContentService({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client();
 
   /// Fetch full article content from URL with images
   Future<ArticleContent> fetchArticleContentWithImages(String url) async {
@@ -36,13 +36,17 @@ class ArticleContentService {
               'Accept': 'text/html,application/xhtml+xml',
             },
           )
-          .timeout(
-            const Duration(seconds: AppConfig.rssTimeoutSeconds),
-          );
+          .timeout(const Duration(seconds: AppConfig.rssTimeoutSeconds));
 
       if (response.statusCode != 200) {
         debugPrint('[ArticleContent] HTTP ${response.statusCode} for $url');
         throw Exception('HTTP ${response.statusCode}');
+      }
+
+      // ponytail: contentLength is null on chunked responses — best-effort
+      final len = response.contentLength;
+      if (len != null && len > AppConfig.maxXmlSizeBytes) {
+        throw Exception('content too large');
       }
 
       final htmlContent = response.body;
@@ -69,7 +73,9 @@ class ArticleContentService {
       for (final selector in genericSelectors) {
         final content = _extractContentBySelector(document, selector);
         if (content.isNotEmpty) {
-          debugPrint('[ArticleContent] Found content using generic selector: $selector');
+          debugPrint(
+            '[ArticleContent] Found content using generic selector: $selector',
+          );
           return ArticleContent(text: content, images: images);
         }
       }
@@ -89,14 +95,18 @@ class ArticleContentService {
 
       debugPrint('[ArticleContent] No content found');
       return ArticleContent(
-        text: 'Unable to extract article content. Please open in browser to read full article.',
+        text:
+            'Unable to extract article content. Please open in browser to read full article.',
         images: images,
       );
     } catch (e) {
       debugPrint('[ArticleContent] Error fetching content: $e');
-      unawaited(ErrorHandler.logError('Error fetching article content', error: e));
+      unawaited(
+        ErrorHandler.logError('Error fetching article content', error: e),
+      );
       return ArticleContent(
-        text: 'Failed to load article content. Please tap "Open in browser" to read the full article.',
+        text:
+            'Failed to load article content. Please tap "Open in browser" to read the full article.',
         images: [],
       );
     }
@@ -130,15 +140,19 @@ class ArticleContentService {
       final elements = document.querySelectorAll(selector);
       for (final img in elements) {
         // Try different attributes
-        String? src = img.attributes['src'] ?? 
-                      img.attributes['data-src'] ?? 
-                      img.attributes['data-lazy-src'] ??
-                      img.attributes['data-original'];
-        
+        String? src =
+            img.attributes['src'] ??
+            img.attributes['data-src'] ??
+            img.attributes['data-lazy-src'] ??
+            img.attributes['data-original'];
+
         if (src != null && src.isNotEmpty) {
           // Skip base64 images, tracking pixels, icons
           if (src.startsWith('data:') ||
-              (src.contains('pixel') || src.contains('icon') || src.contains('logo')) && !src.contains('article')) {
+              (src.contains('pixel') ||
+                      src.contains('icon') ||
+                      src.contains('logo')) &&
+                  !src.contains('article')) {
             continue;
           }
 
@@ -217,15 +231,25 @@ class ArticleContentService {
         final tagName = node.localName?.toLowerCase();
 
         // Skip these elements
-        if (tagName != null && [
-          'script', 'style', 'nav', 'header', 'footer',
-          'aside', 'iframe', 'video', 'audio', 'figure'
-        ].contains(tagName)) {
+        if (tagName != null &&
+            [
+              'script',
+              'style',
+              'nav',
+              'header',
+              'footer',
+              'aside',
+              'iframe',
+              'video',
+              'audio',
+              'figure',
+            ].contains(tagName)) {
           continue;
         }
 
         // Add paragraph breaks
-        if (tagName == 'p' || tagName == 'div' ||
+        if (tagName == 'p' ||
+            tagName == 'div' ||
             (tagName != null && tagName.startsWith('h'))) {
           if (hasContent) {
             textBuilder.write('\n\n');
@@ -290,28 +314,22 @@ class ArticleContentService {
   /// Decode HTML entities (both named entities and numeric character references)
   String _decodeHtmlEntities(String text) {
     // First decode numeric entities (&#8221;, &#8217;, etc.)
-    text = text.replaceAllMapped(
-      RegExp(r'&#(\d+);'),
-      (match) {
-        final code = int.tryParse(match.group(1) ?? '');
-        if (code != null) {
-          return String.fromCharCode(code);
-        }
-        return match.group(0) ?? '';
-      },
-    );
+    text = text.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
+      final code = int.tryParse(match.group(1) ?? '');
+      if (code != null) {
+        return String.fromCharCode(code);
+      }
+      return match.group(0) ?? '';
+    });
 
     // Decode hex numeric entities (&#x2019;, etc.)
-    text = text.replaceAllMapped(
-      RegExp(r'&#x([0-9a-fA-F]+);'),
-      (match) {
-        final code = int.tryParse(match.group(1) ?? '', radix: 16);
-        if (code != null) {
-          return String.fromCharCode(code);
-        }
-        return match.group(0) ?? '';
-      },
-    );
+    text = text.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (match) {
+      final code = int.tryParse(match.group(1) ?? '', radix: 16);
+      if (code != null) {
+        return String.fromCharCode(code);
+      }
+      return match.group(0) ?? '';
+    });
 
     // Then decode named entities
     return text

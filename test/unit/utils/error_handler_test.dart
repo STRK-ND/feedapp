@@ -36,7 +36,9 @@ void main() {
 
       test('returns rate limit message for 429 errors', () {
         expect(
-          ErrorHandler.getUserMessage(Exception('HTTP 429 rate limit exceeded')),
+          ErrorHandler.getUserMessage(
+            Exception('HTTP 429 rate limit exceeded'),
+          ),
           'Too many requests. Please try again in a moment.',
         );
       });

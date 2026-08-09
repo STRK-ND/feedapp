@@ -92,7 +92,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   void _buy() {
     final product = _product;
     if (product == null) return;
-    _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product));
+    _iap.buyNonConsumable(
+      purchaseParam: PurchaseParam(productDetails: product),
+    );
   }
 
   @override
@@ -114,64 +116,62 @@ class _PaywallScreenState extends State<PaywallScreen> {
           child: isPro
               ? _ProThanks(onRestore: _restore)
               : _busy
-                  ? const CircularProgressIndicator()
-                  : !_available || _error != null
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _error ?? 'Store unavailable',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: colorScheme.error),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadStore,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.workspace_premium_outlined,
-                              size: 64,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Support Curated Feeds',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'One-time purchase, yours forever.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 24),
-                            if (_price != null)
-                              Text(
-                                _price!,
-                                style:
-                                    Theme.of(context).textTheme.titleLarge,
-                              ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _product != null ? _buy : null,
-                                child:
-                                    Text('Buy once — ${_price ?? ''}'),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _restore,
-                              child: const Text('Restore purchase'),
-                            ),
-                          ],
-                        ),
+              ? const CircularProgressIndicator()
+              : !_available || _error != null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _error ?? 'Store unavailable',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: colorScheme.error),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadStore,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_outlined,
+                      size: 64,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Support Curated Feeds',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'One-time purchase, yours forever.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    if (_price != null)
+                      Text(
+                        _price!,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _product != null ? _buy : null,
+                        child: Text('Buy once — ${_price ?? ''}'),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _restore,
+                      child: const Text('Restore purchase'),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -192,21 +192,20 @@ class _ProThanks extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.check_circle_outline,
-            size: 64, color: AppColors.success),
+        const Icon(
+          Icons.check_circle_outline,
+          size: 64,
+          color: AppColors.success,
+        ),
         const SizedBox(height: 16),
-        Text('You\'re Pro!',
-            style: Theme.of(context).textTheme.headlineSmall),
+        Text('You\'re Pro!', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
           'Thanks for supporting Curated Feeds.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 24),
-        TextButton(
-          onPressed: onRestore,
-          child: const Text('Restore purchase'),
-        ),
+        TextButton(onPressed: onRestore, child: const Text('Restore purchase')),
       ],
     );
   }

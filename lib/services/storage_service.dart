@@ -10,9 +10,8 @@ class StorageService {
   final FlutterSecureStorage _storage;
 
   StorageService({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage(
-          aOptions: AndroidOptions(),
-        );
+    : _storage =
+          storage ?? const FlutterSecureStorage(aOptions: AndroidOptions());
 
   /// Save articles list (public data)
   Future<void> saveArticles(List<Article> articles) async {
@@ -51,7 +50,9 @@ class StorageService {
       final jsonData = json.encode(articles.map((a) => a.toJson()).toList());
       await _storage.write(key: 'savedArticles', value: jsonData);
     } catch (e) {
-      unawaited(ErrorHandler.logError('Failed to save saved articles', error: e));
+      unawaited(
+        ErrorHandler.logError('Failed to save saved articles', error: e),
+      );
     }
   }
 
@@ -66,7 +67,9 @@ class StorageService {
           .map((json) => Article.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      unawaited(ErrorHandler.logError('Failed to load saved articles', error: e));
+      unawaited(
+        ErrorHandler.logError('Failed to load saved articles', error: e),
+      );
       return [];
     }
   }
@@ -80,7 +83,9 @@ class StorageService {
         await _storage.write(key: 'lastRefresh', value: time.toIso8601String());
       }
     } catch (e) {
-      unawaited(ErrorHandler.logError('Failed to save last refresh time', error: e));
+      unawaited(
+        ErrorHandler.logError('Failed to save last refresh time', error: e),
+      );
     }
   }
 
@@ -91,7 +96,9 @@ class StorageService {
       if (timeString == null) return null;
       return DateTime.parse(timeString);
     } catch (e) {
-      unawaited(ErrorHandler.logError('Failed to load last refresh time', error: e));
+      unawaited(
+        ErrorHandler.logError('Failed to load last refresh time', error: e),
+      );
       return null;
     }
   }

@@ -94,7 +94,9 @@ class _CurvedBottomNavBarState extends State<CurvedBottomNavBar>
               animation: _slideAnimation,
               builder: (context, child) {
                 return ClipRRect(
-                  borderRadius: BorderRadius.circular(CurvedNavTokens.barRadius),
+                  borderRadius: BorderRadius.circular(
+                    CurvedNavTokens.barRadius,
+                  ),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(
                       sigmaX: CurvedNavTokens.blurSigmaX,
@@ -145,7 +147,9 @@ class _CurvedBottomNavBarState extends State<CurvedBottomNavBar>
       case 0:
         return selected ? Icons.article : Icons.article_outlined;
       case 1:
-        return selected ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded;
+        return selected
+            ? Icons.bookmark_rounded
+            : Icons.bookmark_outline_rounded;
       case 2:
         return selected ? Icons.settings : Icons.settings_outlined;
       default:

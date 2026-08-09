@@ -43,8 +43,10 @@ class CuratedFeedsApp extends StatelessWidget {
           },
           update: (_, notifier, theme) {
             // Keep the first arg non-null. If theme is null for any
-            // reason, return the existing provider untouched.
-            return theme!..setThemeMode(notifier.themeMode);
+            // reason, return the existing provider untouched. applyThemeMode
+            // (not the persisting setThemeMode) so we never write the
+            // notifier's default `system` back over a saved theme.
+            return theme!..applyThemeMode(notifier.themeMode);
           },
         ),
       ],
@@ -99,8 +101,9 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _onUpdateTap(String payload) async {
-    final info = await NotificationService()
-        .consumeUpdateNotificationPayload(payload);
+    final info = await NotificationService().consumeUpdateNotificationPayload(
+      payload,
+    );
     if (info == null || info.version.isEmpty) return;
     await _performAutoUpdate(info);
   }
@@ -117,8 +120,9 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _consumeColdStartUpdate() async {
-    final info = await NotificationService()
-        .consumeUpdateNotificationPayload(null);
+    final info = await NotificationService().consumeUpdateNotificationPayload(
+      null,
+    );
     if (info == null || info.version.isEmpty) return;
     await _performAutoUpdate(info);
   }
@@ -139,19 +143,21 @@ class _MainNavigationState extends State<MainNavigation> {
       if (!ctx.mounted) return;
       final launched = await UpdateService.triggerInstall(apkFile: handle.file);
       if (launched) {
-        messenger?.showSnackBar(SnackBar(
-          content: Text('Installing ${info.version}…'),
-        ));
+        messenger?.showSnackBar(
+          SnackBar(content: Text('Installing ${info.version}…')),
+        );
       } else {
         await UpdateService.openDownloadUrl(info.downloadUrl);
-        messenger?.showSnackBar(const SnackBar(
-          content: Text('Opened in browser instead.'),
-        ));
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Opened in browser instead.')),
+        );
       }
     } catch (e) {
-      messenger?.showSnackBar(const SnackBar(
-        content: Text("Couldn't auto-update. Tap the update banner."),
-      ));
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't auto-update. Tap the update banner."),
+        ),
+      );
       debugPrint('[MainNavigation] auto-update threw: $e');
     }
   }

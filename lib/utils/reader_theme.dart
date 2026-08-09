@@ -6,6 +6,7 @@
 /// `eInk` is OLED true-black with warm white.
 /// `paper` is the cream-paper light.
 library;
+
 import 'package:flutter/material.dart';
 import 'design_tokens.dart';
 
@@ -102,7 +103,8 @@ bool isReaderThemeLocked(ReaderTheme theme, bool isPro) =>
     !isPro && (theme == ReaderTheme.sepia || theme == ReaderTheme.eInk);
 
 /// Reading preferences persisted via SettingsService (settings_notifier).
-class ReadingPreferences {  final ReaderTheme theme;
+class ReadingPreferences {
+  final ReaderTheme theme;
   final double fontSize; // 14..22
   final double lineHeight; // 1.4..1.8
   final bool monoDatelines;
@@ -125,13 +127,12 @@ class ReadingPreferences {  final ReaderTheme theme;
     bool? monoDatelines,
     bool? widenMeasure,
     String? bodyFont,
-  }) =>
-      ReadingPreferences(
-        theme: theme ?? this.theme,
-        fontSize: fontSize ?? this.fontSize,
-        lineHeight: lineHeight ?? this.lineHeight,
-        monoDatelines: monoDatelines ?? this.monoDatelines,
-        widenMeasure: widenMeasure ?? this.widenMeasure,
-        bodyFont: bodyFont ?? this.bodyFont,
-      );
+  }) => ReadingPreferences(
+    theme: theme ?? this.theme,
+    fontSize: fontSize ?? this.fontSize,
+    lineHeight: lineHeight ?? this.lineHeight,
+    monoDatelines: monoDatelines ?? this.monoDatelines,
+    widenMeasure: widenMeasure ?? this.widenMeasure,
+    bodyFont: bodyFont ?? this.bodyFont,
+  );
 }

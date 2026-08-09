@@ -80,29 +80,35 @@ void main() {
     });
 
     group('totalPages getter', () {
-      test('Should calculate total pages correctly when total divides evenly', () {
-        final response = PaginatedResponse(
-          items: [testArticle1],
-          total: 100,
-          page: 1,
-          pageSize: 50,
-          hasMore: true,
-        );
+      test(
+        'Should calculate total pages correctly when total divides evenly',
+        () {
+          final response = PaginatedResponse(
+            items: [testArticle1],
+            total: 100,
+            page: 1,
+            pageSize: 50,
+            hasMore: true,
+          );
 
-        expect(response.totalPages, 2);
-      });
+          expect(response.totalPages, 2);
+        },
+      );
 
-      test('Should calculate total pages correctly when there is remainder', () {
-        final response = PaginatedResponse(
-          items: [testArticle1],
-          total: 105,
-          page: 1,
-          pageSize: 50,
-          hasMore: true,
-        );
+      test(
+        'Should calculate total pages correctly when there is remainder',
+        () {
+          final response = PaginatedResponse(
+            items: [testArticle1],
+            total: 105,
+            page: 1,
+            pageSize: 50,
+            hasMore: true,
+          );
 
-        expect(response.totalPages, 3);
-      });
+          expect(response.totalPages, 3);
+        },
+      );
 
       test('Should return 0 when total is 0', () {
         final response = PaginatedResponse(
@@ -132,10 +138,7 @@ void main() {
     group('fromJson', () {
       test('Should create PaginatedResponse from JSON correctly', () {
         final json = {
-          'items': [
-            testArticle1.toJson(),
-            testArticle2.toJson(),
-          ],
+          'items': [testArticle1.toJson(), testArticle2.toJson()],
           'total': 100,
           'page': 1,
           'pageSize': 50,
@@ -156,9 +159,7 @@ void main() {
       });
 
       test('Should use default values for missing fields', () {
-        final json = {
-          'items': [],
-        };
+        final json = {'items': []};
 
         final response = PaginatedResponse.fromJson(json);
 
@@ -187,6 +188,5 @@ void main() {
         expect(response.hasMore, false);
       });
     });
-
   });
 }

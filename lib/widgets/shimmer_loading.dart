@@ -148,7 +148,9 @@ class ArticleCardSkeleton extends StatelessWidget {
                 height: 220,
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
               )
             else
@@ -156,7 +158,9 @@ class ArticleCardSkeleton extends StatelessWidget {
                 height: 180,
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
               ),
 
@@ -168,17 +172,9 @@ class ArticleCardSkeleton extends StatelessWidget {
                   // Source row
                   const Row(
                     children: [
-                      SkeletonBox(
-                        width: 80,
-                        height: 24,
-                        borderRadius: 12,
-                      ),
+                      SkeletonBox(width: 80, height: 24, borderRadius: 12),
                       SizedBox(width: 12),
-                      SkeletonBox(
-                        width: 60,
-                        height: 20,
-                        borderRadius: 10,
-                      ),
+                      SkeletonBox(width: 60, height: 20, borderRadius: 10),
                     ],
                   ),
                   const SizedBox(height: 16),

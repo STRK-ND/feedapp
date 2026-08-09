@@ -43,10 +43,8 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
   @override
   void initState() {
     super.initState();
-    _entrance = AnimationController(
-      vsync: this,
-      duration: AppMotion.base,
-    )..forward();
+    _entrance = AnimationController(vsync: this, duration: AppMotion.base)
+      ..forward();
   }
 
   @override
@@ -77,22 +75,26 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
 
     final items = <Widget>[];
     for (final g in groups) {
-      items.add(SectionEyebrow(
-        label: g.label,
-        count: g.items.length,
-        density: g.density,
-      ));
+      items.add(
+        SectionEyebrow(
+          label: g.label,
+          count: g.items.length,
+          density: g.density,
+        ),
+      );
       for (var i = 0; i < g.items.length; i++) {
         final article = g.items[i];
         final globalIndex = widget.articles.indexOf(article);
-        items.add(_SavedRow(
-          article: article,
-          onTap: () => widget.onTap(globalIndex),
-          onLongPress: () {
-            HapticFeedback.mediumImpact();
-            widget.onToggleSave(globalIndex);
-          },
-        ));
+        items.add(
+          _SavedRow(
+            article: article,
+            onTap: () => widget.onTap(globalIndex),
+            onLongPress: () {
+              HapticFeedback.mediumImpact();
+              widget.onToggleSave(globalIndex);
+            },
+          ),
+        );
       }
     }
 
@@ -257,8 +259,9 @@ class _SavedRow extends StatelessWidget {
                   Expanded(
                     child: Text(
                       article.sourceName.toUpperCase(),
-                      style: AppType.monoEyebrow(color: sourceColor)
-                          .copyWith(letterSpacing: 0.6),
+                      style: AppType.monoEyebrow(
+                        color: sourceColor,
+                      ).copyWith(letterSpacing: 0.6),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -273,8 +276,9 @@ class _SavedRow extends StatelessWidget {
               const SizedBox(height: AppSpacing.s2),
               Text(
                 article.title,
-                style: AppType.titleLarge(color: ink)
-                    .copyWith(fontSize: 18, height: 1.25),
+                style: AppType.titleLarge(
+                  color: ink,
+                ).copyWith(fontSize: 18, height: 1.25),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -289,10 +293,7 @@ class _SavedRow extends StatelessWidget {
               ],
               const SizedBox(height: AppSpacing.s3),
               // Hairline.
-              SizedBox(
-                height: 0.5,
-                child: Container(color: ruleColor),
-              ),
+              SizedBox(height: 0.5, child: Container(color: ruleColor)),
             ],
           ),
         ),

@@ -44,8 +44,10 @@ class _GrainPainter extends CustomPainter {
             alpha: (random.nextDouble() * opacity).clamp(0.0, 1.0),
           );
           canvas.drawCircle(
-            Offset(x * cellSize + random.nextDouble() * cellSize,
-                y * cellSize + random.nextDouble() * cellSize),
+            Offset(
+              x * cellSize + random.nextDouble() * cellSize,
+              y * cellSize + random.nextDouble() * cellSize,
+            ),
             0.5 + random.nextDouble() * 0.5,
             paint,
           );
@@ -55,5 +57,6 @@ class _GrainPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GrainPainter oldDelegate) => oldDelegate.opacity != opacity;
+  bool shouldRepaint(_GrainPainter oldDelegate) =>
+      oldDelegate.opacity != opacity;
 }

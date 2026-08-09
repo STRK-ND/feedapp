@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../di/service_locator.dart';
+import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
 import '../utils/design_tokens.dart';
 import 'curated_feeds_app.dart';
@@ -42,10 +43,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _next() {
     HapticFeedback.selectionClick();
     if (_step < 2) {
-      _pageController.nextPage(
-        duration: AppMotion.base,
-        curve: AppMotion.ease,
-      );
+      _pageController.nextPage(duration: AppMotion.base, curve: AppMotion.ease);
     } else {
       _finish();
     }
@@ -67,26 +65,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await settings.setReaderFontSize(_fontSize);
     await settings.setReaderLineHeight(_lineHeight);
     await settings.setMonoDatelinesEnabled(_monoDatelines);
+    // Narrow the feed only when the user actually picked sources;
+    // "CONTINUE WITHOUT" keeps the default (all sources).
+    if (_pickedSources.isNotEmpty) {
+      await settings.setSubscribedSourceIds(_pickedSources);
+    }
     await settings.setHasCompletedOnboarding(true);
     EditionState.current = await settings.getEditionNumber();
     if (!mounted) return;
-    unawaited(Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const CuratedFeedsApp(),
-        transitionsBuilder: (context, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
-        transitionDuration: AppMotion.base,
+    unawaited(
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const CuratedFeedsApp(),
+          transitionsBuilder: (context, animation, _, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: AppMotion.base,
+        ),
       ),
-    ));
+    );
   }
 
   Future<void> _skip() async {
     await getIt<SettingsService>().setHasCompletedOnboarding(true);
     if (!mounted) return;
-    unawaited(Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const CuratedFeedsApp()),
-    ));
+    unawaited(
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const CuratedFeedsApp()),
+      ),
+    );
   }
 
   @override
@@ -141,7 +148,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s4, AppSpacing.s4, AppSpacing.s4, 0),
+        AppSpacing.s4,
+        AppSpacing.s4,
+        AppSpacing.s4,
+        0,
+      ),
       child: Row(
         children: [
           _StepDots(step: _step, total: 3),
@@ -163,7 +174,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildBottomBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s6, 0, AppSpacing.s6, AppSpacing.s6),
+        AppSpacing.s6,
+        0,
+        AppSpacing.s6,
+        AppSpacing.s6,
+      ),
       child: Row(
         children: [
           if (_step > 0)
@@ -181,7 +196,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             onPressed: _next,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+                horizontal: AppSpacing.s8,
+                vertical: AppSpacing.s4,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.button),
               ),
@@ -190,10 +207,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               _step < 2
                   ? 'CONTINUE'
                   : (_pickedSources.isNotEmpty
-                      ? 'ADD ${_pickedSources.length}  ·  CONTINUE'
-                      : 'CONTINUE WITHOUT'),
-              style: AppType.labelLarge(color: Colors.white)
-                  .copyWith(letterSpacing: 1.2),
+                        ? 'ADD ${_pickedSources.length}  ·  CONTINUE'
+                        : 'CONTINUE WITHOUT'),
+              style: AppType.labelLarge(
+                color: Colors.white,
+              ).copyWith(letterSpacing: 1.2),
             ),
           ),
         ],
@@ -249,7 +267,11 @@ class _StepPickRoom extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s6, AppSpacing.s8, AppSpacing.s6, AppSpacing.s4),
+        AppSpacing.s6,
+        AppSpacing.s8,
+        AppSpacing.s6,
+        AppSpacing.s4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -260,8 +282,9 @@ class _StepPickRoom extends StatelessWidget {
           const SizedBox(height: AppSpacing.s3),
           Text(
             'How should\nthis feel?',
-            style: AppType.displayLarge(color: AppColors.ink)
-                .copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: AppColors.ink,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
@@ -356,12 +379,17 @@ class _RoomSwatch extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: AppType.folioTop(color: AppColors.primary)
-                        .copyWith(letterSpacing: 1.2),
+                    style: AppType.folioTop(
+                      color: AppColors.primary,
+                    ).copyWith(letterSpacing: 1.2),
                   ),
                   const Spacer(),
                   if (selected)
-                    const Icon(Icons.circle, size: 12, color: AppColors.primary),
+                    const Icon(
+                      Icons.circle,
+                      size: 12,
+                      color: AppColors.primary,
+                    ),
                 ],
               ),
               const SizedBox(height: AppSpacing.s4),
@@ -386,9 +414,10 @@ class _RoomSwatch extends StatelessWidget {
                     Text(
                       '07.07 · 14:03',
                       style: AppType.monoDateline(
-                          color: isDarkGround
-                              ? AppColors.paperOnGroundSoft
-                              : AppColors.inkSoft),
+                        color: isDarkGround
+                            ? AppColors.paperOnGroundSoft
+                            : AppColors.inkSoft,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.s2),
                     Text(
@@ -440,7 +469,11 @@ class _StepReaderPrefs extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s6, AppSpacing.s8, AppSpacing.s6, AppSpacing.s4),
+        AppSpacing.s6,
+        AppSpacing.s8,
+        AppSpacing.s6,
+        AppSpacing.s4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -451,8 +484,9 @@ class _StepReaderPrefs extends StatelessWidget {
           const SizedBox(height: AppSpacing.s3),
           Text(
             'Make it\ncomfortable.',
-            style: AppType.displayLarge(color: AppColors.ink)
-                .copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: AppColors.ink,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s6),
           // Live preview
@@ -469,14 +503,16 @@ class _StepReaderPrefs extends StatelessWidget {
                 if (monoDatelines)
                   Text(
                     'CURATED · 07.07 · 14:03',
-                    style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                        .copyWith(letterSpacing: 0.6),
+                    style: AppType.monoEyebrow(
+                      color: AppColors.inkSoft,
+                    ).copyWith(letterSpacing: 0.6),
                   ),
                 const SizedBox(height: AppSpacing.s2),
                 Text(
                   'How a sentence reads at this size.',
-                  style: AppType.displayMedium(color: AppColors.ink)
-                      .copyWith(fontSize: fontSize, height: lineHeight),
+                  style: AppType.displayMedium(
+                    color: AppColors.ink,
+                  ).copyWith(fontSize: fontSize, height: lineHeight),
                 ),
                 const SizedBox(height: AppSpacing.s3),
                 Text(
@@ -548,13 +584,19 @@ class _SliderRow extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(label,
-                style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                    .copyWith(letterSpacing: 0.8)),
+            Text(
+              label,
+              style: AppType.monoEyebrow(
+                color: AppColors.inkSoft,
+              ).copyWith(letterSpacing: 0.8),
+            ),
             const Spacer(),
-            Text(display,
-                style: AppType.monoDateline(color: AppColors.primary)
-                    .copyWith(fontWeight: FontWeight.w600)),
+            Text(
+              display,
+              style: AppType.monoDateline(
+                color: AppColors.primary,
+              ).copyWith(fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         SliderTheme(
@@ -586,23 +628,34 @@ class _StepAddSources extends StatelessWidget {
 
   const _StepAddSources({required this.picked, required this.onToggle});
 
-  static const _sources = [
-    ('the-verge', 'The Verge', 'TECH', Icons.privacy_tip_outlined),
-    ('hacker-news', 'Hacker News', 'TECH', Icons.terminal),
-    ('bbc', 'BBC News', 'NEWS', Icons.public),
-    ('reuters', 'Reuters', 'NEWS', Icons.gavel),
-    ('ars-technica', 'Ars Technica', 'TECH', Icons.memory),
-    ('aeon', 'Aeon', 'ESSAYS', Icons.menu_book_outlined),
-    ('lrb', 'LRB Blog', 'ESSAYS', Icons.book),
-    ('fivethirtyeight', 'FiveThirtyEight', 'POLITICS', Icons.bar_chart),
-    ('the-browser', 'The Browser', 'DAILY DIGEST', Icons.language),
+  // Curated first-issue picks — real IDs only, mapped through
+  // RssFeedService.predefinedSources so name/category/icon stay in sync.
+  static const _sourceIds = [
+    'verge',
+    'wired',
+    'bbc',
+    'newscientist',
+    'skysports',
+    'variety',
+    'arstechnica',
+    'techcrunch',
+    'ign',
+    'nasa',
   ];
+  static final _sources = RssFeedService.predefinedSources
+      .where((s) => _sourceIds.contains(s.id))
+      .map((s) => (id: s.id, name: s.name, category: s.category, icon: s.icon))
+      .toList();
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s6, AppSpacing.s8, AppSpacing.s6, AppSpacing.s4),
+        AppSpacing.s6,
+        AppSpacing.s8,
+        AppSpacing.s6,
+        AppSpacing.s4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -613,8 +666,9 @@ class _StepAddSources extends StatelessWidget {
           const SizedBox(height: AppSpacing.s3),
           Text(
             'Start with one\nor twenty.',
-            style: AppType.displayLarge(color: AppColors.ink)
-                .copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: AppColors.ink,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
@@ -624,12 +678,12 @@ class _StepAddSources extends StatelessWidget {
           const SizedBox(height: AppSpacing.s6),
           for (final s in _sources) ...[
             _SourceRow(
-              id: s.$1,
-              name: s.$2,
-              category: s.$3,
-              icon: s.$4,
-              picked: picked.contains(s.$1),
-              onTap: () => onToggle(s.$1),
+              id: s.id,
+              name: s.name,
+              category: s.category,
+              icon: s.icon,
+              picked: picked.contains(s.id),
+              onTap: () => onToggle(s.id),
             ),
             const SizedBox(height: AppSpacing.s2),
           ],
@@ -677,9 +731,7 @@ class _SourceRow extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(
-              color: picked
-                  ? AppColors.primary
-                  : AppColors.rule,
+              color: picked ? AppColors.primary : AppColors.rule,
               width: picked ? 1.5 : 1,
             ),
           ),
@@ -691,8 +743,9 @@ class _SourceRow extends StatelessWidget {
               const Spacer(),
               Text(
                 category,
-                style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                    .copyWith(letterSpacing: 0.6),
+                style: AppType.monoEyebrow(
+                  color: AppColors.inkSoft,
+                ).copyWith(letterSpacing: 0.6),
               ),
               const SizedBox(width: AppSpacing.s3),
               AnimatedContainer(
@@ -709,8 +762,7 @@ class _SourceRow extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: picked
-                    ? const Icon(Icons.check,
-                        size: 12, color: Colors.white)
+                    ? const Icon(Icons.check, size: 12, color: Colors.white)
                     : null,
               ),
             ],

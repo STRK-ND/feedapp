@@ -40,6 +40,9 @@ const SOURCES = [
 const ARTICLES_CACHE_KEY = 'articles:v1';
 const SEEN_IDS_KEY = 'seen-ids:v1';
 const ARTICLES_TTL_SECONDS = 5 * 60;
+const REFRESH_LOCK_KEY = 'refresh:lock';
+const MAX_XML_BYTES = 5 * 1024 * 1024;
+const CORS_ALLOWED_ORIGIN = 'https://curated-feeds-worker.raj15400881.workers.dev';
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -61,12 +64,19 @@ export default {
         return await handleArticles(url, env);
       }
       if (url.pathname === '/articles/refresh' && request.method === 'GET') {
+        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        const refreshIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+        if (!(await consumeRate(env, 'refresh:' + refreshIp, 5, 60))) {
+          return json({ error: 'rate_limited' }, 429);
+        }
         return await handleForceRefresh(ctx, env);
       }
       if (url.pathname === '/subscribe' && request.method === 'POST') {
+        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
         return await handleSubscribe(request, env);
       }
       if (url.pathname === '/subscribe' && request.method === 'DELETE') {
+        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
         return await handleUnsubscribe(request, env);
       }
       return json({ error: 'not_found' }, 404);
@@ -77,13 +87,31 @@ export default {
   },
 
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(refreshArticlesAndMaybeNotify(env));
+    try {
+      ctx.waitUntil(refreshArticlesAndMaybeNotify(env));
+    } catch (e) {
+      console.error('scheduled_failed', { error: String(e) });
+    }
   },
 };
 
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
+
+function isAuthorized(request, env) {
+  if (!env.API_SECRET) return true; // not configured yet → back-compat
+  return request.headers.get('x-api-secret') === env.API_SECRET;
+}
+
+async function consumeRate(env, key, limit, windowSec) {
+  const win = Math.floor(Date.now() / (windowSec * 1000));
+  const k = `rl:${key}:${win}`;
+  const cur = await env.ARTICLES_KV.get(k, 'json');
+  if (cur && cur.n >= limit) return false;
+  await env.ARTICLES_KV.put(k, JSON.stringify({ n: (cur?.n ?? 0) + 1 }), { expirationTtl: windowSec * 2 });
+  return true;
+}
 
 async function handleArticles(url, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -115,13 +143,18 @@ async function handleSubscribe(request, env) {
   }
   const prefs = body?.preferences && typeof body.preferences === 'object' ? body.preferences : {};
 
-  // Store the subscription.
+  const subIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (!(await consumeRate(env, 'sub:' + token + subIp, 10, 60))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  // Store the subscription. 90-day rolling TTL; refreshed on each app launch.
   await env.ARTICLES_KV.put(`sub:${token}`, JSON.stringify({
     token,
     topic: body.topic || 'new-articles',
     preferences: prefs,
     createdAt: Date.now(),
-  }));
+  }), { expirationTtl: 90 * 24 * 3600 });
 
   // Subscribe the token to the FCM topic. Uses the IID endpoint with an
   // OAuth2 access token derived from FCM_SERVICE_ACCOUNT.
@@ -159,6 +192,12 @@ async function handleUnsubscribe(request, env) {
   if (typeof token !== 'string' || token.length < 10) {
     return json({ error: 'missing_token' }, 400);
   }
+
+  const unsubIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (!(await consumeRate(env, 'unsub:' + token + unsubIp, 10, 60))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
   await env.ARTICLES_KV.delete(`sub:${token}`);
 
   if (env.FCM_SERVICE_ACCOUNT) {
@@ -197,34 +236,46 @@ async function loadArticles(env) {
 }
 
 async function refreshArticlesAndMaybeNotify(env) {
-  const articles = await fetchAllSources();
-  // Read previous seen-ids before overwriting
-  const seen = (await env.ARTICLES_KV.get(SEEN_IDS_KEY, 'json')) || [];
-  const seenSet = new Set(seen);
+  const lock = await env.ARTICLES_KV.get(REFRESH_LOCK_KEY);
+  if (lock === '1') {
+    const cached = await env.ARTICLES_KV.get(ARTICLES_CACHE_KEY, 'json');
+    return Array.isArray(cached) && cached.length ? cached : [];
+  }
+  // KV refuses expirationTtl < 60; a 60s lock is still far shorter than the
+  // 5-min cron cadence, so the thundering-herd protection is unchanged.
+  await env.ARTICLES_KV.put(REFRESH_LOCK_KEY, '1', { expirationTtl: 60 });
+  try {
+    const articles = await fetchAllSources();
+    // Read previous seen-ids before overwriting
+    const seen = (await env.ARTICLES_KV.get(SEEN_IDS_KEY, 'json')) || [];
+    const seenSet = new Set(seen);
 
-  const newIds = [];
-  for (const a of articles) {
-    if (!seenSet.has(a.id)) {
-      newIds.push(a.id);
-      seenSet.add(a.id);
+    const newIds = [];
+    for (const a of articles) {
+      if (!seenSet.has(a.id)) {
+        newIds.push(a.id);
+        seenSet.add(a.id);
+      }
     }
-  }
 
-  // Persist — KV with TTL so we naturally expire to "cold" between crons.
-  await env.ARTICLES_KV.put(ARTICLES_CACHE_KEY, JSON.stringify(articles), {
-    expirationTtl: ARTICLES_TTL_SECONDS * 2, // keep alive through 2 cron ticks
-  });
-  // Seen IDs get a longer TTL — we want them to outlive article cache so the
-  // next refresh still recognises genuinely-new vs "we already know about"
-  // articles.
-  await env.ARTICLES_KV.put(SEEN_IDS_KEY, JSON.stringify([...seenSet]), {
-    expirationTtl: 24 * 60 * 60,
-  });
+    // Persist — KV with TTL so we naturally expire to "cold" between crons.
+    await env.ARTICLES_KV.put(ARTICLES_CACHE_KEY, JSON.stringify(articles), {
+      expirationTtl: ARTICLES_TTL_SECONDS * 2, // keep alive through 2 cron ticks
+    });
+    // Seen IDs get a longer TTL — we want them to outlive article cache so the
+    // next refresh still recognises genuinely-new vs "we already know about"
+    // articles.
+    await env.ARTICLES_KV.put(SEEN_IDS_KEY, JSON.stringify([...seenSet]), {
+      expirationTtl: 24 * 60 * 60,
+    });
 
-  if (newIds.length > 0 && env.FCM_SERVICE_ACCOUNT && env.FCM_PROJECT_ID) {
-    await announceNewArticles(articles.slice(0, 3), env);
+    if (newIds.length > 0 && env.FCM_SERVICE_ACCOUNT && env.FCM_PROJECT_ID) {
+      await announceNewArticles(articles.slice(0, 3), env);
+    }
+    return articles;
+  } finally {
+    await env.ARTICLES_KV.delete(REFRESH_LOCK_KEY);
   }
-  return articles;
 }
 
 async function fetchAllSources() {
@@ -262,7 +313,11 @@ async function fetchSourceArticles(source) {
       console.warn('source_fetch_failed', { source: source.id, status: response.status });
       return [];
     }
-    const xml = await response.text();
+    const xml = await readTextCapped(response, MAX_XML_BYTES);
+    if (xml === null) {
+      console.warn('source_too_large', { source: source.id });
+      return [];
+    }
     return parseRss(xml, source);
   } catch (e) {
     console.warn('source_fetch_error', { source: source.id, error: String(e) });
@@ -330,7 +385,7 @@ function buildArticle(body, source, opts) {
     extractTag(body, opts.descTag) || extractTag(body, opts.fullContentTag)
   );
   const pubDateRaw = strip(extractTag(body, opts.pubDateTag));
-  const pubDate = parseDate(pubDateRaw);
+  const pubDate = parseDate(pubDateRaw) ?? 0;
   const author = strip(extractTag(body, opts.authorTag)) || null;
 
   const mediaMatch = body.match(/<media:content\b[^>]*url="([^"]+)"/i);
@@ -501,6 +556,20 @@ function base64UrlEncodeBytes(bytes) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+async function readTextCapped(response, maxBytes) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '', total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) { await reader.cancel(); return null; }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 function extractTag(body, tag) {
   if (!tag) return null;
   const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
@@ -523,7 +592,7 @@ function strip(s) {
 }
 
 function parseDate(s) {
-  if (!s) return Date.now();
+  if (!s) return null;
   // Sky Sports publishes dates like "Tue, 28 Jul 2026 18:11:00 BST" —
   // JS Date.parse rejects the BST suffix. Normalise non-RFC-2822 timezones.
   const normalized = s
@@ -534,7 +603,7 @@ function parseDate(s) {
     .replace(/\bPST\b/gi, '-0800')
     .replace(/\bPDT\b/gi, '-0700');
   const t = Date.parse(normalized);
-  return Number.isNaN(t) ? Date.now() : t;
+  return Number.isNaN(t) ? null : t;
 }
 
 function stableId(sourceId, link) {
@@ -554,9 +623,12 @@ function json(body, status = 200) {
 }
 
 function cors(response) {
+  // ponytail: single-origin; read env.CORS_ORIGINS (comma-separated) + echo matching origins if browser tooling from other origins is ever needed
   const r = new Response(response.body, response);
-  r.headers.set('Access-Control-Allow-Origin', '*');
+  r.headers.set('Access-Control-Allow-Origin', CORS_ALLOWED_ORIGIN);
   r.headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   r.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   return r;
 }
+
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY };

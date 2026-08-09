@@ -1,0 +1,9 @@
+{
+  "name": "curated-feeds-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "lint": "node --check feed-worker.js"
+  }
+}

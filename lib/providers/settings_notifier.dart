@@ -60,13 +60,13 @@ class SettingsNotifier extends ChangeNotifier {
   bool get isPro => _isPro;
 
   ReadingPreferences get readingPrefs => ReadingPreferences(
-        theme: _readerTheme,
-        fontSize: _fontSize,
-        lineHeight: _lineHeight,
-        monoDatelines: _monoDatelines,
-        widenMeasure: _widenMeasure,
-        bodyFont: _bodyFont,
-      );
+    theme: _readerTheme,
+    fontSize: _fontSize,
+    lineHeight: _lineHeight,
+    monoDatelines: _monoDatelines,
+    widenMeasure: _widenMeasure,
+    bodyFont: _bodyFont,
+  );
 
   // =========================================================================
   //  Load — called once at app start. Re-load after importing storage.

@@ -23,7 +23,7 @@ void main() {
                   'sourceId': 'verge',
                   'sourceName': 'The Verge',
                   'pubDate': 1705312800000,
-                }
+                },
               ],
               'hasMore': false,
               'total': 1,
@@ -48,10 +48,7 @@ void main() {
 
         service = WorkerFeedService(httpClient: mockClient);
 
-        expect(
-          () => service.fetchArticles(),
-          throwsA(isA<RateLimitError>()),
-        );
+        expect(() => service.fetchArticles(), throwsA(isA<RateLimitError>()));
       });
 
       test('throws on HTTP 500 server error', () async {
@@ -61,10 +58,7 @@ void main() {
 
         service = WorkerFeedService(httpClient: mockClient);
 
-        expect(
-          () => service.fetchArticles(),
-          throwsA(isA<Exception>()),
-        );
+        expect(() => service.fetchArticles(), throwsA(isA<Exception>()));
       });
 
       test('throws on malformed JSON', () async {
@@ -74,20 +68,13 @@ void main() {
 
         service = WorkerFeedService(httpClient: mockClient);
 
-        expect(
-          () => service.fetchArticles(),
-          throwsA(isA<Exception>()),
-        );
+        expect(() => service.fetchArticles(), throwsA(isA<Exception>()));
       });
 
       test('returns empty items on 200 with no items', () async {
         final mockClient = MockClient((request) async {
           return http.Response(
-            jsonEncode({
-              'items': [],
-              'hasMore': false,
-              'total': 0,
-            }),
+            jsonEncode({'items': [], 'hasMore': false, 'total': 0}),
             200,
           );
         });

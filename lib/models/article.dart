@@ -1,5 +1,6 @@
 /// Article Model
 library;
+
 import '../utils/helpers.dart';
 
 class Article {

@@ -51,18 +51,18 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          sed -i "s/^version: .*/version: $VERSION/" pubspec.yaml
-          echo "Synced pubspec version to $VERSION"
+          sed -i "s/^version: .*/version: $VERSION+$GITHUB_RUN_NUMBER/" pubspec.yaml
+          echo "Synced pubspec version to $VERSION+$GITHUB_RUN_NUMBER"
 
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=WORKER_API_SECRET=${{ secrets.WORKER_API_SECRET }}
 
       - name: Build AAB
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=WORKER_API_SECRET=${{ secrets.WORKER_API_SECRET }}
 
       - name: Rename artifacts
         run: |

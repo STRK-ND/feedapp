@@ -31,7 +31,9 @@ class WorkerFeedService {
   Future<PaginatedResponse> fetchArticles({FilterParams? params}) async {
     final filterParams = params ?? const FilterParams.defaults();
     final queryParams = filterParams.toQueryParams();
-    final uri = Uri.parse(AppConfig.workerApiUrl).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+    final uri = Uri.parse(
+      AppConfig.workerApiUrl,
+    ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
     final url = uri.toString();
 
     debugPrint('[Worker] Fetching articles from $url');
@@ -41,10 +43,17 @@ class WorkerFeedService {
     const baseDelayMs = 1000; // Start with 1 second
     final parsedUri = Uri.parse(url);
 
+    // Send the shared API secret when one was compiled in via
+    // --dart-define=WORKER_API_SECRET.
+    final headers = <String, String>{};
+    if (AppConfig.workerApiSecret.isNotEmpty) {
+      headers['x-api-secret'] = AppConfig.workerApiSecret;
+    }
+
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         final response = await _httpClient
-            .get(parsedUri)
+            .get(parsedUri, headers: headers)
             .timeout(
               const Duration(seconds: AppConfig.workerTimeoutSeconds),
               onTimeout: () {
@@ -66,48 +75,65 @@ class WorkerFeedService {
         } else if (response.statusCode == 429) {
           // Rate limited — retry with backoff if we have retries left
           if (attempt < maxRetries) {
-            final delayMs = baseDelayMs * (1 << attempt); // exponential: 1s, 2s, 4s
-            debugPrint('[Worker] Rate limited (429), retry ${attempt + 1}/$maxRetries in ${delayMs}ms');
-            unawaited(ErrorHandler.logError(
-              'Worker API rate limited, retrying in ${delayMs}ms',
-              severity: ErrorSeverity.medium,
-            ));
+            final delayMs =
+                baseDelayMs * (1 << attempt); // exponential: 1s, 2s, 4s
+            debugPrint(
+              '[Worker] Rate limited (429), retry ${attempt + 1}/$maxRetries in ${delayMs}ms',
+            );
+            unawaited(
+              ErrorHandler.logError(
+                'Worker API rate limited, retrying in ${delayMs}ms',
+                severity: ErrorSeverity.medium,
+              ),
+            );
             await Future.delayed(Duration(milliseconds: delayMs));
             continue;
           }
-          unawaited(ErrorHandler.logError(
-            'Worker API rate limited after $maxRetries retries',
-            severity: ErrorSeverity.high,
-          ));
-          throw RateLimitError(message: 'Rate limit exceeded. Please try again later.');
+          unawaited(
+            ErrorHandler.logError(
+              'Worker API rate limited after $maxRetries retries',
+              severity: ErrorSeverity.high,
+            ),
+          );
+          throw RateLimitError(
+            message: 'Rate limit exceeded. Please try again later.',
+          );
         } else {
-          unawaited(ErrorHandler.logError(
-            'Worker API returned ${response.statusCode}',
-            severity: ErrorSeverity.high,
-          ));
+          unawaited(
+            ErrorHandler.logError(
+              'Worker API returned ${response.statusCode}',
+              severity: ErrorSeverity.high,
+            ),
+          );
           throw Exception('HTTP ${response.statusCode}');
         }
       } on FormatException catch (e) {
-        unawaited(ErrorHandler.logError(
-          'Invalid JSON response from Worker',
-          error: e,
-          severity: ErrorSeverity.high,
-        ));
+        unawaited(
+          ErrorHandler.logError(
+            'Invalid JSON response from Worker',
+            error: e,
+            severity: ErrorSeverity.high,
+          ),
+        );
         throw Exception('Invalid JSON response');
       } catch (e) {
         if (e is RateLimitError) rethrow;
         // Network error — retry if we have attempts left
         if (attempt < maxRetries - 1) {
           final delayMs = baseDelayMs * (1 << attempt);
-          debugPrint('[Worker] Network error: $e, retry ${attempt + 1}/$maxRetries in ${delayMs}ms');
+          debugPrint(
+            '[Worker] Network error: $e, retry ${attempt + 1}/$maxRetries in ${delayMs}ms',
+          );
           await Future.delayed(Duration(milliseconds: delayMs));
           continue;
         }
-        unawaited(ErrorHandler.logError(
-          'Failed to fetch from Worker API',
-          error: e,
-          severity: ErrorSeverity.high,
-        ));
+        unawaited(
+          ErrorHandler.logError(
+            'Failed to fetch from Worker API',
+            error: e,
+            severity: ErrorSeverity.high,
+          ),
+        );
         rethrow;
       }
     }
@@ -115,5 +141,4 @@ class WorkerFeedService {
     // Should not reach here, but compiler doesn't know
     throw Exception('Max retries exceeded');
   }
-
 }

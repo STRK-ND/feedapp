@@ -38,7 +38,12 @@ class UpdateService {
 
   /// Check for updates (throttle to at most once per hour).
   /// Behavior unchanged from before the OTA pass.
-  static Future<UpdateInfo?> checkForUpdates({bool forceCheck = false}) async {
+  /// `client` is optional and injectable so tests can mock the
+  /// GitHub HTTP call; defaults to a real [http.Client].
+  static Future<UpdateInfo?> checkForUpdates({
+    bool forceCheck = false,
+    http.Client? client,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastChecked = prefs.getInt(_lastCheckedKey) ?? 0;
@@ -49,10 +54,12 @@ class UpdateService {
         return null;
       }
 
-      final response = await http.get(
-        Uri.parse(githubApiUrl),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      ).timeout(const Duration(seconds: 10));
+      final response = await (client ?? http.Client())
+          .get(
+            Uri.parse(githubApiUrl),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -125,10 +132,7 @@ class UpdateService {
   static Future<bool> openDownloadUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
-      return await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
     return false;
   }
@@ -141,13 +145,16 @@ class UpdateService {
   ///
   /// Streamed via `http.get`, written via `dart:io` `File.writeAsBytes`
   /// (APKs are <30 MB so we keep it simple — no `flutter_downloader`).
+  /// `client` is optional and injectable for tests, mirroring
+  /// [checkForUpdates].
   static Future<UpdateDownloadHandle> downloadApk({
     required String url,
     required String version,
+    http.Client? client,
   }) async {
-    final response = await http.get(Uri.parse(url)).timeout(
-          const Duration(minutes: 4),
-        );
+    final response = await (client ?? http.Client())
+        .get(Uri.parse(url))
+        .timeout(const Duration(minutes: 4));
     if (response.statusCode != 200) {
       throw HttpException(
         'Download failed: ${response.statusCode}',
@@ -178,10 +185,7 @@ class UpdateService {
       debugPrint('[UpdateService] APK missing at ${apkFile.path}');
       return false;
     }
-    final result = await OpenFilex.open(
-      apkFile.path,
-      type: _apkMimeType,
-    );
+    final result = await OpenFilex.open(apkFile.path, type: _apkMimeType);
     // result.type contains a string status. Anything other than
     // 'done' / 'opened' means we did not successfully start the
     // installer.

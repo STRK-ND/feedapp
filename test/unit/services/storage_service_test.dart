@@ -130,7 +130,9 @@ void main() {
     group('clearAll', () {
       test('clears all stored data', () async {
         await service.saveArticles([_makeArticle(id: '1', title: 'Test')]);
-        await service.saveSavedArticles([_makeArticle(id: '2', title: 'Saved')]);
+        await service.saveSavedArticles([
+          _makeArticle(id: '2', title: 'Saved'),
+        ]);
         await service.saveViewMode('card');
 
         await service.clearAll();
@@ -289,10 +291,16 @@ class MockFlutterSecureStorage implements FlutterSecureStorage {
   Map<String, List<ValueChanged<String?>>> get getListeners => {};
 
   @override
-  void registerListener({required String key, required ValueChanged<String?> listener}) {}
+  void registerListener({
+    required String key,
+    required ValueChanged<String?> listener,
+  }) {}
 
   @override
-  void unregisterListener({required String key, required ValueChanged<String?> listener}) {}
+  void unregisterListener({
+    required String key,
+    required ValueChanged<String?> listener,
+  }) {}
 
   @override
   void unregisterAllListeners() {}

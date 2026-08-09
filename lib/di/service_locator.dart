@@ -23,9 +23,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<ApkCacheManager>(() => ApkCacheManager());
   getIt.registerLazySingleton<SettingsService>(() => SettingsService());
 
-  getIt.registerLazySingleton<RssFeedService>(
-    () => RssFeedService(),
-  );
+  getIt.registerLazySingleton<RssFeedService>(() => RssFeedService());
   getIt.registerLazySingleton<ArticleContentService>(
     () => ArticleContentService(httpClient: getIt<http.Client>()),
   );

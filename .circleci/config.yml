@@ -20,13 +20,29 @@ jobs:
           name: flutter pub get
           command: flutter pub get
       - run:
+          name: dart format check
+          command: dart format --output=none --set-exit-if-changed lib test
+      - run:
+          name: dart pub audit
+          command: dart pub audit || true  # known/transitive — resolve in a dedicated pass
+      - run:
           name: flutter analyze
           command: flutter analyze
       - run:
           name: flutter test
           command: flutter test --reporter expanded
-      - store_test_results:
-          path: test-results
+
+  worker:
+    docker:
+      - image: cimg/node:20.15-browsers
+    steps:
+      - checkout
+      - run:
+          name: Worker syntax check
+          command: node --check workers/feed-worker.js
+      - run:
+          name: Worker tests
+          command: cd workers && npm test
 
   build-release:
     executor: flutter
@@ -70,6 +86,10 @@ workflows:
   main:
     jobs:
       - analyze-and-test:
+          filters:
+            tags:
+              only: /.*/
+      - worker:
           filters:
             tags:
               only: /.*/

@@ -103,7 +103,7 @@ void main() {
       // Assert
       expect(article.author, null);
       expect(article.imageUrl, null);
-      expect(article.isRead, false);  // Defaults to false
+      expect(article.isRead, false); // Defaults to false
       expect(article.isSaved, false); // Defaults to false
     });
 
@@ -365,9 +365,9 @@ void main() {
 
       // Act
       const query = 'flutter';
-      final results = articles.where((a) =>
-        a.title.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where((a) => a.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
 
       // Assert
       expect(results.length, 1);
@@ -401,9 +401,11 @@ void main() {
 
       // Act
       const query = 'flutter';
-      final results = articles.where((a) =>
-        a.description.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where(
+            (a) => a.description.toLowerCase().contains(query.toLowerCase()),
+          )
+          .toList();
 
       // Assert
       expect(results.length, 1);
@@ -437,9 +439,11 @@ void main() {
 
       // Act
       const query = 'techcrunch';
-      final results = articles.where((a) =>
-        a.sourceName.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where(
+            (a) => a.sourceName.toLowerCase().contains(query.toLowerCase()),
+          )
+          .toList();
 
       // Assert
       expect(results.length, 1);
@@ -463,9 +467,9 @@ void main() {
 
       // Act
       const query = '';
-      final results = articles.where((a) =>
-        a.title.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where((a) => a.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
 
       // Assert - Empty query should match all
       expect(results.length, articles.length);
@@ -488,9 +492,9 @@ void main() {
 
       // Act
       const query = 'flutter';
-      final results = articles.where((a) =>
-        a.title.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where((a) => a.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
 
       // Assert
       expect(results.length, 1);
@@ -513,9 +517,9 @@ void main() {
 
       // Act
       const query = 'python';
-      final results = articles.where((a) =>
-        a.title.toLowerCase().contains(query.toLowerCase())
-      ).toList();
+      final results = articles
+          .where((a) => a.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
 
       // Assert
       expect(results.length, 0);

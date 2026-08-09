@@ -22,14 +22,14 @@ class FilterParams {
 
   /// Default pagination params
   const FilterParams.defaults()
-      : page = 1,
-        pageSize = 50,
-        category = null,
-        sources = null,
-        searchQuery = null,
-        since = null,
-        until = null,
-        sortBy = null;
+    : page = 1,
+      pageSize = 50,
+      category = null,
+      sources = null,
+      searchQuery = null,
+      since = null,
+      until = null,
+      sortBy = null;
 
   /// Create a copy with modified fields
   FilterParams copyWith({

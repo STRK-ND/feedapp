@@ -15,7 +15,8 @@ class InAppNotificationBanner extends StatefulWidget {
   });
 
   @override
-  State<InAppNotificationBanner> createState() => _InAppNotificationBannerState();
+  State<InAppNotificationBanner> createState() =>
+      _InAppNotificationBannerState();
 }
 
 class _InAppNotificationBannerState extends State<InAppNotificationBanner>
@@ -39,12 +40,10 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOut,
-      ),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
     _startDismissTimer();
@@ -95,13 +94,10 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
       animation: _controller,
       builder: (context, child) {
         return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, -1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: _controller,
-            curve: Curves.easeOutBack,
-          )),
+          position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+              ),
           child: FadeTransition(
             opacity: _fadeAnimation,
             child: GestureDetector(
@@ -159,7 +155,9 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                           animation: _progressController,
                           builder: (context, child) {
                             return LinearProgressIndicator(
-                              value: _isHovering ? null : _progressController.value,
+                              value: _isHovering
+                                  ? null
+                                  : _progressController.value,
                               backgroundColor: Colors.transparent,
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 type.backgroundColor.withValues(alpha: 0.6),
@@ -178,7 +176,9 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: type.backgroundColor.withValues(alpha: 0.15),
+                                  color: type.backgroundColor.withValues(
+                                    alpha: 0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -229,7 +229,8 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest,
+                                      color:
+                                          colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(
@@ -260,13 +261,11 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
 class InAppNotificationOverlay extends StatefulWidget {
   final Widget child;
 
-  const InAppNotificationOverlay({
-    super.key,
-    required this.child,
-  });
+  const InAppNotificationOverlay({super.key, required this.child});
 
   @override
-  State<InAppNotificationOverlay> createState() => _InAppNotificationOverlayState();
+  State<InAppNotificationOverlay> createState() =>
+      _InAppNotificationOverlayState();
 }
 
 class _InAppNotificationOverlayState extends State<InAppNotificationOverlay> {
@@ -276,7 +275,9 @@ class _InAppNotificationOverlayState extends State<InAppNotificationOverlay> {
   @override
   void initState() {
     super.initState();
-    _subscription = InAppNotificationManager().notificationStream.listen(_addNotification);
+    _subscription = InAppNotificationManager().notificationStream.listen(
+      _addNotification,
+    );
   }
 
   @override

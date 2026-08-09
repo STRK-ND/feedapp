@@ -197,10 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: Text(
-              'Settings',
-              style: AppType.headlineSmall(),
-            ),
+            title: Text('Settings', style: AppType.headlineSmall()),
             centerTitle: false,
           ),
           body: ListView(
@@ -233,242 +230,258 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icons.notifications_outlined,
                   title: 'Push Notifications',
                   subtitle: 'Receive notifications for new content',
-              value: _notificationsEnabled,
-              onChanged: (value) async {
-                final previous = _notificationsEnabled;
-                setState(() => _notificationsEnabled = value);
-                try {
-                  if (value) {
-                    await NotificationService.enablePushNotifications();
-                  } else {
-                    await NotificationService.disablePushNotifications();
-                  }
-                  await _settingsService.setNotificationsEnabled(value);
-                } catch (_) {
-                  if (!context.mounted) return;
-                  setState(() => _notificationsEnabled = previous);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Could not reach notification server — try again',
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-            if (_notificationsEnabled) ...[
-              _buildDivider(),
-              _buildSwitchTile(
-                icon: Icons.article_outlined,
-                title: 'New Articles',
-                subtitle: 'Notify when new articles are available',
-                value: _newArticleNotifs,
-                onChanged: (value) async {
-                  setState(() => _newArticleNotifs = value);
-                  await _settingsService.setNewArticleNotifications(value);
-                  // Re-POST prefs to the worker so the server-side row
-                  // reflects the change without a manual toggle of master.
-                  if (_notificationsEnabled) {
-                    unawaited(
-                      NotificationService.enablePushNotifications()
-                          .catchError((Object _) {}),
-                    );
-                  }
-                },
-                indented: true,
-              ),
-              _buildDivider(),
-              _buildSwitchTile(
-                icon: Icons.notifications_active_outlined,
-                title: 'In-App Notifications',
-                subtitle: 'Show notification banners inside the app',
-                value: _inAppNotifsEnabled,
-                onChanged: (value) async {
-                  setState(() => _inAppNotifsEnabled = value);
-                  InAppNotificationManager().setEnabled(value);
-                  await _settingsService.setInAppNotificationsEnabled(value);
-                },
-                indented: true,
-              ),
-            ],
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Feed Settings'),
-          _buildSettingsCard([
-            _buildSwitchTile(
-              icon: Icons.refresh_outlined,
-              title: 'Auto Refresh',
-              subtitle: 'Automatically refresh feeds in background',
-              value: notifier.autoRefresh,
-              onChanged: notifier.setAutoRefresh,
-            ),
-            if (notifier.autoRefresh) ...[
-              _buildDivider(),
-              _buildIntervalSelector(notifier),
-              _buildDivider(),
-              _buildMaxArticlesSelector(notifier),
-            ],
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Sources'),
-          _buildSettingsCard([
-            _buildActionTile(
-              icon: Icons.rss_feed_outlined,
-              title: 'Manage sources',
-              subtitle: 'Subscribe, browse, and unsubscribe',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SourcesScreen()),
-                );
-              },
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Reading'),
-          _buildSettingsCard([
-            _buildReaderPrefsRow(),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.text_fields_outlined,
-              title: 'Body font',
-              value: bodyFont == 'lora' ? 'Lora' : 'DM Sans',
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.format_line_spacing_outlined,
-              title: 'Line height',
-              value: lineHeight,
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.format_size_outlined,
-              title: 'Font size',
-              value: fontSizePt,
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Edition'),
-          _buildSettingsCard([
-            _buildEditionRow(edition),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Storage & Data'),
-          _buildSettingsCard([
-            _buildInfoTile(
-              icon: Icons.cached_outlined,
-              title: 'Cached Articles',
-              value: '$cachedArticles articles',
-            ),
-            _buildDivider(),
-            _buildInfoTile(
-              icon: Icons.bookmark_outline_rounded,
-              title: 'Saved Articles',
-              value: '$savedArticles articles',
-            ),
-            _buildDivider(),
-            _buildActionTile(
-              icon: Icons.delete_outline_rounded,
-              title: 'Clear Cache',
-              subtitle: 'Remove all cached data',
-              iconColor: colorScheme.error,
-              onTap: _clearCache,
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('About'),
-          _buildSettingsCard([
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                ),
-                child: Icon(Icons.info_outline_rounded, size: 20, color: colorScheme.onPrimaryContainer),
-              ),
-              title: Text('App Version', style: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
-              trailing: FutureBuilder<String>(
-                future: AppConfig.getVersion(),
-                builder: (context, snapshot) => Text(
-                  'v${snapshot.data ?? '...'}',
-                  style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.primary),
-                ),
-              ),
-            ),
-            _buildDivider(),
-            _buildActionTile(
-              icon: Icons.code_outlined,
-              title: 'Open Source Licenses',
-              subtitle: 'View third-party licenses',
-              onTap: () async {
-                final version = await AppConfig.getVersion();
-                if (context.mounted) {
-                  showLicensePage(
-                    context: context,
-                    applicationName: 'Curated Feeds',
-                    applicationVersion: version,
-                  );
-                }
-              },
-            ),
-          ]),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Support'),
-          _buildSettingsCard([
-            _buildActionTile(
-              icon: Icons.workspace_premium_outlined,
-              title: isPro ? 'Pro' : 'Support the app',
-              subtitle:
-                  isPro ? 'Thanks for your support!' : 'One-time purchase, yours forever',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
-                );
-              },
-            ),
-            _buildDivider(),
-            _buildActionTile(
-              icon: Icons.bug_report_outlined,
-              title: 'Report bug / Feedback',
-              subtitle: 'rajatkashyap7062@gmail.com',
-              onTap: () async {
-                final uri = Uri(
-                  scheme: 'mailto',
-                  path: 'rajatkashyap7062@gmail.com',
-                  queryParameters: {
-                    'subject': 'Curated Feeds — Feedback',
+                  value: _notificationsEnabled,
+                  onChanged: (value) async {
+                    final previous = _notificationsEnabled;
+                    setState(() => _notificationsEnabled = value);
+                    try {
+                      if (value) {
+                        await NotificationService.enablePushNotifications();
+                      } else {
+                        await NotificationService.disablePushNotifications();
+                      }
+                      await _settingsService.setNotificationsEnabled(value);
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      setState(() => _notificationsEnabled = previous);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not reach notification server — try again',
+                          ),
+                        ),
+                      );
+                    }
                   },
-                );
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                } else if (context.mounted) {
-                  // No mail client — copy the address to the clipboard so
-                  // the user can paste it anywhere.
-                  await Clipboard.setData(
-                    const ClipboardData(text: 'rajatkashyap7062@gmail.com'),
-                  );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Email address copied to clipboard',
+                ),
+                if (_notificationsEnabled) ...[
+                  _buildDivider(),
+                  _buildSwitchTile(
+                    icon: Icons.article_outlined,
+                    title: 'New Articles',
+                    subtitle: 'Notify when new articles are available',
+                    value: _newArticleNotifs,
+                    onChanged: (value) async {
+                      setState(() => _newArticleNotifs = value);
+                      await _settingsService.setNewArticleNotifications(value);
+                      // Re-POST prefs to the worker so the server-side row
+                      // reflects the change without a manual toggle of master.
+                      if (_notificationsEnabled) {
+                        unawaited(
+                          NotificationService.enablePushNotifications()
+                              .catchError((Object _) {}),
+                        );
+                      }
+                    },
+                    indented: true,
+                  ),
+                  _buildDivider(),
+                  _buildSwitchTile(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'In-App Notifications',
+                    subtitle: 'Show notification banners inside the app',
+                    value: _inAppNotifsEnabled,
+                    onChanged: (value) async {
+                      setState(() => _inAppNotifsEnabled = value);
+                      InAppNotificationManager().setEnabled(value);
+                      await _settingsService.setInAppNotificationsEnabled(
+                        value,
+                      );
+                    },
+                    indented: true,
+                  ),
+                ],
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Feed Settings'),
+              _buildSettingsCard([
+                _buildSwitchTile(
+                  icon: Icons.refresh_outlined,
+                  title: 'Auto Refresh',
+                  subtitle: 'Automatically refresh feeds in background',
+                  value: notifier.autoRefresh,
+                  onChanged: notifier.setAutoRefresh,
+                ),
+                if (notifier.autoRefresh) ...[
+                  _buildDivider(),
+                  _buildIntervalSelector(notifier),
+                  _buildDivider(),
+                  _buildMaxArticlesSelector(notifier),
+                ],
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Sources'),
+              _buildSettingsCard([
+                _buildActionTile(
+                  icon: Icons.rss_feed_outlined,
+                  title: 'Manage sources',
+                  subtitle: 'Subscribe, browse, and unsubscribe',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SourcesScreen()),
+                    );
+                  },
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Reading'),
+              _buildSettingsCard([
+                _buildReaderPrefsRow(),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.text_fields_outlined,
+                  title: 'Body font',
+                  value: bodyFont == 'lora' ? 'Lora' : 'DM Sans',
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.format_line_spacing_outlined,
+                  title: 'Line height',
+                  value: lineHeight,
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.format_size_outlined,
+                  title: 'Font size',
+                  value: fontSizePt,
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Edition'),
+              _buildSettingsCard([_buildEditionRow(edition)]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Storage & Data'),
+              _buildSettingsCard([
+                _buildInfoTile(
+                  icon: Icons.cached_outlined,
+                  title: 'Cached Articles',
+                  value: '$cachedArticles articles',
+                ),
+                _buildDivider(),
+                _buildInfoTile(
+                  icon: Icons.bookmark_outline_rounded,
+                  title: 'Saved Articles',
+                  value: '$savedArticles articles',
+                ),
+                _buildDivider(),
+                _buildActionTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: 'Clear Cache',
+                  subtitle: 'Remove all cached data',
+                  iconColor: colorScheme.error,
+                  onTap: _clearCache,
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('About'),
+              _buildSettingsCard([
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(
+                        AppCardStyles.badgeRadius,
                       ),
                     ),
-                  );
-                }
-              },
-            ),
-          ]),
-          const SizedBox(height: 24),
-        ],
-      ),
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      size: 20,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  title: Text(
+                    'App Version',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  trailing: FutureBuilder<String>(
+                    future: AppConfig.getVersion(),
+                    builder: (context, snapshot) => Text(
+                      'v${snapshot.data ?? '...'}',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                _buildDivider(),
+                _buildActionTile(
+                  icon: Icons.code_outlined,
+                  title: 'Open Source Licenses',
+                  subtitle: 'View third-party licenses',
+                  onTap: () async {
+                    final version = await AppConfig.getVersion();
+                    if (context.mounted) {
+                      showLicensePage(
+                        context: context,
+                        applicationName: 'Curated Feeds',
+                        applicationVersion: version,
+                      );
+                    }
+                  },
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Support'),
+              _buildSettingsCard([
+                _buildActionTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: isPro ? 'Pro' : 'Support the app',
+                  subtitle: isPro
+                      ? 'Thanks for your support!'
+                      : 'One-time purchase, yours forever',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                    );
+                  },
+                ),
+                _buildDivider(),
+                _buildActionTile(
+                  icon: Icons.bug_report_outlined,
+                  title: 'Report bug / Feedback',
+                  subtitle: AppConfig.supportEmail,
+                  onTap: () async {
+                    final uri = Uri(
+                      scheme: 'mailto',
+                      path: AppConfig.supportEmail,
+                      queryParameters: {'subject': 'Curated Feeds — Feedback'},
+                    );
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    } else if (context.mounted) {
+                      // No mail client — copy the address to the clipboard so
+                      // the user can paste it anywhere.
+                      await Clipboard.setData(
+                        const ClipboardData(text: AppConfig.supportEmail),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Email address copied to clipboard'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ]),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
     );
-        },
-      );
   }
 
   Widget _buildSectionHeader(String title) {
@@ -520,14 +533,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _SettingsReaderSheet(
-        initial: initial,
-        notifier: notifier,
-      ),
+      builder: (ctx) =>
+          _SettingsReaderSheet(initial: initial, notifier: notifier),
     );
     // The Consumer wrapping this screen rebuilds on every notify; no
     // manual setState required.
-    if (updated == true) {/* no-op: Consumer rebuild already updated */}
+    if (updated == true) {
+      /* no-op: Consumer rebuild already updated */
+    }
   }
 
   Widget _buildEditionRow(int edition) {
@@ -544,8 +557,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Text(
           edition.toString().padLeft(2, '0').substring(0, 2),
           textAlign: TextAlign.center,
-          style: AppType.folioTop(color: AppColors.primary)
-              .copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+          style: AppType.folioTop(
+            color: AppColors.primary,
+          ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       title: Text(
@@ -755,10 +769,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: AppType.folioTop(color: AppColors.primary),
-                ),
+                Text(label, style: AppType.folioTop(color: AppColors.primary)),
                 const SizedBox(height: AppSpacing.s2),
                 Row(
                   children: [
@@ -791,17 +802,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s4, vertical: AppSpacing.s2),
+        horizontal: AppSpacing.s4,
+        vertical: AppSpacing.s2,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.only(
-                left: AppSpacing.s2, top: AppSpacing.s2, bottom: AppSpacing.s3),
-            child: Text(
-              'Theme',
-              style: AppType.titleMedium(),
+              left: AppSpacing.s2,
+              top: AppSpacing.s2,
+              bottom: AppSpacing.s3,
             ),
+            child: Text('Theme', style: AppType.titleMedium()),
           ),
           Row(
             children: [
@@ -897,10 +910,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _SettingsReaderSheet extends StatefulWidget {
   final ReadingPreferences initial;
   final SettingsNotifier notifier;
-  const _SettingsReaderSheet({
-    required this.initial,
-    required this.notifier,
-  });
+  const _SettingsReaderSheet({required this.initial, required this.notifier});
 
   @override
   State<_SettingsReaderSheet> createState() => _SettingsReaderSheetState();
@@ -919,8 +929,9 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
     return Container(
       decoration: BoxDecoration(
         color: ground,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(AppRadius.sheetTop)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheetTop),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.10),
@@ -1028,8 +1039,9 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
             ),
             child: Text(
               'DONE',
-              style: AppType.labelLarge(color: Colors.white)
-                  .copyWith(letterSpacing: 1.4),
+              style: AppType.labelLarge(
+                color: Colors.white,
+              ).copyWith(letterSpacing: 1.4),
             ),
           ),
         ],
@@ -1058,20 +1070,25 @@ class _SliderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final soft =
-        isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(label,
-                style: AppType.monoEyebrow(color: soft)
-                    .copyWith(letterSpacing: 0.8)),
+            Text(
+              label,
+              style: AppType.monoEyebrow(
+                color: soft,
+              ).copyWith(letterSpacing: 0.8),
+            ),
             const Spacer(),
-            Text(display,
-                style: AppType.monoDateline(color: AppColors.primary)
-                    .copyWith(fontWeight: FontWeight.w600)),
+            Text(
+              display,
+              style: AppType.monoDateline(
+                color: AppColors.primary,
+              ).copyWith(fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         Slider(

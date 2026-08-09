@@ -74,8 +74,9 @@ class ListArticleCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         article.sourceName.toUpperCase(),
-                        style: AppType.monoEyebrow(color: sourceColor)
-                            .copyWith(letterSpacing: 0.6),
+                        style: AppType.monoEyebrow(
+                          color: sourceColor,
+                        ).copyWith(letterSpacing: 0.6),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -83,16 +84,18 @@ class ListArticleCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.s2),
                     Text(
                       _formatDateline(article.pubDate),
-                      style: AppType.monoDateline(color: soft)
-                          .copyWith(letterSpacing: 0.05),
+                      style: AppType.monoDateline(
+                        color: soft,
+                      ).copyWith(letterSpacing: 0.05),
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s2),
                 Text(
                   article.title,
-                  style: AppType.titleLarge(color: ink)
-                      .copyWith(fontSize: 19, height: 1.22),
+                  style: AppType.titleLarge(
+                    color: ink,
+                  ).copyWith(fontSize: 19, height: 1.22),
                 ),
                 if (article.description.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.s2),
@@ -107,7 +110,9 @@ class ListArticleCard extends StatelessWidget {
                 Consumer<SettingsNotifier>(
                   builder: (context, settings, _) {
                     if (!settings.showImages) return const SizedBox.shrink();
-                    if (article.imageUrl == null) return const SizedBox.shrink();
+                    if (article.imageUrl == null) {
+                      return const SizedBox.shrink();
+                    }
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.card),
                       child: RepaintBoundary(
@@ -129,10 +134,7 @@ class ListArticleCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s3),
                 // Hairline — keep a fixed slot so trailing border aligns.
-                SizedBox(
-                  height: 0.5,
-                  child: Container(color: ruleColor),
-                ),
+                SizedBox(height: 0.5, child: Container(color: ruleColor)),
               ],
             ),
           ),

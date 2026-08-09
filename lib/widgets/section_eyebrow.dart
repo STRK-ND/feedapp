@@ -56,9 +56,7 @@ class _SectionEyebrowState extends State<SectionEyebrow>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final mutedColor = isDark
-        ? AppColors.paperOnGroundSoft
-        : AppColors.inkSoft;
+    final mutedColor = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
     final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
 
     final padTop = switch (widget.density) {
@@ -109,8 +107,9 @@ class _SectionEyebrowState extends State<SectionEyebrow>
                       const SizedBox(width: AppSpacing.s2),
                       Text(
                         '${widget.count} ARTICLES',
-                        style: AppType.monoEyebrow(color: mutedColor)
-                            .copyWith(fontWeight: FontWeight.w400),
+                        style: AppType.monoEyebrow(
+                          color: mutedColor,
+                        ).copyWith(fontWeight: FontWeight.w400),
                       ),
                     ],
                   ),
@@ -124,9 +123,7 @@ class _SectionEyebrowState extends State<SectionEyebrow>
                   child: Align(
                     alignment: Alignment.centerLeft,
                     widthFactor: _rule.value.clamp(0.0, 1.0),
-                    child: Container(
-                      color: ruleColor,
-                    ),
+                    child: Container(color: ruleColor),
                   ),
                 ),
               ),

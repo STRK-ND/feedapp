@@ -107,12 +107,15 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   ) {
     final sourceCategory = article.sourceCategory ?? 'Technology';
     final descText = article.description;
-    final readTime = descText.isEmpty ? 1 : (descText.split(RegExp(r'\s+')).length / 200).ceil().clamp(1, 999);
+    final readTime = descText.isEmpty
+        ? 1
+        : (descText.split(RegExp(r'\s+')).length / 200).ceil().clamp(1, 999);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Semantics(
       button: true,
-      label: 'Article: ${article.title}. ${isFront ? 'Tap to read, swipe right to save, swipe left to dismiss.' : ''}',
+      label:
+          'Article: ${article.title}. ${isFront ? 'Tap to read, swipe right to save, swipe left to dismiss.' : ''}',
       child: GestureDetector(
         onTap: () {
           if (isFront) {
@@ -120,137 +123,144 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
           }
         },
         child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-          color: colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.primary.withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-          child: AspectRatio(
-            aspectRatio: 3 / 4,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
- // Background image with Hero transition
- Hero(
- tag: getArticleHeroTag(article.id),
- child: showImages && article.imageUrl != null
- ? CachedNetworkImage(
- imageUrl: article.imageUrl!,
- width: imageMaxWidth.toDouble(),
- fit: BoxFit.cover,
- cacheManager: AppCacheManager(),
- memCacheWidth: imageMaxWidth,
- placeholder: (context, url) => Container(color: colorScheme.surfaceContainerHighest),
- errorWidget: (context, url, error) => Container(
-   color: colorScheme.surfaceContainerHighest,
-   child: Icon(Icons.broken_image_outlined, color: colorScheme.onSurfaceVariant),
- ),
- )
- : Container(color: colorScheme.surfaceContainerHighest),
- ),
-
- // Content
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Category badges
-                        Row(
-                          children: [
-                            CategoryBadge(category: sourceCategory),
-                            const SizedBox(width: 8),
-                            ReadTimeBadge(minutes: readTime),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Title
-                        Text(
-                          article.title,
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                            height: 1.2,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Description
-                        Text(
-                          article.description,
-                          style: TextStyle(
-                            color: colorScheme.onSurface.withValues(alpha: 0.8),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 1.5,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Read more button
-                        GestureDetector(
-                          onTap: () => widget.onTap(index),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 15,
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+            color: colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Background image with Hero transition
+                  Hero(
+                    tag: getArticleHeroTag(article.id),
+                    child: showImages && article.imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: article.imageUrl!,
+                            width: imageMaxWidth.toDouble(),
+                            fit: BoxFit.cover,
+                            cacheManager: AppCacheManager(),
+                            memCacheWidth: imageMaxWidth,
+                            placeholder: (context, url) => Container(
+                              color: colorScheme.surfaceContainerHighest,
                             ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(
-                                AppCardStyles.buttonRadius,
+                            errorWidget: (context, url, error) => Container(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Read Full Story',
-                                  style: TextStyle(
-                                    color: colorScheme.primary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
+                          )
+                        : Container(color: colorScheme.surfaceContainerHighest),
+                  ),
+
+                  // Content
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Category badges
+                          Row(
+                            children: [
+                              CategoryBadge(category: sourceCategory),
+                              const SizedBox(width: 8),
+                              ReadTimeBadge(minutes: readTime),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Title
+                          Text(
+                            article.title,
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
+                              height: 1.2,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Description
+                          Text(
+                            article.description,
+                            style: TextStyle(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.8,
+                              ),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 1.5,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Read more button
+                          GestureDetector(
+                            onTap: () => widget.onTap(index),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 15,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(
+                                  AppCardStyles.buttonRadius,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Read Full Story',
+                                    style: TextStyle(
+                                      color: colorScheme.primary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  size: 16,
-                                  color: colorScheme.primary,
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward,
+                                    size: 16,
+                                    color: colorScheme.primary,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }

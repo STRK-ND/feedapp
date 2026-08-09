@@ -20,6 +20,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart pub audit || true  # known/transitive — resolve in a dedicated pass
       - run: flutter analyze
 
   test:
@@ -34,3 +36,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test --reporter expanded
+
+  worker:
+    name: Worker checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --check workers/feed-worker.js
+      - run: cd workers && npm test

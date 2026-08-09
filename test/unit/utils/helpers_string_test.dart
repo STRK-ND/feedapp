@@ -82,9 +82,18 @@ void main() {
       });
 
       test('Should accept image from common CDNs', () {
-        expect(Helpers.isValidImageUrl('https://images.unsplash.com/photo'), true);
-        expect(Helpers.isValidImageUrl('https://cdn.pixabay.com/image.png'), true);
-        expect(Helpers.isValidImageUrl('https://res.cloudinary.com/img.jpg'), true);
+        expect(
+          Helpers.isValidImageUrl('https://images.unsplash.com/photo'),
+          true,
+        );
+        expect(
+          Helpers.isValidImageUrl('https://cdn.pixabay.com/image.png'),
+          true,
+        );
+        expect(
+          Helpers.isValidImageUrl('https://res.cloudinary.com/img.jpg'),
+          true,
+        );
       });
 
       test('Should reject non-image URLs', () {
@@ -93,15 +102,26 @@ void main() {
       });
 
       test('Should accept URLs with image keywords', () {
-        expect(Helpers.isValidImageUrl('https://example.com/content/image123'), true);
-        expect(Helpers.isValidImageUrl('https://example.com/photo_abc123'), true);
+        expect(
+          Helpers.isValidImageUrl('https://example.com/content/image123'),
+          true,
+        );
+        expect(
+          Helpers.isValidImageUrl('https://example.com/photo_abc123'),
+          true,
+        );
       });
 
       test('Should accept URLs with dimension parameters', () {
-        expect(Helpers.isValidImageUrl('https://example.com/img?width=200'), true);
-        expect(Helpers.isValidImageUrl('https://example.com/photo?h=300&w=200'), true);
+        expect(
+          Helpers.isValidImageUrl('https://example.com/img?width=200'),
+          true,
+        );
+        expect(
+          Helpers.isValidImageUrl('https://example.com/photo?h=300&w=200'),
+          true,
+        );
       });
     });
-
   });
 }

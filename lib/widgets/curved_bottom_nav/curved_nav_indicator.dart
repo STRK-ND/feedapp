@@ -35,24 +35,26 @@ class CurvedNavBarPainter extends CustomPainter {
     );
 
     final bgFillPaint = Paint()
-      ..color = (isDark
-              ? CurvedNavTokens.darkBarFill
-              : CurvedNavTokens.lightBarFill)
-          .withValues(
-              alpha: isDark
-                  ? CurvedNavTokens.darkBarFillAlpha
-                  : CurvedNavTokens.lightBarFillAlpha);
+      ..color =
+          (isDark ? CurvedNavTokens.darkBarFill : CurvedNavTokens.lightBarFill)
+              .withValues(
+                alpha: isDark
+                    ? CurvedNavTokens.darkBarFillAlpha
+                    : CurvedNavTokens.lightBarFillAlpha,
+              );
     canvas.drawRRect(bgRRect, bgFillPaint);
 
     // Border
     final borderPaint = Paint()
-      ..color = (isDark
-              ? CurvedNavTokens.darkBarBorder
-              : CurvedNavTokens.lightBarBorder)
-          .withValues(
-              alpha: isDark
-                  ? CurvedNavTokens.darkBarBorderAlpha
-                  : CurvedNavTokens.lightBarBorderAlpha)
+      ..color =
+          (isDark
+                  ? CurvedNavTokens.darkBarBorder
+                  : CurvedNavTokens.lightBarBorder)
+              .withValues(
+                alpha: isDark
+                    ? CurvedNavTokens.darkBarBorderAlpha
+                    : CurvedNavTokens.lightBarBorderAlpha,
+              )
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.drawRRect(bgRRect, borderPaint);
@@ -64,7 +66,8 @@ class CurvedNavBarPainter extends CustomPainter {
 
     final indicatorWidth =
         (width / itemCount) - (CurvedNavTokens.itemPadding * 2);
-    final indicatorHeight = height -
+    final indicatorHeight =
+        height -
         CurvedNavTokens.indicatorTopInset -
         CurvedNavTokens.indicatorBottomInset;
 
@@ -77,9 +80,10 @@ class CurvedNavBarPainter extends CustomPainter {
     // ── 3. Glow shadow behind indicator ───────────────────────────
     final glowPaint = Paint()
       ..color = AppColors.primary.withValues(
-          alpha: isDark
-              ? CurvedNavTokens.darkGlowAlpha
-              : CurvedNavTokens.lightGlowAlpha)
+        alpha: isDark
+            ? CurvedNavTokens.darkGlowAlpha
+            : CurvedNavTokens.lightGlowAlpha,
+      )
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
 
     canvas.drawRRect(
@@ -99,9 +103,10 @@ class CurvedNavBarPainter extends CustomPainter {
 
     final indicatorPaint = Paint()
       ..color = AppColors.primary.withValues(
-          alpha: isDark
-              ? CurvedNavTokens.darkIndicatorFillAlpha
-              : CurvedNavTokens.lightIndicatorFillAlpha);
+        alpha: isDark
+            ? CurvedNavTokens.darkIndicatorFillAlpha
+            : CurvedNavTokens.lightIndicatorFillAlpha,
+      );
     canvas.drawPath(indicatorPath, indicatorPaint);
   }
 
@@ -118,9 +123,7 @@ class CurvedNavBarPainter extends CustomPainter {
 
   /// Ease-in-out curve for smooth indicator slide
   double _easeCurve(double t) {
-    return t < 0.5
-        ? 4 * t * t * t
-        : 1 - (pow(-2 * t + 2, 3) / 2);
+    return t < 0.5 ? 4 * t * t * t : 1 - (pow(-2 * t + 2, 3) / 2);
   }
 
   /// Builds a custom path: rounded rectangle with a subtle upward

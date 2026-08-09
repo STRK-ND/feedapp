@@ -95,90 +95,90 @@ class AppType {
   AppType._();
 
   static TextStyle displayLarge({Color? color}) => GoogleFonts.playfairDisplay(
-        fontSize: 32,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.5,
-        height: 1.15,
-        color: color,
-      );
+    fontSize: 32,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.5,
+    height: 1.15,
+    color: color,
+  );
 
   static TextStyle displayMedium({Color? color}) => GoogleFonts.playfairDisplay(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.4,
-        height: 1.2,
-        color: color,
-      );
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.4,
+    height: 1.2,
+    color: color,
+  );
 
   static TextStyle headlineSmall({Color? color}) => GoogleFonts.playfairDisplay(
-        fontSize: 22,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.3,
-        height: 1.2,
-        color: color,
-      );
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.3,
+    height: 1.2,
+    color: color,
+  );
 
   static TextStyle titleLarge({Color? color}) => GoogleFonts.playfairDisplay(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.2,
-        height: 1.25,
-        color: color,
-      );
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.2,
+    height: 1.25,
+    color: color,
+  );
 
   static TextStyle titleMedium({Color? color}) => GoogleFonts.dmSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        height: 1.3,
-        color: color,
-      );
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+    color: color,
+  );
 
   static TextStyle bodyLarge({Color? color}) => GoogleFonts.dmSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        height: 1.55,
-        color: color,
-      );
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    height: 1.55,
+    color: color,
+  );
 
   static TextStyle bodyMedium({Color? color}) => GoogleFonts.dmSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        height: 1.5,
-        color: color,
-      );
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.5,
+    color: color,
+  );
 
   static TextStyle labelLarge({Color? color}) => GoogleFonts.dmSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.1,
-        color: color,
-      );
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+    color: color,
+  );
 
   /// Section eyebrow — uppercase mono labels: TODAY, YESTERDAY, EARLIER, ABOUT.
   static TextStyle monoEyebrow({Color? color}) => GoogleFonts.jetBrainsMono(
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 0.8,
-        height: 1.2,
-        color: color,
-      );
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.8,
+    height: 1.2,
+    color: color,
+  );
 
   /// Numeric dateline — date / time / counts.
   static TextStyle monoDateline({Color? color}) => GoogleFonts.jetBrainsMono(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0.05,
-        color: color,
-      );
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0.05,
+    color: color,
+  );
 
   /// Folio Rule top line — date uppercase mono like a paper masthead.
   static TextStyle folioTop({Color? color}) => GoogleFonts.jetBrainsMono(
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 0.6,
-        height: 1.2,
-        color: color,
-      );
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.6,
+    height: 1.2,
+    color: color,
+  );
 }
 
 /// A simple opacity mix — Flutter's `withValues` does it but it allocates.

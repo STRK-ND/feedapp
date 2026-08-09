@@ -83,41 +83,51 @@ class SettingsService {
   // NOTIFICATION SETTINGS
   // ============================================
 
-  Future<bool> getNotificationsEnabled() => _getBool('notifications_enabled', true);
-  Future<void> setNotificationsEnabled(bool enabled) => _setBool('notifications_enabled', enabled);
+  Future<bool> getNotificationsEnabled() =>
+      _getBool('notifications_enabled', true);
+  Future<void> setNotificationsEnabled(bool enabled) =>
+      _setBool('notifications_enabled', enabled);
 
-  Future<bool> getNewArticleNotifications() => _getBool('new_article_notifs', true);
-  Future<void> setNewArticleNotifications(bool enabled) => _setBool('new_article_notifs', enabled);
+  Future<bool> getNewArticleNotifications() =>
+      _getBool('new_article_notifs', true);
+  Future<void> setNewArticleNotifications(bool enabled) =>
+      _setBool('new_article_notifs', enabled);
 
-  Future<bool> getInAppNotificationsEnabled() => _getBool('in_app_notifications_enabled', true);
-  Future<void> setInAppNotificationsEnabled(bool enabled) => _setBool('in_app_notifications_enabled', enabled);
+  Future<bool> getInAppNotificationsEnabled() =>
+      _getBool('in_app_notifications_enabled', true);
+  Future<void> setInAppNotificationsEnabled(bool enabled) =>
+      _setBool('in_app_notifications_enabled', enabled);
 
   // ============================================
   // APP SETTINGS
   // ============================================
 
   Future<bool> getAutoRefresh() => _getBool('auto_refresh', true);
-  Future<void> setAutoRefresh(bool enabled) => _setBool('auto_refresh', enabled);
+  Future<void> setAutoRefresh(bool enabled) =>
+      _setBool('auto_refresh', enabled);
 
   Future<int> getRefreshInterval() async {
     final value = await _getString('refresh_interval');
     return int.tryParse(value ?? '30') ?? 30;
   }
 
-  Future<void> setRefreshInterval(int minutes) => _setString('refresh_interval', minutes.toString());
+  Future<void> setRefreshInterval(int minutes) =>
+      _setString('refresh_interval', minutes.toString());
 
   Future<int> getMaxArticles() async {
     final value = await _getString('max_articles');
     return int.tryParse(value ?? '500') ?? 500;
   }
 
-  Future<void> setMaxArticles(int count) => _setString('max_articles', count.toString());
+  Future<void> setMaxArticles(int count) =>
+      _setString('max_articles', count.toString());
 
   Future<bool> getShowImages() => _getBool('show_images', true);
   Future<void> setShowImages(bool enabled) => _setBool('show_images', enabled);
 
   Future<bool> getDataSaverMode() => _getBool('data_saver_mode', false);
-  Future<void> setDataSaverMode(bool enabled) => _setBool('data_saver_mode', enabled);
+  Future<void> setDataSaverMode(bool enabled) =>
+      _setBool('data_saver_mode', enabled);
 
   // ============================================
   // DESIGN v2 PREFERENCES
@@ -163,6 +173,7 @@ class SettingsService {
     final value = await _getString('feed_view_mode');
     return value == 'continuous' ? 'continuous' : 'stack';
   }
+
   Future<void> setFeedViewMode(String mode) =>
       _setString('feed_view_mode', mode);
 
@@ -171,6 +182,7 @@ class SettingsService {
     final value = await _getString('edition_number');
     return int.tryParse(value ?? '1') ?? 1;
   }
+
   Future<void> setEditionNumber(int value) =>
       _setString('edition_number', value.toString());
   Future<int> bumpEditionNumber() async {
@@ -188,6 +200,7 @@ class SettingsService {
       orElse: () => ReaderTheme.defaultTheme,
     );
   }
+
   Future<void> setReaderTheme(ReaderTheme value) =>
       _setString('reader_theme', value.name);
 
@@ -195,6 +208,7 @@ class SettingsService {
     final value = await _getString('reader_font_size');
     return double.tryParse(value ?? '16') ?? 16;
   }
+
   Future<void> setReaderFontSize(double value) =>
       _setString('reader_font_size', value.toString());
 
@@ -202,11 +216,11 @@ class SettingsService {
     final value = await _getString('reader_line_height');
     return double.tryParse(value ?? '1.6') ?? 1.6;
   }
+
   Future<void> setReaderLineHeight(double value) =>
       _setString('reader_line_height', value.toString());
 
-  Future<bool> getMonoDatelinesEnabled() =>
-      _getBool('mono_datelines', true);
+  Future<bool> getMonoDatelinesEnabled() => _getBool('mono_datelines', true);
   Future<void> setMonoDatelinesEnabled(bool value) =>
       _setBool('mono_datelines', value);
 
@@ -219,6 +233,7 @@ class SettingsService {
     final v = await _getString('body_font');
     return (v == 'lora') ? 'lora' : 'dm';
   }
+
   Future<void> setBodyFont(String value) =>
       _setString('body_font', value == 'lora' ? 'lora' : 'dm');
 

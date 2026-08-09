@@ -24,7 +24,8 @@ class PaginatedResponse {
 
   factory PaginatedResponse.fromJson(Map<String, dynamic> json) {
     return PaginatedResponse(
-      items: (json['items'] as List<dynamic>?)
+      items:
+          (json['items'] as List<dynamic>?)
               ?.map((item) => Article.fromJson(item as Map<String, dynamic>))
               .toList() ??
           [],
@@ -34,5 +35,4 @@ class PaginatedResponse {
       hasMore: json['hasMore'] as bool? ?? false,
     );
   }
-
 }

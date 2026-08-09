@@ -10,18 +10,12 @@ class AnalyticsService {
   }
 
   static Future<void> logAppStart() async {
-    await analytics.logEvent(
-      name: 'app_start',
-      parameters: {},
-    );
+    await analytics.logEvent(name: 'app_start', parameters: {});
   }
 
   // Feed events
   static Future<void> logFeedRefresh() async {
-    await analytics.logEvent(
-      name: 'feed_refresh',
-      parameters: {},
-    );
+    await analytics.logEvent(name: 'feed_refresh', parameters: {});
   }
 
   static Future<void> logFeedLoad({required int articleCount}) async {
@@ -39,13 +33,13 @@ class AnalyticsService {
   }
 
   // Article events
-  static Future<void> logArticleOpen({required String articleId, required String title}) async {
+  static Future<void> logArticleOpen({
+    required String articleId,
+    required String title,
+  }) async {
     await analytics.logEvent(
       name: 'article_open',
-      parameters: {
-        'article_id': articleId,
-        'title': title,
-      },
+      parameters: {'article_id': articleId, 'title': title},
     );
   }
 
@@ -70,7 +64,9 @@ class AnalyticsService {
     );
   }
 
-  static Future<void> logArticleReadComplete({required String articleId}) async {
+  static Future<void> logArticleReadComplete({
+    required String articleId,
+  }) async {
     await analytics.logEvent(
       name: 'article_read_complete',
       parameters: {'article_id': articleId},
@@ -79,18 +75,12 @@ class AnalyticsService {
 
   // Search events
   static Future<void> logSearch({required String query}) async {
-    await analytics.logEvent(
-      name: 'search',
-      parameters: {'query': query},
-    );
+    await analytics.logEvent(name: 'search', parameters: {'query': query});
   }
 
   // User engagement
   static Future<void> logSessionStart() async {
-    await analytics.logEvent(
-      name: 'session_start',
-      parameters: {},
-    );
+    await analytics.logEvent(name: 'session_start', parameters: {});
   }
 
   static Future<void> logSessionEnd({required int durationSeconds}) async {
@@ -101,13 +91,13 @@ class AnalyticsService {
   }
 
   // Error tracking
-  static Future<void> logError({required String error, String? stackTrace}) async {
+  static Future<void> logError({
+    required String error,
+    String? stackTrace,
+  }) async {
     await analytics.logEvent(
       name: 'error',
-      parameters: {
-        'error': error,
-        'stack_trace': ?stackTrace,
-      },
+      parameters: {'error': error, 'stack_trace': ?stackTrace},
     );
   }
 }

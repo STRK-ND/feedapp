@@ -340,7 +340,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(source.icon, size: 14, color: sourceColor),
+                                  Icon(
+                                    source.icon,
+                                    size: 14,
+                                    color: sourceColor,
+                                  ),
                                   const SizedBox(width: 8),
                                   Flexible(
                                     child: Text(
@@ -420,165 +424,171 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                             constraints: BoxConstraints(
                               maxWidth: _widenMeasure ? 720 : 960,
                             ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (showImages && widget.article.imageUrl != null)
-                              ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: imageMaxWidth,
-                                ),
-                                child: _buildFadeInImage(
-                                  widget.article.imageUrl!,
-                                  220,
-                                  AppCardStyles.imageRadius,
-                                ),
-                              ),
-                            if (showImages && widget.article.imageUrl != null)
-                              const SizedBox(height: 16),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Row(
-                                children: [
-                                  if (widget.article.author != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: AppCardStyles.chipDecoration(
-                                        sourceColor,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.person_outline_rounded,
-                                            size: 13,
-                                            color: sourceColor,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (showImages &&
+                                    widget.article.imageUrl != null)
+                                  ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: imageMaxWidth,
+                                    ),
+                                    child: _buildFadeInImage(
+                                      widget.article.imageUrl!,
+                                      220,
+                                      AppCardStyles.imageRadius,
+                                    ),
+                                  ),
+                                if (showImages &&
+                                    widget.article.imageUrl != null)
+                                  const SizedBox(height: 16),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      if (widget.article.author != null) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            widget.article.author!,
-                                            style: GoogleFonts.dmSans(
-                                              fontSize: 12,
-                                              color: sourceColor,
-                                              fontWeight: FontWeight.w600,
+                                          decoration:
+                                              AppCardStyles.chipDecoration(
+                                                sourceColor,
+                                              ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.person_outline_rounded,
+                                                size: 13,
+                                                color: sourceColor,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                widget.article.author!,
+                                                style: GoogleFonts.dmSans(
+                                                  fontSize: 12,
+                                                  color: sourceColor,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.1,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                      ],
+                                      Icon(
+                                        Icons.access_time_rounded,
+                                        size: 14,
+                                        color: palette.soft,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        Helpers.formatDate(
+                                          widget.article.pubDate,
+                                        ),
+                                        style:
+                                            (_monoDatelines
+                                            ? GoogleFonts.jetBrainsMono
+                                            : GoogleFonts.dmSans)(
+                                              fontSize: 13,
+                                              color: palette.soft,
                                               letterSpacing: 0.1,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.s2),
+                                // Reader-mode controls: theme swatches + Aa.
+                                ReaderControls(
+                                  currentTheme: _readerTheme,
+                                  fontSize: _fontSize,
+                                  lineHeight: _lineHeight,
+                                  widenMeasure: _widenMeasure,
+                                  bodyFont: _bodyFont,
+                                  isPro: settings.isPro,
+                                  onTheme: _persistTheme,
+                                  onFontSize: _persistFontSize,
+                                  onLineHeight: _persistLineHeight,
+                                  onWidenMeasure: _persistWiden,
+                                  onBodyFont: _persistBodyFont,
+                                  onLockedTheme: (t) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${t.label} is a Pro theme — Go Pro to unlock',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: AppSpacing.s5),
+                                Text(
+                                  widget.article.title,
+                                  style: GoogleFonts.playfairDisplay(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w700,
+                                    color: palette.text,
+                                    height: 1.35,
+                                    letterSpacing: -0.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  widget.article.description,
+                                  style: _bodyStyle().copyWith(
+                                    fontSize: _fontSize,
+                                    color: palette.text,
+                                    height: _lineHeight,
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                if (_isLoadingContent)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 40,
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  sourceColor,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Loading full article...',
+                                            style: GoogleFonts.dmSans(
+                                              fontSize: 14,
+                                              color: palette.soft,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                  ],
-                                  Icon(
-                                    Icons.access_time_rounded,
-                                    size: 14,
-                                    color: palette.soft,
-                                  ),
-                                  const SizedBox(width: 6),
+                                  )
+                                else if (_fullContent != null &&
+                                    _fullContent!.isNotEmpty)
                                   Text(
-                                    Helpers.formatDate(
-                                      widget.article.pubDate,
+                                    _fullContent!,
+                                    style: _bodyStyle().copyWith(
+                                      fontSize: _fontSize - 1,
+                                      color: palette.soft,
+                                      height: _lineHeight + 0.1,
+                                      letterSpacing: 0.05,
                                     ),
-                                    style: (_monoDatelines
-                                            ? GoogleFonts.jetBrainsMono
-                                            : GoogleFonts.dmSans)(
-                                        fontSize: 13,
-                                        color: palette.soft,
-                                        letterSpacing: 0.1,
-                                      ),
                                   ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.s2),
-                            // Reader-mode controls: theme swatches + Aa.
-                            ReaderControls(
-                              currentTheme: _readerTheme,
-                              fontSize: _fontSize,
-                              lineHeight: _lineHeight,
-                              widenMeasure: _widenMeasure,
-                              bodyFont: _bodyFont,
-                              isPro: settings.isPro,
-                              onTheme: _persistTheme,
-                              onFontSize: _persistFontSize,
-                              onLineHeight: _persistLineHeight,
-                              onWidenMeasure: _persistWiden,
-                              onBodyFont: _persistBodyFont,
-                              onLockedTheme: (t) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${t.label} is a Pro theme — Go Pro to unlock',
-                                    ),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.s5),
-                            Text(
-                              widget.article.title,
-                              style: GoogleFonts.playfairDisplay(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                color: palette.text,
-                                height: 1.35,
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              widget.article.description,
-                              style: _bodyStyle().copyWith(
-                                fontSize: _fontSize,
-                                color: palette.text,
-                                height: _lineHeight,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            if (_isLoadingContent)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 40,
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    children: [
-                                      CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              sourceColor,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Loading full article...',
-                                        style: GoogleFonts.dmSans(
-                                          fontSize: 14,
-                                          color: palette.soft,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            else if (_fullContent != null &&
-                                _fullContent!.isNotEmpty)
-                              Text(
-                                _fullContent!,
-                                style: _bodyStyle().copyWith(
-                                  fontSize: _fontSize - 1,
-                                  color: palette.soft,
-                                  height: _lineHeight + 0.1,
-                                  letterSpacing: 0.05,
-                                ),
-                              ),
-                              const SizedBox(height: 120),
+                                const SizedBox(height: 120),
                               ],
                             ),
                           ),

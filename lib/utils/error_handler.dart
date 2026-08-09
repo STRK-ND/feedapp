@@ -2,12 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// App error severity levels
-enum ErrorSeverity {
-  low,
-  medium,
-  high,
-  critical,
-}
+enum ErrorSeverity { low, medium, high, critical }
 
 /// App error handler for consistent error management
 class ErrorHandler {
@@ -206,13 +201,9 @@ class Result<T> {
   final String? error;
   final bool isSuccess;
 
-  Result.success(this.data)
-      : error = null,
-        isSuccess = true;
+  Result.success(this.data) : error = null, isSuccess = true;
 
-  Result.failure(this.error)
-      : data = null,
-        isSuccess = false;
+  Result.failure(this.error) : data = null, isSuccess = false;
 
   bool get isFailure => !isSuccess;
 

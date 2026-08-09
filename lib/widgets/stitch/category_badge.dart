@@ -59,11 +59,7 @@ class ReadTimeBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.schedule,
-              size: 12,
-              color: colorScheme.primary,
-            ),
+            Icon(Icons.schedule, size: 12, color: colorScheme.primary),
             const SizedBox(width: 4),
             Text(
               '$minutes min read',

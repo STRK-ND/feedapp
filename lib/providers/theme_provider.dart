@@ -14,14 +14,16 @@ class ThemeProvider extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   Color get primaryColor => _primaryColor;
   Color get accentColor => _accentColor;
-  
+
   /// Light theme colors - Stitch "Curated" design
-  static const Color _lightBackground = Color(0xFFF7F5F8); // Stitch light background
+  static const Color _lightBackground = Color(
+    0xFFF7F5F8,
+  ); // Stitch light background
   static const Color _lightSurface = Color(0xFFFFFFFF);
   static const Color _lightTextPrimary = Color(0xFF1A1B2E);
   static const Color _lightTextSecondary = Color(0xFF6B7280);
   static const Color _lightDivider = Color(0xFFE5E7EB);
-  
+
   /// Dark theme colors
   static const Color _darkBackground = Color(0xFF190F23);
   static const Color _darkSurface = Color(0xFF1E1E2E);
@@ -33,7 +35,7 @@ class ThemeProvider extends ChangeNotifier {
   static const Color darkGradientStart = Color(0xFF121214);
   static const Color darkGradientMid = Color(0xFF18181B);
   static const Color darkGradientEnd = Color(0xFF1C1C1F);
-  
+
   /// Initialize theme from settings
   Future<void> init() async {
     _themeMode = await _settingsService.getThemeMode();
@@ -44,56 +46,97 @@ class ThemeProvider extends ChangeNotifier {
       // Ignore if disposed during async gap
     }
   }
-  
+
   /// Set theme mode
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     await _settingsService.setThemeMode(mode);
     notifyListeners();
   }
-  
+
+  /// Apply a theme to live UI state WITHOUT persisting it. Used by the
+  /// CuratedFeedsApp proxy to mirror the SettingsNotifier source of truth —
+  /// persisting there would race load() and clobber the user's saved choice
+  /// with the notifier's initial `system` default on every cold start.
+  void applyThemeMode(ThemeMode mode) {
+    if (_themeMode == mode) {
+      return;
+    }
+    _themeMode = mode;
+    notifyListeners();
+  }
+
   /// Set primary color
   Future<void> setPrimaryColor(Color color) async {
     _primaryColor = color;
     await _settingsService.setPrimaryColor(color);
     notifyListeners();
   }
-  
+
   /// Build text theme — shared between light and dark
   static TextTheme _buildTextTheme(Color primary, Color secondary) {
     return TextTheme(
       headlineLarge: GoogleFonts.playfairDisplay(
-        fontSize: 48, fontWeight: FontWeight.w700, color: primary, letterSpacing: -0.5,
+        fontSize: 48,
+        fontWeight: FontWeight.w700,
+        color: primary,
+        letterSpacing: -0.5,
       ),
       headlineMedium: GoogleFonts.playfairDisplay(
-        fontSize: 32, fontWeight: FontWeight.w600, color: primary, letterSpacing: -0.3,
+        fontSize: 32,
+        fontWeight: FontWeight.w600,
+        color: primary,
+        letterSpacing: -0.3,
       ),
       headlineSmall: GoogleFonts.playfairDisplay(
-        fontSize: 24, fontWeight: FontWeight.w600, color: primary, letterSpacing: -0.2,
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: primary,
+        letterSpacing: -0.2,
       ),
       titleLarge: GoogleFonts.playfairDisplay(
-        fontSize: 22, fontWeight: FontWeight.w600, color: primary, letterSpacing: -0.2,
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: primary,
+        letterSpacing: -0.2,
       ),
       titleMedium: GoogleFonts.playfairDisplay(
-        fontSize: 18, fontWeight: FontWeight.w600, color: primary, letterSpacing: -0.1,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: primary,
+        letterSpacing: -0.1,
       ),
       bodyLarge: GoogleFonts.dmSans(
-        fontSize: 16, fontWeight: FontWeight.w400, color: primary, height: 1.6,
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: primary,
+        height: 1.6,
       ),
       bodyMedium: GoogleFonts.dmSans(
-        fontSize: 14, fontWeight: FontWeight.w400, color: secondary, height: 1.5,
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: secondary,
+        height: 1.5,
       ),
       labelLarge: GoogleFonts.dmSans(
-        fontSize: 14, fontWeight: FontWeight.w600, color: primary,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: primary,
       ),
       bodySmall: GoogleFonts.dmSans(
-        fontSize: 12, fontWeight: FontWeight.w400, color: secondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: secondary,
       ),
       labelMedium: GoogleFonts.dmSans(
-        fontSize: 12, fontWeight: FontWeight.w500, color: secondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: secondary,
       ),
       labelSmall: GoogleFonts.dmSans(
-        fontSize: 10, fontWeight: FontWeight.w500, color: secondary,
+        fontSize: 10,
+        fontWeight: FontWeight.w500,
+        color: secondary,
       ),
     );
   }
@@ -126,9 +169,7 @@ class ThemeProvider extends ChangeNotifier {
       cardTheme: CardThemeData(
         color: _lightSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: _lightSurface,
@@ -138,13 +179,8 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: _buildTextTheme(_lightTextPrimary, _lightTextSecondary),
-      dividerTheme: const DividerThemeData(
-        color: _lightDivider,
-        thickness: 1,
-      ),
-      iconTheme: const IconThemeData(
-        color: _lightTextPrimary,
-      ),
+      dividerTheme: const DividerThemeData(color: _lightDivider, thickness: 1),
+      iconTheme: const IconThemeData(color: _lightTextPrimary),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
@@ -154,15 +190,11 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: _lightSurface,
         contentTextStyle: GoogleFonts.dmSans(color: _lightTextPrimary),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: _lightSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -173,7 +205,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _primaryColor.withValues(alpha:  0.5);
+            return _primaryColor.withValues(alpha: 0.5);
           }
           return _lightDivider;
         }),
@@ -185,7 +217,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
     );
   }
-  
+
   /// Get dark theme data
   ThemeData get darkTheme {
     return ThemeData(
@@ -214,9 +246,7 @@ class ThemeProvider extends ChangeNotifier {
       cardTheme: CardThemeData(
         color: _darkSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: _darkSurface,
@@ -226,13 +256,8 @@ class ThemeProvider extends ChangeNotifier {
         elevation: 8,
       ),
       textTheme: _buildTextTheme(_darkTextPrimary, _darkTextSecondary),
-      dividerTheme: const DividerThemeData(
-        color: _darkDivider,
-        thickness: 1,
-      ),
-      iconTheme: const IconThemeData(
-        color: _darkTextPrimary,
-      ),
+      dividerTheme: const DividerThemeData(color: _darkDivider, thickness: 1),
+      iconTheme: const IconThemeData(color: _darkTextPrimary),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
@@ -242,15 +267,11 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: _darkSurface,
         contentTextStyle: GoogleFonts.dmSans(color: _darkTextPrimary),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: _darkSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -261,7 +282,7 @@ class ThemeProvider extends ChangeNotifier {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return _accentColor.withValues(alpha:  0.5);
+            return _accentColor.withValues(alpha: 0.5);
           }
           return _darkDivider;
         }),

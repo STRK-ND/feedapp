@@ -79,10 +79,15 @@ void main() {
         final beforeCall = DateTime.now();
         final result = Helpers.parseDate('invalid-date');
         final afterCall = DateTime.now();
-        expect(result.isAfter(beforeCall.subtract(const Duration(seconds: 1))), true);
-        expect(result.isBefore(afterCall.add(const Duration(seconds: 1))), true);
+        expect(
+          result.isAfter(beforeCall.subtract(const Duration(seconds: 1))),
+          true,
+        );
+        expect(
+          result.isBefore(afterCall.add(const Duration(seconds: 1))),
+          true,
+        );
       });
     });
-
   });
 }

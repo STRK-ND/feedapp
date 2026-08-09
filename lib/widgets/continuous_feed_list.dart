@@ -38,20 +38,24 @@ class ContinuousFeedList extends StatelessWidget {
 
     final List<Widget> items = [];
     for (final g in groups) {
-      items.add(SectionEyebrow(
-        label: g.label,
-        count: g.items.length,
-        density: g.density,
-      ));
+      items.add(
+        SectionEyebrow(
+          label: g.label,
+          count: g.items.length,
+          density: g.density,
+        ),
+      );
       for (var i = 0; i < g.items.length; i++) {
         // Look up global index for tap-callback.
         final globalIndex = articles.indexOf(g.items[i]);
-        items.add(ListArticleCard(
-          article: g.items[i],
-          index: globalIndex,
-          measure: measure,
-          onTap: () => onTap(globalIndex),
-        ));
+        items.add(
+          ListArticleCard(
+            article: g.items[i],
+            index: globalIndex,
+            measure: measure,
+            onTap: () => onTap(globalIndex),
+          ),
+        );
       }
     }
 

@@ -120,10 +120,14 @@ class _SwipeableCardState extends State<SwipeableCard>
     final oldListener = _animationListener;
 
     // Reuse existing Tween objects — only change begin values
-    _animation = Tween<Offset>(begin: _position, end: Offset.zero)
-      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    _rotationAnimation = Tween<double>(begin: _rotation, end: 0.0)
-      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _animation = Tween<Offset>(
+      begin: _position,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _rotationAnimation = Tween<double>(
+      begin: _rotation,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.reset();
 
@@ -169,7 +173,9 @@ class _SwipeableCardState extends State<SwipeableCard>
                     color: colorScheme.onSurfaceVariant.withValues(
                       alpha: _position.dx < 0 ? _position.dx.abs() / 400 : 0,
                     ),
-                    borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppCardStyles.cardRadius,
+                    ),
                   ),
                   child: _position.dx < -40
                       ? Center(
@@ -181,8 +187,8 @@ class _SwipeableCardState extends State<SwipeableCard>
                                 Icons.close_rounded,
                                 size: 80,
                                 color: colorScheme.onSurfaceVariant.withValues(
-                                  alpha: _position.dx.abs()
-                                      .clamp(40.0, 400.0) /
+                                  alpha:
+                                      _position.dx.abs().clamp(40.0, 400.0) /
                                       400.0,
                                 ),
                               ),
@@ -204,7 +210,9 @@ class _SwipeableCardState extends State<SwipeableCard>
                     color: colorScheme.primary.withValues(
                       alpha: _position.dx > 0 ? (_position.dx / 400) * 0.12 : 0,
                     ),
-                    borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppCardStyles.cardRadius,
+                    ),
                   ),
                   child: _position.dx > 40
                       ? Center(
@@ -216,8 +224,8 @@ class _SwipeableCardState extends State<SwipeableCard>
                                 Icons.favorite_rounded,
                                 size: 80,
                                 color: colorScheme.primary.withValues(
-                                  alpha: _position.dx.clamp(40.0, 400.0) /
-                                      400.0,
+                                  alpha:
+                                      _position.dx.clamp(40.0, 400.0) / 400.0,
                                 ),
                               ),
                             ),

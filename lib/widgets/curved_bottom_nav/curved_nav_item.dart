@@ -55,9 +55,7 @@ class CurvedNavItem extends StatelessWidget {
               children: [
                 // Icon with scale animation
                 AnimatedScale(
-                  scale: isSelected
-                      ? CurvedNavTokens.iconScaleSelected
-                      : 1.0,
+                  scale: isSelected ? CurvedNavTokens.iconScaleSelected : 1.0,
                   duration: CurvedNavTokens.iconDuration,
                   curve: CurvedNavTokens.iconCurve,
                   child: Icon(

@@ -48,7 +48,6 @@ class Helpers {
     // Block URLs that require authentication or have expired signatures
     const blockedPatterns = [
       'o.aolcdn.com', // AOL images require authentication
-      'media.m半岛日报.com',
       'dims?image_uri',
     ];
     for (final pattern in blockedPatterns) {
@@ -139,7 +138,9 @@ class Helpers {
   /// Validate URL format
   static bool isValidUrl(String url) {
     final uri = Uri.tryParse(url);
-    return uri != null && uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
+    return uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
   /// Compare two semver version strings. Returns true if [latest] > [current].

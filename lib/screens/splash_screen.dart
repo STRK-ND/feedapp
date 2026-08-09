@@ -119,8 +119,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final onboardingDone =
-        await getIt<SettingsService>().getHasCompletedOnboarding();
+    final onboardingDone = await getIt<SettingsService>()
+        .getHasCompletedOnboarding();
 
     if (!mounted) return;
 
@@ -287,10 +287,7 @@ class _FolioGlyphPainter extends CustomPainter {
     final fullPath = _buildGlyphPath(size);
     if (drawProgress < 1.0) {
       for (final metric in fullPath.computeMetrics()) {
-        final extract = metric.extractPath(
-          0,
-          metric.length * drawProgress,
-        );
+        final extract = metric.extractPath(0, metric.length * drawProgress);
         canvas.drawPath(extract, strokePaint);
       }
     } else {

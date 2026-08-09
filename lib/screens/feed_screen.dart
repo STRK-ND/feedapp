@@ -141,7 +141,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final settings = context.read<SettingsNotifier>();
-    final shouldRefresh = _autoRefreshTimer == null ||
+    final shouldRefresh =
+        _autoRefreshTimer == null ||
         settings.autoRefresh != _lastAutoRefresh ||
         settings.refreshInterval != _lastRefreshInterval;
     if (shouldRefresh) {
@@ -157,7 +158,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _autoRefreshTimer = null;
     _lastAutoRefresh = settings.autoRefresh;
     _lastRefreshInterval = settings.refreshInterval;
-    if (!_autoRefreshEnabled || !settings.autoRefresh || settings.refreshInterval <= 0) {
+    if (!_autoRefreshEnabled ||
+        !settings.autoRefresh ||
+        settings.refreshInterval <= 0) {
       return;
     }
     // Single-shot schedule — does NOT keep firing while the app is
@@ -293,8 +296,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       return;
     }
     final last = _lastRefreshAt;
-    if (last != null &&
-        DateTime.now().difference(last).inSeconds < 10) {
+    if (last != null && DateTime.now().difference(last).inSeconds < 10) {
       debugPrint('[Feed] Refresh skipped (within 10s min interval).');
       return;
     }
@@ -445,15 +447,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         if (!_savedArticles.any((a) => a.id == article.id)) {
           _savedArticles = [article, ..._savedArticles];
         }
-        ErrorHandler.addBreadcrumb('Article saved: ${article.title}',
-            category: 'feed');
+        ErrorHandler.addBreadcrumb(
+          'Article saved: ${article.title}',
+          category: 'feed',
+        );
       } else {
-        _savedArticles =
-            _savedArticles.where((a) => a.id != article.id).toList();
-        ErrorHandler.addBreadcrumb('Article unsaved: ${article.title}',
-            category: 'feed');
+        _savedArticles = _savedArticles
+            .where((a) => a.id != article.id)
+            .toList();
+        ErrorHandler.addBreadcrumb(
+          'Article unsaved: ${article.title}',
+          category: 'feed',
+        );
       }
     });
+
+    _saveArticles();
   }
 
   void _onTapCard(int index) {
@@ -469,8 +478,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       articleId: article.id,
       title: article.title,
     );
-    ErrorHandler.addBreadcrumb('Article opened: ${article.title}',
-        category: 'navigation');
+    ErrorHandler.addBreadcrumb(
+      'Article opened: ${article.title}',
+      category: 'navigation',
+    );
 
     setState(() {
       _articles[articleIndex].isRead = true;
@@ -545,9 +556,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         ),
         backgroundColor: colorScheme.inverseSurface,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 8,
         duration: duration,
         action: (actionLabel != null && onAction != null)
@@ -566,9 +575,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     final result = await _articleRepository.markAllAsRead();
     if (!mounted) return;
     if (result.isFailure) {
-      _showSnackBar(
-        result.error ?? 'Couldn\'t mark all read.',
-      );
+      _showSnackBar(result.error ?? 'Couldn\'t mark all read.');
       return;
     }
 
@@ -609,13 +616,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     final icon = isSearchEmpty
         ? Icons.search_off_rounded
         : _selectedTab == 0
-            ? Icons.style_outlined
-            : Icons.bookmark_outline_rounded;
+        ? Icons.style_outlined
+        : Icons.bookmark_outline_rounded;
     final title = isSearchEmpty
         ? 'No results for "$_searchQuery"'
         : _selectedTab == 0
-            ? 'No articles'
-            : 'No saved articles';
+        ? 'No articles'
+        : 'No saved articles';
 
     return Center(
       child: Column(
@@ -707,12 +714,20 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           curve: Curves.easeInOut,
           child: _isLoading && _articles.isNotEmpty
               ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+                      borderRadius: BorderRadius.circular(
+                        AppCardStyles.badgeRadius,
+                      ),
                       border: Border.all(
                         color: colorScheme.primary.withValues(alpha: 0.25),
                         width: 1,
@@ -750,18 +765,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           child: _displayedArticles.isEmpty && !_isLoading
               ? _buildEmptyState()
               : (_viewMode == 'stack'
-                  ? CardStack(
-                      articles: _displayedArticles,
-                      onSwipeRight: _onSwipeRight,
-                      onSwipeLeft: _onSwipeLeft,
-                      onTap: _onTapCard,
-                      emptyState: _buildEmptyState(),
-                      isFilterActive: _selectedFilter != 'All',
-                    )
-                  : ContinuousFeedList(
-                      articles: _displayedArticles,
-                      onTap: _onTapCard,
-                    )),
+                    ? CardStack(
+                        articles: _displayedArticles,
+                        onSwipeRight: _onSwipeRight,
+                        onSwipeLeft: _onSwipeLeft,
+                        onTap: _onTapCard,
+                        emptyState: _buildEmptyState(),
+                        isFilterActive: _selectedFilter != 'All',
+                      )
+                    : ContinuousFeedList(
+                        articles: _displayedArticles,
+                        onTap: _onTapCard,
+                      )),
         ),
       ],
     );
@@ -858,493 +873,513 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         const GrainOverlay(),
         Scaffold(
           backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: colorScheme.surface.withValues(alpha: isDark ? 0.0 : 1.0),
-          elevation: isDark ? 0 : 2,
-          shadowColor: isDark ? null : colorScheme.shadow,
-          title: Text(
-            _selectedTab == 0
-                ? 'Curated Feeds'
-                : _selectedTab == 1
-                    ? 'Saved'
-                    : 'Settings',
-            style: _textTheme.headlineMedium?.copyWith(
-              fontSize: 24,
-              color: appBarTitleColor,
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: colorScheme.surface.withValues(
+              alpha: isDark ? 0.0 : 1.0,
             ),
-          ),
-          actions: [
-            // Mark-all-read with undo.
-            if (_selectedTab == 0)
-              Semantics(
-                button: true,
-                label: _unreadCount > 0
-                    ? 'Mark $_unreadCount unread articles as read'
-                    : 'No unread to mark as read',
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: IconButton(
-                    onPressed: _unreadCount == 0
-                        ? null
-                        : () {
-                            HapticFeedback.lightImpact();
-                            _onMarkAllRead();
-                          },
-                    tooltip: _unreadCount > 0
-                        ? 'Mark all as read'
-                        : 'All caught up',
-                    icon: Icon(
-                      _unreadCount == 0
-                          ? Icons.done_all_rounded
-                          : Icons.done_all_outlined,
-                      color: appBarTitleColor,
-                    ),
-                  ),
-                ),
+            elevation: isDark ? 0 : 2,
+            shadowColor: isDark ? null : colorScheme.shadow,
+            title: Text(
+              _selectedTab == 0
+                  ? 'Curated Feeds'
+                  : _selectedTab == 1
+                  ? 'Saved'
+                  : 'Settings',
+              style: _textTheme.headlineMedium?.copyWith(
+                fontSize: 24,
+                color: appBarTitleColor,
               ),
-            // View-mode toggle (Stack / Continuous) — feed tab only.
-            if (_selectedTab == 0)
-              Semantics(
-                button: true,
-                label: _viewMode == 'stack'
-                    ? 'Switch to continuous list'
-                    : 'Switch to card stack',
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: IconButton(
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      _toggleViewMode();
-                    },
-                    tooltip: _viewMode == 'stack'
-                        ? 'Continuous'
-                        : 'Card stack',
-                    icon: Icon(
-                      _viewMode == 'stack'
-                          ? Icons.view_agenda_outlined
-                          : Icons.crop_square,
-                      color: appBarTitleColor,
-                    ),
-                  ),
-                ),
-              ),
-            if (_selectedTab == 0 && _articles.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Semantics(
-                      label: '$_unreadCount unread articles',
-                      child: Icon(
-                        Icons.article_outlined,
-                        size: 16,
-                        color: appBarTitleColor.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$_unreadCount',
-                      style: _textTheme.labelLarge?.copyWith(
-                        fontSize: 14,
+            ),
+            actions: [
+              // Mark-all-read with undo.
+              if (_selectedTab == 0)
+                Semantics(
+                  button: true,
+                  label: _unreadCount > 0
+                      ? 'Mark $_unreadCount unread articles as read'
+                      : 'No unread to mark as read',
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: IconButton(
+                      onPressed: _unreadCount == 0
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              _onMarkAllRead();
+                            },
+                      tooltip: _unreadCount > 0
+                          ? 'Mark all as read'
+                          : 'All caught up',
+                      icon: Icon(
+                        _unreadCount == 0
+                            ? Icons.done_all_rounded
+                            : Icons.done_all_outlined,
                         color: appBarTitleColor,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            if (_selectedTab == 0)
-              Semantics(
-                button: true,
-                label: _isLoading ? 'Loading' : 'Refresh feeds',
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: IconButton(
-                    onPressed: _isLoading ? null : () {
-                      HapticFeedback.lightImpact();
-                      _refreshFeeds();
-                    },
-                    icon: _isLoading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                appBarTitleColor,
-                              ),
-                            ),
-                          )
-                        : Icon(
-                            Icons.refresh_rounded,
-                            color: appBarTitleColor,
-                          ),
                   ),
                 ),
-              ),
-            Semantics(
-              button: true,
-              label: _isSearchActive ? 'Close search' : 'Search articles',
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: IconButton(
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    setState(() {
-                      _isSearchActive = !_isSearchActive;
-                      if (!_isSearchActive) {
-                        _searchQuery = '';
-                        _displayedArticles = _getFilteredArticles();
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    _isSearchActive ? Icons.close_rounded : Icons.search_rounded,
-                    color: appBarTitleColor,
-                  ),
-                ),
-              ),
-            ),
-            Semantics(
-              button: true,
-              label: 'More options',
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: appBarTitleColor,
-                  ),
-                  color: colorScheme.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  onSelected: (value) async {
-                    if (value == 'check_updates') {
-                      final updateInfo = await UpdateService.checkForUpdates(
-                        forceCheck: true,
-                      );
-                      if (context.mounted) {
-                        if (updateInfo != null) {
-                          await showUpdateDialog(
-                            context: context,
-                            updateInfo: updateInfo,
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "You're using the latest version!",
-                              ),
-                            ),
-                          );
-                        }
-                      }
-                    } else if (value == 'settings') {
-                      unawaited(Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsScreen(),
-                        ),
-                      ));
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 'check_updates',
-                      child: Row(
-                        children: [
-                          Icon(Icons.system_update),
-                          SizedBox(width: 12),
-                          Text('Check for updates'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'settings',
-                      child: Row(
-                        children: [
-                          Icon(Icons.settings),
-                          SizedBox(width: 12),
-                          Text('Settings'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Folio Rule — signature masthead. Only on the feed tab.
+              // View-mode toggle (Stack / Continuous) — feed tab only.
               if (_selectedTab == 0)
-                Consumer<SettingsNotifier>(
-                  builder: (context, settings, _) {
-                    return FolioRule(
-                      date: DateTime.now(),
-                      edition: settings.edition,
-                      articleCount: _displayedArticles.length,
-                      unreadCount: _unreadCount,
-                      isPro: settings.isPro,
-                      // The amber dot doubles as the "mark all read"
-                      // affordance — it ONLY exists when there is
-                      // something unread, so tapping it is the
-                      // fastest path to a clean slate. Stack mode
-                      // and Continuous mode both use the same action.
-                      onTapDot: _unreadCount > 0 ? _onMarkAllRead : null,
-                    );
-                  },
-                ),
-              // Search bar - theme-aware styling
-              if (_isSearchActive)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: TextField(
-                    autofocus: true,
-                    textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search articles, sources, or content...',
-                    hintStyle: _textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 15,
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                      borderSide: BorderSide(
-                        color: colorScheme.outlineVariant,
-                        width: 1,
+                Semantics(
+                  button: true,
+                  label: _viewMode == 'stack'
+                      ? 'Switch to continuous list'
+                      : 'Switch to card stack',
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: IconButton(
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        _toggleViewMode();
+                      },
+                      tooltip: _viewMode == 'stack'
+                          ? 'Continuous'
+                          : 'Card stack',
+                      icon: Icon(
+                        _viewMode == 'stack'
+                            ? Icons.view_agenda_outlined
+                            : Icons.crop_square,
+                        color: appBarTitleColor,
                       ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                      borderSide: BorderSide(
-                        color: colorScheme.outlineVariant,
-                        width: 1,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                      borderSide: BorderSide(
-                        color: colorScheme.primary,
-                        width: 2,
-                      ),
-                    ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? Semantics(
-                              button: true,
-                              label: 'Clear search',
-                              child: IconButton(
-                                icon: Icon(
-                                  Icons.clear_rounded,
-                                  color: appBarTitleColor,
-                                ),
-                                onPressed: () {
-                                  _searchDebounceTimer?.cancel();
-                                  setState(() {
-                                    _searchQuery = '';
-                                    _displayedArticles = _getFilteredArticles();
-                                  });
-                                },
-                              ),
-                            )
-                          : null,
-                    ),
-                    style: _textTheme.bodyLarge?.copyWith(
-                      color: appBarTitleColor,
-                      fontSize: 16,
-                    ),
-                    onChanged: (value) {
-                      _searchDebounceTimer?.cancel();
-                      _searchDebounceTimer = Timer(
-                        const Duration(milliseconds: 250),
-                        () {
-                          if (mounted) {
-                            setState(() {
-                              _searchQuery = value;
-                              _displayedArticles = _getFilteredArticles();
-                            });
-                          }
-                        },
-                      );
-                    },
                   ),
                 ),
-
-              // Category filter chips for feeds tab
-              if (_selectedTab == 0 &&
-                  !_isSearchActive &&
-                  (_articles.isNotEmpty || _isLoading)) ...[
+              if (_selectedTab == 0 && _articles.isNotEmpty)
                 Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final category = _categories[index];
-                      final isSelected = _selectedFilter == category;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Semantics(
-                          button: true,
-                          label: 'Filter by $category',
-                          selected: isSelected,
-                          child: InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _selectedFilter = category;
-                                _displayedArticles = _getFilteredArticles();
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                            splashColor: colorScheme.primary.withValues(alpha: 0.08),
-                            child: AnimatedContainer(
-                              duration: AppCardStyles.quickDuration,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? colorScheme.primary
-                                    : colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.outlineVariant,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                category,
-                                style: _textTheme.labelLarge?.copyWith(
-                                  color: isSelected
-                                      ? colorScheme.onPrimary
-                                      : colorScheme.onSurfaceVariant,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Search results indicator
-              if (_isSearchActive && _searchQuery.isNotEmpty)
-                Padding(
+                  margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 12,
                     vertical: 8,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.search_rounded,
-                        size: 16,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
-                        style: _textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Offline indicator
-              if (!_isOnline && _selectedTab == 0)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
                   decoration: BoxDecoration(
-                    color: colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(
+                      AppCardStyles.badgeRadius,
+                    ),
                     border: Border.all(
-                      color: colorScheme.error.withValues(alpha: 0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.cloud_off_rounded,
-                        size: 16,
-                        color: colorScheme.error,
+                      Semantics(
+                        label: '$_unreadCount unread articles',
+                        child: Icon(
+                          Icons.article_outlined,
+                          size: 16,
+                          color: appBarTitleColor.withValues(alpha: 0.85),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Offline - Showing cached content',
-                          style: _textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onErrorContainer,
-                            fontSize: 13,
-                          ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$_unreadCount',
+                        style: _textTheme.labelLarge?.copyWith(
+                          fontSize: 14,
+                          color: appBarTitleColor,
                         ),
                       ),
                     ],
                   ),
                 ),
-
-              if (!_isOnline) const SizedBox(height: 8),
-
-              // Content
-              Expanded(
-                child: RefreshIndicator(
-                  color: colorScheme.primary,
-                  backgroundColor: colorScheme.surface,
-                  strokeWidth: 2.5,
-                  onRefresh: _isLoading
-                      ? () async {}
-                      : () async {
-                          await _refreshFeeds();
-                        },
-                  child: _isLoading && _articles.isEmpty
-                      ? _buildLoadingState()
-                      : _selectedTab == 0
-                          ? _buildCardView()
-                          : _buildSavedArticlesView(),
+              if (_selectedTab == 0)
+                Semantics(
+                  button: true,
+                  label: _isLoading ? 'Loading' : 'Refresh feeds',
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              _refreshFeeds();
+                            },
+                      icon: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  appBarTitleColor,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.refresh_rounded,
+                              color: appBarTitleColor,
+                            ),
+                    ),
+                  ),
+                ),
+              Semantics(
+                button: true,
+                label: _isSearchActive ? 'Close search' : 'Search articles',
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: IconButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _isSearchActive = !_isSearchActive;
+                        if (!_isSearchActive) {
+                          _searchQuery = '';
+                          _displayedArticles = _getFilteredArticles();
+                        }
+                      });
+                    },
+                    icon: Icon(
+                      _isSearchActive
+                          ? Icons.close_rounded
+                          : Icons.search_rounded,
+                      color: appBarTitleColor,
+                    ),
+                  ),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: 'More options',
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: appBarTitleColor),
+                    color: colorScheme.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    onSelected: (value) async {
+                      if (value == 'check_updates') {
+                        final updateInfo = await UpdateService.checkForUpdates(
+                          forceCheck: true,
+                        );
+                        if (context.mounted) {
+                          if (updateInfo != null) {
+                            await showUpdateDialog(
+                              context: context,
+                              updateInfo: updateInfo,
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "You're using the latest version!",
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      } else if (value == 'settings') {
+                        unawaited(
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'check_updates',
+                        child: Row(
+                          children: [
+                            Icon(Icons.system_update),
+                            SizedBox(width: 12),
+                            Text('Check for updates'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'settings',
+                        child: Row(
+                          children: [
+                            Icon(Icons.settings),
+                            SizedBox(width: 12),
+                            Text('Settings'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Folio Rule — signature masthead. Only on the feed tab.
+                if (_selectedTab == 0)
+                  Consumer<SettingsNotifier>(
+                    builder: (context, settings, _) {
+                      return FolioRule(
+                        date: DateTime.now(),
+                        edition: settings.edition,
+                        articleCount: _displayedArticles.length,
+                        unreadCount: _unreadCount,
+                        isPro: settings.isPro,
+                        // The amber dot doubles as the "mark all read"
+                        // affordance — it ONLY exists when there is
+                        // something unread, so tapping it is the
+                        // fastest path to a clean slate. Stack mode
+                        // and Continuous mode both use the same action.
+                        onTapDot: _unreadCount > 0 ? _onMarkAllRead : null,
+                      );
+                    },
+                  ),
+                // Search bar - theme-aware styling
+                if (_isSearchActive)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: TextField(
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: 'Search articles, sources, or content...',
+                        hintStyle: _textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 15,
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppCardStyles.badgeRadius,
+                          ),
+                          borderSide: BorderSide(
+                            color: colorScheme.outlineVariant,
+                            width: 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppCardStyles.badgeRadius,
+                          ),
+                          borderSide: BorderSide(
+                            color: colorScheme.outlineVariant,
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppCardStyles.badgeRadius,
+                          ),
+                          borderSide: BorderSide(
+                            color: colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? Semantics(
+                                button: true,
+                                label: 'Clear search',
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.clear_rounded,
+                                    color: appBarTitleColor,
+                                  ),
+                                  onPressed: () {
+                                    _searchDebounceTimer?.cancel();
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _displayedArticles =
+                                          _getFilteredArticles();
+                                    });
+                                  },
+                                ),
+                              )
+                            : null,
+                      ),
+                      style: _textTheme.bodyLarge?.copyWith(
+                        color: appBarTitleColor,
+                        fontSize: 16,
+                      ),
+                      onChanged: (value) {
+                        _searchDebounceTimer?.cancel();
+                        _searchDebounceTimer = Timer(
+                          const Duration(milliseconds: 250),
+                          () {
+                            if (mounted) {
+                              setState(() {
+                                _searchQuery = value;
+                                _displayedArticles = _getFilteredArticles();
+                              });
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                // Category filter chips for feeds tab
+                if (_selectedTab == 0 &&
+                    !_isSearchActive &&
+                    (_articles.isNotEmpty || _isLoading)) ...[
+                  Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: _categories.length,
+                      itemBuilder: (context, index) {
+                        final category = _categories[index];
+                        final isSelected = _selectedFilter == category;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Semantics(
+                            button: true,
+                            label: 'Filter by $category',
+                            selected: isSelected,
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _selectedFilter = category;
+                                  _displayedArticles = _getFilteredArticles();
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(
+                                AppCardStyles.badgeRadius,
+                              ),
+                              splashColor: colorScheme.primary.withValues(
+                                alpha: 0.08,
+                              ),
+                              child: AnimatedContainer(
+                                duration: AppCardStyles.quickDuration,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(
+                                    AppCardStyles.badgeRadius,
+                                  ),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.outlineVariant,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  category,
+                                  style: _textTheme.labelLarge?.copyWith(
+                                    color: isSelected
+                                        ? colorScheme.onPrimary
+                                        : colorScheme.onSurfaceVariant,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Search results indicator
+                if (_isSearchActive && _searchQuery.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.search_rounded,
+                          size: 16,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
+                          style: _textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Offline indicator
+                if (!_isOnline && _selectedTab == 0)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.error.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.cloud_off_rounded,
+                          size: 16,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Offline - Showing cached content',
+                            style: _textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (!_isOnline) const SizedBox(height: 8),
+
+                // Content
+                Expanded(
+                  child: RefreshIndicator(
+                    color: colorScheme.primary,
+                    backgroundColor: colorScheme.surface,
+                    strokeWidth: 2.5,
+                    onRefresh: _isLoading
+                        ? () async {}
+                        : () async {
+                            await _refreshFeeds();
+                          },
+                    child: _isLoading && _articles.isEmpty
+                        ? _buildLoadingState()
+                        : _selectedTab == 0
+                        ? _buildCardView()
+                        : _buildSavedArticlesView(),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
       ],
     );
   }

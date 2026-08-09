@@ -33,6 +33,16 @@ class NotificationService {
   // http.Client is injectable, and SettingsService supplies prefs.
   // ---------------------------------------------------------------------------
 
+  /// Base headers for worker calls. Sends the shared API secret when
+  /// one was compiled in via --dart-define=WORKER_API_SECRET.
+  static Map<String, String> _workerHeaders() {
+    final headers = {'Content-Type': 'application/json'};
+    if (AppConfig.workerApiSecret.isNotEmpty) {
+      headers['x-api-secret'] = AppConfig.workerApiSecret;
+    }
+    return headers;
+  }
+
   /// Re-register the FCM token with the worker. Call this on app start
   /// when notifications are enabled, and from the Settings toggle
   /// handler. ponytail: skip onTokenRefresh listener — re-POST on
@@ -49,14 +59,15 @@ class NotificationService {
     }
 
     final settingsService = getIt<SettingsService>();
-    final newArticlesEnabled =
-        await settingsService.getNewArticleNotifications();
+    final newArticlesEnabled = await settingsService
+        .getNewArticleNotifications();
 
     final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
+    final headers = _workerHeaders();
     final response = await client
         .post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: headers,
           body: jsonEncode({
             'token': token,
             'topic': 'new-articles',
@@ -66,9 +77,7 @@ class NotificationService {
         .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
 
     if (response.statusCode != 200) {
-      throw StateError(
-        'Push subscription failed: HTTP ${response.statusCode}',
-      );
+      throw StateError('Push subscription failed: HTTP ${response.statusCode}');
     }
   }
 
@@ -85,7 +94,7 @@ class NotificationService {
     await client
         .delete(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: _workerHeaders(),
           body: jsonEncode({'token': token}),
         )
         .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
@@ -97,9 +106,12 @@ class NotificationService {
 
     // Check if notifications are enabled
     final settingsService = getIt<SettingsService>();
-    final notificationsEnabled = await settingsService.getNotificationsEnabled();
+    final notificationsEnabled = await settingsService
+        .getNotificationsEnabled();
     if (!notificationsEnabled) {
-      debugPrint('[Notification] Notifications disabled by user, skipping init');
+      debugPrint(
+        '[Notification] Notifications disabled by user, skipping init',
+      );
       _isInitialized = true;
       return;
     }
@@ -116,9 +128,11 @@ class NotificationService {
 
     // Re-register with the worker — upsert is idempotent on the server
     // and covers token rotation, stale data, and uninstall-reinstall.
-    unawaited(NotificationService.enablePushNotifications().catchError((Object e) {
-      debugPrint('[Notification] Failed to register token with worker: $e');
-    }));
+    unawaited(
+      NotificationService.enablePushNotifications().catchError((Object e) {
+        debugPrint('[Notification] Failed to register token with worker: $e');
+      }),
+    );
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -262,8 +276,8 @@ class NotificationService {
     final firstLine = info.releaseNotes.isEmpty
         ? 'Tap to update Curated Feeds.'
         : (info.releaseNotes.split('\n').first.length > 80
-            ? '${info.releaseNotes.substring(0, 77)}…'
-            : info.releaseNotes.split('\n').first);
+              ? '${info.releaseNotes.substring(0, 77)}…'
+              : info.releaseNotes.split('\n').first);
 
     await _localNotifications.show(
       id: _kOtaNotificationId,
@@ -276,9 +290,7 @@ class NotificationService {
     await prefs.setString(_pendingUpdatePayloadKey, payload);
     await prefs.setString('last_announced_update_version', info.version);
 
-    debugPrint(
-      '[Notification] Scheduled OTA announcement for ${info.version}',
-    );
+    debugPrint('[Notification] Scheduled OTA announcement for ${info.version}');
   }
 
   /// Stable ID used for the OTA announcement notification. Re-using
@@ -358,7 +370,9 @@ class NotificationService {
 
   /// Handle foreground message
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    debugPrint('[Notification] Foreground message: ${message.notification?.title}');
+    debugPrint(
+      '[Notification] Foreground message: ${message.notification?.title}',
+    );
 
     // Check if in-app notifications are enabled
     final settingsService = getIt<SettingsService>();
@@ -373,7 +387,9 @@ class NotificationService {
 
   /// Handle background message (must be top-level function)
   static Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-    debugPrint('[Notification] Background message: ${message.notification?.title}');
+    debugPrint(
+      '[Notification] Background message: ${message.notification?.title}',
+    );
   }
 
   /// Handle notification tap from terminated/background

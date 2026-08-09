@@ -47,7 +47,10 @@ void main() {
       expect(json['link'], 'https://example.com/article/1');
       expect(json['sourceId'], 'test-source');
       expect(json['sourceName'], 'Test Source');
-      expect(json['pubDate'], 1705314600000); // milliseconds since epoch for UTC
+      expect(
+        json['pubDate'],
+        1705314600000,
+      ); // milliseconds since epoch for UTC
       expect(json['author'], 'Test Author');
       expect(json['imageUrl'], 'https://example.com/image.jpg');
       expect(json['isRead'], false);

@@ -45,15 +45,19 @@ class ArticleRepository {
       _cachedArticles = articles;
 
       // Use debugPrint for success/info messages — ErrorHandler is for actual errors
-      debugPrint('[Repository] Retrieved ${articles.length} articles from storage');
+      debugPrint(
+        '[Repository] Retrieved ${articles.length} articles from storage',
+      );
 
       return Result.success(articles);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to fetch all articles',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to fetch all articles',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -115,15 +119,19 @@ class ArticleRepository {
       _cachedArticles = mergedArticles;
       await _storageService.saveArticles(mergedArticles);
 
-      debugPrint('[Repository] Added ${articlesToAdd.length} new articles. Total: ${mergedArticles.length}');
+      debugPrint(
+        '[Repository] Added ${articlesToAdd.length} new articles. Total: ${mergedArticles.length}',
+      );
 
       return Result.success(mergedArticles);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to fetch new articles',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to fetch new articles',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -143,11 +151,13 @@ class ArticleRepository {
 
       return Result.success(articles);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to fetch saved articles',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to fetch saved articles',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -182,7 +192,8 @@ class ArticleRepository {
           // Add to saved if not already there
           if (!updatedSavedArticles.any((a) => a.id == article.id)) {
             updatedSavedArticles.insert(0, updatedArticle);
-          }        } else {
+          }
+        } else {
           // Remove from saved
           updatedSavedArticles.removeWhere((a) => a.id == article.id);
         }
@@ -193,11 +204,13 @@ class ArticleRepository {
 
       return Result.success(null);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to toggle save status',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to toggle save status',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -236,16 +249,16 @@ class ArticleRepository {
       _cachedArticles = updated;
       await _storageService.saveArticles(updated);
 
-      debugPrint(
-        '[Repository] Marked all read. Flipped $touched article(s).',
-      );
+      debugPrint('[Repository] Marked all read. Flipped $touched article(s).');
       return Result.success(previousReadState);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to mark all as read',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to mark all as read',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
@@ -276,18 +289,17 @@ class ArticleRepository {
       _cachedArticles = updated;
       await _storageService.saveArticles(updated);
 
-      debugPrint(
-        '[Repository] Restored ${ids.length} article(s) to unread.',
-      );
+      debugPrint('[Repository] Restored ${ids.length} article(s) to unread.');
       return Result.success(null);
     } catch (e, stackTrace) {
-      unawaited(ErrorHandler.logError(
-        'Failed to restore read state',
-        error: e,
-        stackTrace: stackTrace,
-      ));
+      unawaited(
+        ErrorHandler.logError(
+          'Failed to restore read state',
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
       return Result.failure(ErrorHandler.getUserMessage(e));
     }
   }
-
 }

@@ -129,9 +129,9 @@ class FolioRule extends StatelessWidget {
                   isNarrow
                       ? _formatMastheadCompact(date)
                       : _formatMasthead(date),
-                  style: AppType.folioTop(color: top).copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppType.folioTop(
+                    color: top,
+                  ).copyWith(fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -154,19 +154,18 @@ class FolioRule extends StatelessWidget {
                   ),
                   child: Text(
                     'PRO',
-                    style: AppType.folioTop(color: accent).copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                    ),
+                    style: AppType.folioTop(
+                      color: accent,
+                    ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
                   ),
                 ),
               ],
               const SizedBox(width: AppSpacing.s3),
               Text(
                 '$articleCount curated',
-                style: AppType.folioTop(color: top).copyWith(
-                  letterSpacing: 0.4,
-                ),
+                style: AppType.folioTop(
+                  color: top,
+                ).copyWith(letterSpacing: 0.4),
               ),
               const SizedBox(width: AppSpacing.s3),
               Semantics(
@@ -211,10 +210,7 @@ class _AnimatedDotState extends State<_AnimatedDot>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: AppMotion.slow,
-    );
+    _ctrl = AnimationController(vsync: this, duration: AppMotion.slow);
     if (widget.active) _ctrl.forward();
   }
 
@@ -248,9 +244,7 @@ class _AnimatedDotState extends State<_AnimatedDot>
           width: 10 + pulse * 4,
           height: 10 + pulse * 4,
           decoration: BoxDecoration(
-            color: widget.active
-                ? widget.color
-                : idleColor,
+            color: widget.active ? widget.color : idleColor,
             shape: BoxShape.circle,
             boxShadow: widget.active
                 ? [

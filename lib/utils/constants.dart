@@ -9,10 +9,14 @@ class AppColors {
   AppColors._();
 
   // Primary colors - Stitch Design System
-  static const Color primary = Color(0xFFC4944E); // Warm amber (editorial primary)
+  static const Color primary = Color(
+    0xFFC4944E,
+  ); // Warm amber (editorial primary)
   static const Color primary10 = Color(0x1AC4944E); // 10% opacity
   static const Color primary5 = Color(0x0DC4944E); // 5% opacity
-  static const Color background = Color(0xFF1A1423); // Deep charcoal (dark mode)
+  static const Color background = Color(
+    0xFF1A1423,
+  ); // Deep charcoal (dark mode)
   static const Color backgroundLight = Color(0xFFF7F5F8); // Light mode bg
   static const Color backgroundDark = Color(
     0xFF1A1423,
@@ -67,10 +71,24 @@ class AppConfig {
   }
 
   // Worker API settings
-  static String get workerApiUrl =>
-      const String.fromEnvironment('WORKER_API_URL',
-          defaultValue: 'https://curated-feeds-worker.raj15400881.workers.dev/');
+  static String get workerApiUrl => const String.fromEnvironment(
+    'WORKER_API_URL',
+    defaultValue: 'https://curated-feeds-worker.raj15400881.workers.dev/',
+  );
   static const int workerTimeoutSeconds = 8;
+
+  /// Shared secret header sent to the worker on app-side API calls.
+  /// Empty when not compiled in via --dart-define=WORKER_API_SECRET=...
+  static const String workerApiSecret = String.fromEnvironment(
+    'WORKER_API_SECRET',
+    defaultValue: '',
+  );
+
+  /// Support email — shown in Settings and used for the mailto link.
+  static const String supportEmail = String.fromEnvironment(
+    'SUPPORT_EMAIL',
+    defaultValue: 'rajatkashyap7062@gmail.com',
+  );
 
   static const int rssTimeoutSeconds = 8;
   static const int maxArticlesPerSource = 20;
@@ -121,13 +139,27 @@ class AppCardStyles {
   static const double buttonRadius = 14.0;
 
   // Animation durations - Standardized
-  static const Duration microDuration = Duration(milliseconds: 150);    // Haptic feedback, instant
-  static const Duration quickDuration = Duration(milliseconds: 250);    // Button states
-  static const Duration standardDuration = Duration(milliseconds: 300); // Default UI transitions
-  static const Duration fadeInDuration = Duration(milliseconds: 300);   // Image fade
-  static const Duration emphasisDuration = Duration(milliseconds: 400); // FAB, bounce
-  static const Duration staggerDuration = Duration(milliseconds: 700);  // Feed stagger
-  static const Duration shimmerDuration = Duration(milliseconds: 1500); // Loading shimmer
+  static const Duration microDuration = Duration(
+    milliseconds: 150,
+  ); // Haptic feedback, instant
+  static const Duration quickDuration = Duration(
+    milliseconds: 250,
+  ); // Button states
+  static const Duration standardDuration = Duration(
+    milliseconds: 300,
+  ); // Default UI transitions
+  static const Duration fadeInDuration = Duration(
+    milliseconds: 300,
+  ); // Image fade
+  static const Duration emphasisDuration = Duration(
+    milliseconds: 400,
+  ); // FAB, bounce
+  static const Duration staggerDuration = Duration(
+    milliseconds: 700,
+  ); // Feed stagger
+  static const Duration shimmerDuration = Duration(
+    milliseconds: 1500,
+  ); // Loading shimmer
   static const Curve bounceCurve = Curves.easeOutBack;
 
   /// Category chip glass effect
@@ -242,4 +274,3 @@ class CurvedNavTokens {
   static const Curve iconCurve = Curves.easeOutBack;
   static const Curve labelCurve = Curves.easeOutCubic;
 }
-

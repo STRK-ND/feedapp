@@ -4,7 +4,8 @@ import '../models/in_app_notification.dart';
 
 /// Manager for displaying in-app notifications as overlays
 class InAppNotificationManager extends ChangeNotifier {
-  static final InAppNotificationManager _instance = InAppNotificationManager._internal();
+  static final InAppNotificationManager _instance =
+      InAppNotificationManager._internal();
   factory InAppNotificationManager() => _instance;
   InAppNotificationManager._internal();
 
@@ -15,11 +16,14 @@ class InAppNotificationManager extends ChangeNotifier {
   bool _isEnabled = true;
   static const Duration displayDuration = Duration(seconds: 4);
 
-  List<InAppNotification> get notifications => List.unmodifiable(_notifications);
+  List<InAppNotification> get notifications =>
+      List.unmodifiable(_notifications);
   Stream<InAppNotification> get notificationStream {
-    _notificationStreamController ??= StreamController<InAppNotification>.broadcast();
+    _notificationStreamController ??=
+        StreamController<InAppNotification>.broadcast();
     return _notificationStreamController!.stream;
   }
+
   bool get isEnabled => _isEnabled;
 
   /// Enable or disable in-app notifications
@@ -30,8 +34,10 @@ class InAppNotificationManager extends ChangeNotifier {
 
   /// Ensure stream controller is available
   void _ensureStreamController() {
-    if (_notificationStreamController == null || _notificationStreamController!.isClosed) {
-      _notificationStreamController = StreamController<InAppNotification>.broadcast();
+    if (_notificationStreamController == null ||
+        _notificationStreamController!.isClosed) {
+      _notificationStreamController =
+          StreamController<InAppNotification>.broadcast();
     }
   }
 

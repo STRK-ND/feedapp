@@ -59,31 +59,37 @@ void main() {
       );
     });
 
-    test('enablePushNotifications throws StateError when token is null', () async {
-      // Note: requires NotificationService singleton with _fcmToken == null.
-      // The singleton factory boots FirebaseMessaging — so this test
-      // relies on the "no fcmToken" branch via explicit param.
-      expect(
-        () => NotificationService.enablePushNotifications(
-          fcmToken: null,
+    test(
+      'enablePushNotifications throws StateError when token is null',
+      () async {
+        // Note: requires NotificationService singleton with _fcmToken == null.
+        // The singleton factory boots FirebaseMessaging — so this test
+        // relies on the "no fcmToken" branch via explicit param.
+        expect(
+          () => NotificationService.enablePushNotifications(
+            fcmToken: null,
+            httpClient: mockClient(),
+          ),
+          throwsA(anything), // Firebase boot OR StateError
+        );
+      },
+    );
+
+    test(
+      'enablePushNotifications includes newArticles pref when disabled',
+      () async {
+        final svc = getIt<SettingsService>();
+        await svc.setNewArticleNotifications(false);
+
+        await NotificationService.enablePushNotifications(
+          fcmToken: 'fake-fcm-token-12345',
           httpClient: mockClient(),
-        ),
-        throwsA(anything), // Firebase boot OR StateError
-      );
-    });
+        );
 
-    test('enablePushNotifications includes newArticles pref when disabled', () async {
-      final svc = getIt<SettingsService>();
-      await svc.setNewArticleNotifications(false);
-
-      await NotificationService.enablePushNotifications(
-        fcmToken: 'fake-fcm-token-12345',
-        httpClient: mockClient(),
-      );
-
-      final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
-      expect(body['preferences']['newArticles'], isFalse);
-    });
+        final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+        expect(body['preferences']['newArticles'], isFalse);
+      },
+    );
 
     test('disablePushNotifications issues DELETE with token', () async {
       await NotificationService.disablePushNotifications(

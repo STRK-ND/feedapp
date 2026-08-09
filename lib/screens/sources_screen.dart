@@ -9,7 +9,7 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +19,7 @@ import '../di/service_locator.dart';
 import '../models/rss_source.dart';
 import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
+import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
 
 class SourcesScreen extends StatefulWidget {
@@ -89,9 +90,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Group canonical sources by category in stable order.
@@ -110,14 +109,15 @@ class _SourcesScreenState extends State<SourcesScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          'Sources',
-          style: AppType.headlineSmall(),
-        ),
+        title: Text('Sources', style: AppType.headlineSmall()),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s4, AppSpacing.s4, AppSpacing.s4, AppSpacing.s16),
+          AppSpacing.s4,
+          AppSpacing.s4,
+          AppSpacing.s4,
+          AppSpacing.s16,
+        ),
         children: [
           _buildSectionHeader(
             'SUBSCRIBED',
@@ -127,25 +127,26 @@ class _SourcesScreenState extends State<SourcesScreen> {
           if (subscribed.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s2, vertical: AppSpacing.s4),
+                horizontal: AppSpacing.s2,
+                vertical: AppSpacing.s4,
+              ),
               child: Text(
                 'No sources yet. Pick from DISCOVER below.',
                 style: AppType.bodyMedium(color: AppColors.inkSoft),
               ),
             )
           else
-            ...subscribed.map((s) => _SourceTile(
-                  source: s,
-                  subtitle: s.category,
-                  isSubscribed: true,
-                  onTap: () => _showFilterHint(s),
-                  onLongPress: () => _confirmUnsub(s),
-                )),
+            ...subscribed.map(
+              (s) => _SourceTile(
+                source: s,
+                subtitle: s.category,
+                isSubscribed: true,
+                onTap: () => _showFilterHint(s),
+                onLongPress: () => _confirmUnsub(s),
+              ),
+            ),
           const SizedBox(height: AppSpacing.s8),
-          _buildSectionHeader(
-            'DISCOVER',
-            trailing: 'tap to add',
-          ),
+          _buildSectionHeader('DISCOVER', trailing: 'tap to add'),
           const SizedBox(height: AppSpacing.s3),
           for (final category in categories) ...[
             _CategoryGroup(
@@ -199,8 +200,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
           if (trailing != null)
             Text(
               trailing.toUpperCase(),
-              style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                  .copyWith(letterSpacing: 0.6),
+              style: AppType.monoEyebrow(
+                color: AppColors.inkSoft,
+              ).copyWith(letterSpacing: 0.6),
             ),
         ],
       ),
@@ -209,9 +211,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
 
   void _showFilterHint(RssSource s) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Filtering by "${s.name}" — coming soon'),
-        duration: const Duration(milliseconds: 1800),
+      const SnackBar(
+        content: Text('Source feed filtering is coming in a future update'),
+        duration: Duration(milliseconds: 1800),
       ),
     );
   }
@@ -222,16 +224,28 @@ class _SourcesScreenState extends State<SourcesScreen> {
   /// list — arbitrary custom-source support is out of scope for v1).
   Future<void> _importOpml() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      // withData keeps the picked bytes in memory — Android SAF can
+      // return a null path otherwise. Deprecated in file_picker 12.x
+      // but still functional; readAsBytes() below is the non-deprecated
+      // way to consume them.
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['opml', 'xml'],
-        withData: false,
+        // ignore: deprecated_member_use
+        withData: true,
       );
       if (!mounted || result == null || result.files.isEmpty) return;
-      final path = result.files.single.path;
-      if (path == null) return;
+      final bytes = await result.files.single.readAsBytes();
 
-      final text = await File(path).readAsString();
+      if (bytes.length > AppConfig.maxXmlSizeBytes) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('File too large')));
+        return;
+      }
+
+      final text = utf8.decode(bytes);
       final urls = _parseOpmlUrls(text);
 
       if (urls.isEmpty) {
@@ -254,7 +268,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
           SnackBar(
             content: Text(
               'Found ${urls.length} feed URLs but none match Curated Feeds sources. '
-              'Custom-source support is coming in v1.1.',
+              'Only Curated Feeds sources are supported.',
             ),
           ),
         );
@@ -267,15 +281,13 @@ class _SourcesScreenState extends State<SourcesScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Imported ${matching.length} source(s)'),
-        ),
+        SnackBar(content: Text('Imported ${matching.length} source(s)')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Import failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
     }
   }
 
@@ -356,15 +368,18 @@ class _SourceTile extends StatelessWidget {
             ),
             Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s2 + 2, vertical: 2),
+                horizontal: AppSpacing.s2 + 2,
+                vertical: 2,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.rule.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(AppRadius.chip),
               ),
               child: Text(
                 source.category.toUpperCase(),
-                style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                    .copyWith(letterSpacing: 0.6, fontSize: 10),
+                style: AppType.monoEyebrow(
+                  color: AppColors.inkSoft,
+                ).copyWith(letterSpacing: 0.6, fontSize: 10),
               ),
             ),
           ],
@@ -396,15 +411,18 @@ class _CategoryGroup extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
           child: Text(
             category.toUpperCase(),
-            style: AppType.monoEyebrow(color: AppColors.inkSoft)
-                .copyWith(fontSize: 10, letterSpacing: 1.0),
+            style: AppType.monoEyebrow(
+              color: AppColors.inkSoft,
+            ).copyWith(fontSize: 10, letterSpacing: 1.0),
           ),
         ),
         const SizedBox(height: AppSpacing.s2),
         for (final s in sources) ...[
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s2, vertical: AppSpacing.s2),
+              horizontal: AppSpacing.s2,
+              vertical: AppSpacing.s2,
+            ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => onToggle(s),
@@ -421,9 +439,10 @@ class _CategoryGroup extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s3),
                   Expanded(
-                    child: Text(s.name,
-                        style: AppType.titleMedium()
-                            .copyWith(fontSize: 14)),
+                    child: Text(
+                      s.name,
+                      style: AppType.titleMedium().copyWith(fontSize: 14),
+                    ),
                   ),
                   AnimatedContainer(
                     duration: AppMotion.fast,
@@ -443,8 +462,7 @@ class _CategoryGroup extends StatelessWidget {
                     ),
                     alignment: Alignment.center,
                     child: subscriptions.contains(s.id)
-                        ? const Icon(Icons.check,
-                            size: 12, color: Colors.white)
+                        ? const Icon(Icons.check, size: 12, color: Colors.white)
                         : null,
                   ),
                 ],

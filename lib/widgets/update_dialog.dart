@@ -62,10 +62,7 @@ class UpdateDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(20),
@@ -211,8 +208,7 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
   _Stage _stage = _Stage.idle;
   String? _errorText;
 
-  bool get _busy =>
-      _stage == _Stage.downloading || _stage == _Stage.installing;
+  bool get _busy => _stage == _Stage.downloading || _stage == _Stage.installing;
 
   @override
   Widget build(BuildContext context) {
@@ -252,8 +248,9 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
             child: Text(
               _errorText!,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.error),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
       ],

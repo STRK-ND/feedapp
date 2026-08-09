@@ -176,7 +176,9 @@ class _AaButton extends StatelessWidget {
             message: 'Type & spacing',
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s3, vertical: AppSpacing.s2),
+                horizontal: AppSpacing.s3,
+                vertical: AppSpacing.s2,
+              ),
               child: Text(
                 'Aa',
                 style: AppType.titleLarge(
@@ -254,8 +256,9 @@ class _AaPanelState extends State<_AaPanel> {
     return Container(
       decoration: BoxDecoration(
         color: groundColor,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(AppRadius.sheetTop)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheetTop),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.10),
@@ -297,10 +300,9 @@ class _AaPanelState extends State<_AaPanel> {
             ),
             child: Text(
               'A river of words at the\nsize you prefer.',
-              style: AppType.displayMedium(color: AppColors.ink).copyWith(
-                fontSize: _fontSize,
-                height: _lineHeight,
-              ),
+              style: AppType.displayMedium(
+                color: AppColors.ink,
+              ).copyWith(fontSize: _fontSize, height: _lineHeight),
             ),
           ),
           const SizedBox(height: AppSpacing.s5),
@@ -313,8 +315,9 @@ class _AaPanelState extends State<_AaPanel> {
               const Spacer(),
               Text(
                 '${_fontSize.round()} PT',
-                style: AppType.monoDateline(color: AppColors.primary)
-                    .copyWith(fontWeight: FontWeight.w600),
+                style: AppType.monoDateline(
+                  color: AppColors.primary,
+                ).copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -339,8 +342,9 @@ class _AaPanelState extends State<_AaPanel> {
               const Spacer(),
               Text(
                 _lineHeight.toStringAsFixed(2),
-                style: AppType.monoDateline(color: AppColors.primary)
-                    .copyWith(fontWeight: FontWeight.w600),
+                style: AppType.monoDateline(
+                  color: AppColors.primary,
+                ).copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -480,10 +484,7 @@ class _Segment extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                sample,
-                style: style.copyWith(fontSize: 22, height: 1.0),
-              ),
+              Text(sample, style: style.copyWith(fontSize: 22, height: 1.0)),
               const SizedBox(height: AppSpacing.s2),
               Text(
                 label,
