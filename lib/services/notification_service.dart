@@ -52,32 +52,41 @@ class NotificationService {
     String? fcmToken,
     http.Client? httpClient,
   }) async {
+    final ownsClient = httpClient == null;
     final client = httpClient ?? http.Client();
-    final token = fcmToken ?? NotificationService()._fcmToken;
-    if (token == null) {
-      throw StateError('No FCM token available');
-    }
+    try {
+      final token = fcmToken ?? NotificationService()._fcmToken;
+      if (token == null) {
+        throw StateError('No FCM token available');
+      }
 
-    final settingsService = getIt<SettingsService>();
-    final newArticlesEnabled = await settingsService
-        .getNewArticleNotifications();
+      final settingsService = getIt<SettingsService>();
+      final newArticlesEnabled = await settingsService
+          .getNewArticleNotifications();
 
-    final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
-    final headers = _workerHeaders();
-    final response = await client
-        .post(
-          uri,
-          headers: headers,
-          body: jsonEncode({
-            'token': token,
-            'topic': 'new-articles',
-            'preferences': {'newArticles': newArticlesEnabled},
-          }),
-        )
-        .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
+      final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
+      final headers = _workerHeaders();
+      final response = await client
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'token': token,
+              'topic': 'new-articles',
+              'preferences': {'newArticles': newArticlesEnabled},
+            }),
+          )
+          .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
 
-    if (response.statusCode != 200) {
-      throw StateError('Push subscription failed: HTTP ${response.statusCode}');
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Push subscription failed: HTTP ${response.statusCode}',
+        );
+      }
+    } finally {
+      // Per-call client: close it (and its connection pool) unless a test
+      // injected its own, which the caller owns (data-layer L7).
+      if (ownsClient) client.close();
     }
   }
 
@@ -86,18 +95,23 @@ class NotificationService {
     String? fcmToken,
     http.Client? httpClient,
   }) async {
+    final ownsClient = httpClient == null;
     final client = httpClient ?? http.Client();
-    final token = fcmToken ?? NotificationService()._fcmToken;
-    if (token == null) return; // nothing to disable
+    try {
+      final token = fcmToken ?? NotificationService()._fcmToken;
+      if (token == null) return; // nothing to disable
 
-    final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
-    await client
-        .delete(
-          uri,
-          headers: _workerHeaders(),
-          body: jsonEncode({'token': token}),
-        )
-        .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
+      final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
+      await client
+          .delete(
+            uri,
+            headers: _workerHeaders(),
+            body: jsonEncode({'token': token}),
+          )
+          .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
+    } finally {
+      if (ownsClient) client.close();
+    }
   }
 
   /// Initialize notification service
@@ -108,6 +122,22 @@ class NotificationService {
     final settingsService = getIt<SettingsService>();
     final notificationsEnabled = await settingsService
         .getNotificationsEnabled();
+
+    // Always obtain the FCM token — it's a device registration, not a
+    // permission. Skipping it when push was off at launch left _fcmToken
+    // null for the whole process, so toggling push ON later threw
+    // "No FCM token available" with no path to recover (data-layer H2).
+    try {
+      _fcmToken ??= await _firebaseMessaging.getToken();
+      if (_fcmToken != null) {
+        debugPrint(
+          '[Notification] FCM Token: ${_fcmToken!.substring(0, 20)}...',
+        );
+      }
+    } catch (e) {
+      debugPrint('[Notification] Failed to obtain FCM token: $e');
+    }
+
     if (!notificationsEnabled) {
       debugPrint(
         '[Notification] Notifications disabled by user, skipping init',
@@ -121,10 +151,6 @@ class NotificationService {
 
     // Initialize local notifications
     await _initLocalNotifications();
-
-    // Get FCM token
-    _fcmToken = await _firebaseMessaging.getToken();
-    debugPrint('[Notification] FCM Token: ${_fcmToken?.substring(0, 20)}...');
 
     // Re-register with the worker — upsert is idempotent on the server
     // and covers token rotation, stale data, and uninstall-reinstall.
@@ -323,12 +349,14 @@ class NotificationService {
     String? calledWith,
   ) async {
     String? payload = calledWith;
-    if (payload == null) {
-      final prefs = await SharedPreferences.getInstance();
-      payload = prefs.getString(_pendingUpdatePayloadKey);
-      if (payload != null) {
-        await prefs.remove(_pendingUpdatePayloadKey);
-      }
+    final prefs = await SharedPreferences.getInstance();
+    // Always drain the cached copy. A warm tap (calledWith != null) must
+    // also clear it — otherwise the same payload re-fires the auto-update
+    // flow on the next cold start (data-layer M4).
+    final cached = prefs.getString(_pendingUpdatePayloadKey);
+    if (cached != null) {
+      await prefs.remove(_pendingUpdatePayloadKey);
+      payload ??= cached;
     }
     if (payload == null) return null;
     return _decodePayload(payload);

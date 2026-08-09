@@ -17,6 +17,11 @@ import '../widgets/curved_bottom_nav/curved_bottom_nav_bar.dart';
 import 'feed_screen.dart';
 import 'settings_screen.dart';
 
+/// Root navigator key, owned at the MaterialApp level so cold-start
+/// notification taps — which fire before the nav shell exists — can still
+/// resolve a context for ScaffoldMessenger feedback (data-layer H3).
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 class CuratedFeedsApp extends StatelessWidget {
   const CuratedFeedsApp({super.key});
 
@@ -55,6 +60,7 @@ class CuratedFeedsApp extends StatelessWidget {
           return MaterialApp(
             title: 'Curated Feeds',
             debugShowCheckedModeBanner: false,
+            navigatorKey: appNavigatorKey,
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
@@ -93,12 +99,6 @@ class _MainNavigationState extends State<MainNavigation> {
     const SavedArticlesScreen(),
     const SettingsScreen(),
   ];
-
-  /// Global key for showing dialogs / SnackBars from non-context
-  /// callbacks (notification taps that fire after the app has
-  /// rebuilt). Lives at the nav level so it's always available
-  /// while the app is running.
-  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -141,7 +141,7 @@ class _MainNavigationState extends State<MainNavigation> {
   /// browser handoff if the installer intent isn't available.
   /// Shared by the warm-app tap handler and the cold-start path.
   Future<void> _performAutoUpdate(UpdateInfo info) async {
-    final ctx = _navigatorKey.currentContext;
+    final ctx = appNavigatorKey.currentContext;
     if (ctx == null) return;
     final messenger = ScaffoldMessenger.maybeOf(ctx);
     try {

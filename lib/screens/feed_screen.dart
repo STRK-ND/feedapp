@@ -140,9 +140,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _autoRefreshTimer?.cancel();
         _autoRefreshTimer = null;
         _connectivitySubscription?.pause();
+        _flushSaveDebounce();
         break;
       case AppLifecycleState.detached:
-        // App is on its way out; nothing to do.
+        // App is on its way out; flush anything still in the debounce.
+        _flushSaveDebounce();
         break;
     }
   }
@@ -223,7 +225,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
-    _saveDebounceTimer?.cancel();
+    _flushSaveDebounce();
     _searchDebounceTimer?.cancel();
     super.dispose();
   }
@@ -298,16 +300,35 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   void _saveArticles() {
+    // Keep the repository cache in sync with the UI's authoritative lists so
+    // the next refresh / mark-all-read merge operates on current read/save
+    // state, not a stale splash-time snapshot (data-layer H1).
+    _articleRepository.syncFrom(_articles, _savedArticles);
     _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      try {
-        await _storage.saveArticles(_articles);
-        await _storage.saveSavedArticles(_savedArticles);
-        await _storage.saveLastRefreshTime(_lastRefreshTime);
-      } catch (e) {
-        unawaited(ErrorHandler.logError('Failed to save articles', error: e));
-      }
-    });
+    _saveDebounceTimer = Timer(
+      const Duration(milliseconds: 500),
+      _persistArticles,
+    );
+  }
+
+  /// Flush a pending debounced write immediately. Called on lifecycle pause
+  /// and dispose so a read/save can't be lost to the debounce window when
+  /// the process is killed (data-layer L6).
+  void _flushSaveDebounce() {
+    if (_saveDebounceTimer?.isActive != true) return;
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = null;
+    unawaited(_persistArticles());
+  }
+
+  Future<void> _persistArticles() async {
+    try {
+      await _storage.saveArticles(_articles);
+      await _storage.saveSavedArticles(_savedArticles);
+      await _storage.saveLastRefreshTime(_lastRefreshTime);
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Failed to save articles', error: e));
+    }
   }
 
   Future<void> _refreshFeeds() async {
@@ -340,7 +361,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   Future<void> _performRefresh() async {
     debugPrint('[Feed] Starting refresh...');
     await AnalyticsService.logFeedRefresh();
-    _lastRefreshAt = DateTime.now();
 
     final connectivityResult = await _connectivity.checkConnectivity();
     if (!mounted) return;
@@ -373,6 +393,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           '[Feed] Repository returned ${newArticles.length} new articles (max: $maxArticles)',
         );
 
+        // Stamp AFTER success so a failed/offline attempt doesn't suppress a
+        // retry for the 10s min-interval window (data-layer M5).
+        _lastRefreshAt = DateTime.now();
         setState(() {
           _articles = newArticles;
           _displayedArticles = _getFilteredArticles();
@@ -520,7 +543,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       backgroundColor: Colors.transparent,
       builder: (context) => ExpandedArticleCard(
         article: _articles[articleIndex],
-        onClose: () => Navigator.pop(context),
+        onClose: () {
+          // Persist fetchedFullContent set in the reader (data-layer L9).
+          _saveArticles();
+          Navigator.pop(context);
+        },
         onToggleSave: () {
           _onToggleSave(_articles[articleIndex]);
         },

@@ -87,11 +87,13 @@ export default {
   },
 
   async scheduled(_event, env, ctx) {
-    try {
-      ctx.waitUntil(refreshArticlesAndMaybeNotify(env));
-    } catch (e) {
-      console.error('scheduled_failed', { error: String(e) });
-    }
+    // waitUntil returns immediately, so an async rejection can't surface in
+    // the try/catch — attach the handler to the returned promise instead.
+    ctx.waitUntil(
+      refreshArticlesAndMaybeNotify(env).catch((e) => {
+        console.error('scheduled_refresh_failed', { error: String(e) });
+      }),
+    );
   },
 };
 
@@ -100,7 +102,12 @@ export default {
 // ---------------------------------------------------------------------------
 
 function isAuthorized(request, env) {
-  if (!env.API_SECRET) return true; // not configured yet → back-compat
+  if (!env.API_SECRET) {
+    // Not configured yet → open for back-compat. Loud so a live deployment
+    // can't silently run without the gate.
+    console.warn('api_secret_not_configured');
+    return true;
+  }
   return request.headers.get('x-api-secret') === env.API_SECRET;
 }
 
@@ -114,10 +121,15 @@ async function consumeRate(env, key, limit, windowSec) {
 }
 
 async function handleArticles(url, env) {
-  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') || '50', 10)));
+  const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
+  const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+  const sizeRaw = parseInt(url.searchParams.get('pageSize') || '50', 10);
+  const pageSize = Number.isFinite(sizeRaw) ? Math.min(100, Math.max(1, sizeRaw)) : 50;
 
   const articles = await loadArticles(env);
+  if (articles === null) {
+    return json({ error: 'busy', message: 'Feed is refreshing' }, 503);
+  }
   const total = articles.length;
   const start = (page - 1) * pageSize;
   const items = articles.slice(start, start + pageSize);
@@ -127,6 +139,9 @@ async function handleArticles(url, env) {
 
 async function handleForceRefresh(ctx, env) {
   const articles = await refreshArticlesAndMaybeNotify(env);
+  if (articles === null) {
+    return json({ error: 'busy', message: 'Feed is refreshing' }, 503);
+  }
   return json({ items: articles.slice(0, 50), total: articles.length, refreshed: true });
 }
 
@@ -156,28 +171,8 @@ async function handleSubscribe(request, env) {
     createdAt: Date.now(),
   }), { expirationTtl: 90 * 24 * 3600 });
 
-  // Subscribe the token to the FCM topic. Uses the IID endpoint with an
-  // OAuth2 access token derived from FCM_SERVICE_ACCOUNT.
-  if (env.FCM_SERVICE_ACCOUNT) {
-    const accessToken = await getFcmAccessToken(env);
-    if (accessToken) {
-      const resp = await fetch(
-        `https://iid.googleapis.com/iid/v1/${token}/rel/topics/new-articles`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        },
-      );
-      if (resp.status !== 200) {
-        const text = await resp.text();
-        console.error('fcm_subscribe_failed', { status: resp.status, body: text });
-      }
-    }
-  }
-
+  // Push delivery is per-token (announceNewArticles reads the sub:* rows), so
+  // no topic registration is needed — the stored row is enough.
   return json({ ok: true });
 }
 
@@ -200,26 +195,8 @@ async function handleUnsubscribe(request, env) {
 
   await env.ARTICLES_KV.delete(`sub:${token}`);
 
-  if (env.FCM_SERVICE_ACCOUNT) {
-    const accessToken = await getFcmAccessToken(env);
-    if (accessToken) {
-      await fetch(
-        `https://iid.googleapis.com/iid/v1:batchRemove`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            to: '/topics/new-articles',
-            registration_tokens: [token],
-          }),
-        },
-      );
-    }
-  }
-
+  // No IID topic cleanup needed — delivery is per-token via the sub:* rows,
+  // and deleting the row is what stops future announces reaching the token.
   return json({ ok: true });
 }
 
@@ -239,13 +216,23 @@ async function refreshArticlesAndMaybeNotify(env) {
   const lock = await env.ARTICLES_KV.get(REFRESH_LOCK_KEY);
   if (lock === '1') {
     const cached = await env.ARTICLES_KV.get(ARTICLES_CACHE_KEY, 'json');
-    return Array.isArray(cached) && cached.length ? cached : [];
+    if (Array.isArray(cached) && cached.length) return cached;
+    // A refresh is mid-flight and there's no cache to serve. Return null so
+    // callers (handleArticles / handleForceRefresh) answer 503 "busy" instead
+    // of a misleading empty feed.
+    return null;
   }
   // KV refuses expirationTtl < 60; a 60s lock is still far shorter than the
   // 5-min cron cadence, so the thundering-herd protection is unchanged.
   await env.ARTICLES_KV.put(REFRESH_LOCK_KEY, '1', { expirationTtl: 60 });
   try {
     const articles = await fetchAllSources();
+    // Every source failed this cycle — don't clobber a good cache with an
+    // empty feed (the app would read "nothing new" for a full TTL window).
+    if (articles.length === 0) {
+      const stale = await env.ARTICLES_KV.get(ARTICLES_CACHE_KEY, 'json');
+      return Array.isArray(stale) && stale.length ? stale : [];
+    }
     // Read previous seen-ids before overwriting
     const seen = (await env.ARTICLES_KV.get(SEEN_IDS_KEY, 'json')) || [];
     const seenSet = new Set(seen);
@@ -270,7 +257,12 @@ async function refreshArticlesAndMaybeNotify(env) {
     });
 
     if (newIds.length > 0 && env.FCM_SERVICE_ACCOUNT && env.FCM_PROJECT_ID) {
-      await announceNewArticles(articles.slice(0, 3), env);
+      try {
+        await announceNewArticles(articles.slice(0, 3), env);
+      } catch (e) {
+        // A push failure must never fail a refresh that already succeeded.
+        console.error('announce_failed', { error: String(e) });
+      }
     }
     return articles;
   } finally {
@@ -423,21 +415,43 @@ function buildArticle(body, source, opts) {
 
 async function announceNewArticles(articles, env) {
   if (articles.length === 0) return;
+
+  // Dedupe against a refresh racing to announce the same ids: KV has no
+  // compare-and-swap, so two concurrent refreshes can both reach this step.
+  // Mark ids as announced (24h TTL) and only send for ones we marked first.
+  const fresh = [];
+  for (const a of articles) {
+    const k = 'announced:' + a.id;
+    if ((await env.ARTICLES_KV.get(k)) !== null) continue;
+    await env.ARTICLES_KV.put(k, '1', { expirationTtl: 24 * 60 * 60 });
+    fresh.push(a);
+  }
+  if (fresh.length === 0) return;
+
   const accessToken = await getFcmAccessToken(env);
   if (!accessToken) return;
 
+  // Per-token delivery instead of a topic multicast: read every subscription
+  // row and send only to tokens whose owner hasn't opted out of "new
+  // articles". The app re-POSTs /subscribe with preferences.newArticles when
+  // the toggle flips, so the stored row is the source of truth.
   const projectId = env.FCM_PROJECT_ID;
-  const latestTitle = articles[0]?.title || 'Fresh feed is ready';
+  const optedIn = await optedInTokens(env);
+  if (optedIn.length === 0) return;
+
+  const latestTitle = fresh[0]?.title || 'Fresh feed is ready';
   const message = {
     message: {
-      topic: 'new-articles',
+      // ponytail: capped at 500 tokens per multicast; chunk if the list ever
+      // outgrows it.
+      registration_tokens: optedIn.slice(0, 500),
       notification: {
         title: 'New articles just dropped',
         body: latestTitle,
       },
       data: {
         type: 'new_articles',
-        count: String(articles.length),
+        count: String(fresh.length),
       },
       android: {
         priority: 'HIGH',
@@ -463,6 +477,24 @@ async function announceNewArticles(articles, env) {
   } catch (e) {
     console.error('fcm_send_failed', { error: String(e) });
   }
+}
+
+// All opted-in subscription tokens. Reads every `sub:*` KV row, skipping
+// rows where the owner disabled "new articles".
+async function optedInTokens(env) {
+  const tokens = [];
+  let cursor;
+  do {
+    const page = await env.ARTICLES_KV.list({ prefix: 'sub:', cursor });
+    for (const { name } of page.keys) {
+      const row = await env.ARTICLES_KV.get(name, 'json');
+      if (!row || typeof row.token !== 'string') continue;
+      if (row.preferences && row.preferences.newArticles === false) continue;
+      tokens.push(row.token);
+    }
+    cursor = page.cursor;
+  } while (cursor);
+  return tokens;
 }
 
 const FCM_TOKEN_CACHE_KEY = 'fcm:access-token';
@@ -493,7 +525,15 @@ async function getFcmAccessToken(env) {
     exp: nowSeconds + 3600,
   }));
 
-  const signature = await signRs256(`${header}.${payload}`, sa.private_key);
+  let signature;
+  try {
+    signature = await signRs256(`${header}.${payload}`, sa.private_key);
+  } catch (e) {
+    // Malformed service-account key — degrade to "no push" rather than
+    // letting a hard throw break a refresh that already succeeded.
+    console.error('fcm_sa_key_invalid', { error: String(e) });
+    return null;
+  }
   const jwt = `${header}.${payload}.${signature}`;
 
   const resp = await fetch('https://oauth2.googleapis.com/token', {
@@ -627,7 +667,7 @@ function cors(response) {
   const r = new Response(response.body, response);
   r.headers.set('Access-Control-Allow-Origin', CORS_ALLOWED_ORIGIN);
   r.headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  r.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  r.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-secret');
   return r;
 }
 

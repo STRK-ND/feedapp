@@ -29,6 +29,17 @@ class ArticleRepository {
     _cachedSavedArticles = null;
   }
 
+  /// Mirror the feed screen's authoritative in-memory lists into the cache.
+  ///
+  /// The feed screen mutates article read/save state in place and persists
+  /// straight to storage (bypassing repository mutation methods), so the
+  /// cache would otherwise drift — and the next refresh merge would revert
+  /// the user's state. Push the source-of-truth lists in on every mutation.
+  void syncFrom(List<Article> articles, List<Article> savedArticles) {
+    _cachedArticles = List.of(articles);
+    _cachedSavedArticles = List.of(savedArticles);
+  }
+
   /// Fetch all articles from storage
   Future<Result<List<Article>>> fetchAllArticles({
     bool forceRefresh = false,

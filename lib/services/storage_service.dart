@@ -34,10 +34,7 @@ class StorageService {
       final jsonString = await _storage.read(key: 'articles');
       if (jsonString == null) return [];
 
-      final List<dynamic> decoded = json.decode(jsonString);
-      return decoded
-          .map((json) => Article.fromJson(json as Map<String, dynamic>))
-          .toList();
+      return _decodeArticleList(jsonString, key: 'articles');
     } catch (e) {
       unawaited(ErrorHandler.logError('Failed to load articles', error: e));
       return [];
@@ -62,16 +59,35 @@ class StorageService {
       final jsonString = await _storage.read(key: 'savedArticles');
       if (jsonString == null) return [];
 
-      final List<dynamic> decoded = json.decode(jsonString);
-      return decoded
-          .map((json) => Article.fromJson(json as Map<String, dynamic>))
-          .toList();
+      return _decodeArticleList(jsonString, key: 'savedArticles');
     } catch (e) {
       unawaited(
         ErrorHandler.logError('Failed to load saved articles', error: e),
       );
       return [];
     }
+  }
+
+  /// Decode a stored article JSON array, skipping (not discarding) any
+  /// record that fails to parse. One corrupt record previously wiped the
+  /// whole list — a partially-corrupted blob showed an empty feed
+  /// (data-layer L8).
+  List<Article> _decodeArticleList(String jsonString, {required String key}) {
+    final List<dynamic> decoded = json.decode(jsonString);
+    final articles = <Article>[];
+    for (final item in decoded) {
+      try {
+        articles.add(Article.fromJson(item as Map<String, dynamic>));
+      } catch (e) {
+        unawaited(
+          ErrorHandler.logError(
+            'Failed to parse an article record ($key)',
+            error: e,
+          ),
+        );
+      }
+    }
+    return articles;
   }
 
   /// Save last refresh time

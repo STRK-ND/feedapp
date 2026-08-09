@@ -44,6 +44,7 @@ class UpdateService {
     bool forceCheck = false,
     http.Client? client,
   }) async {
+    http.Client? ownedClient;
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastChecked = prefs.getInt(_lastCheckedKey) ?? 0;
@@ -54,7 +55,7 @@ class UpdateService {
         return null;
       }
 
-      final response = await (client ?? http.Client())
+      final response = await (client ?? (ownedClient = http.Client()))
           .get(
             Uri.parse(githubApiUrl),
             headers: {'Accept': 'application/vnd.github.v3+json'},
@@ -102,6 +103,10 @@ class UpdateService {
     } catch (e) {
       debugPrint('Error checking for updates: $e');
       return null;
+    } finally {
+      // Close the per-call client so its connection pool isn't leaked; an
+      // injected client is owned by the caller (data-layer L7).
+      ownedClient?.close();
     }
   }
 
@@ -152,25 +157,30 @@ class UpdateService {
     required String version,
     http.Client? client,
   }) async {
-    final response = await (client ?? http.Client())
-        .get(Uri.parse(url))
-        .timeout(const Duration(minutes: 4));
-    if (response.statusCode != 200) {
-      throw HttpException(
-        'Download failed: ${response.statusCode}',
-        uri: Uri.parse(url),
+    http.Client? ownedClient;
+    try {
+      final response = await (client ?? (ownedClient = http.Client()))
+          .get(Uri.parse(url))
+          .timeout(const Duration(minutes: 4));
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'Download failed: ${response.statusCode}',
+          uri: Uri.parse(url),
+        );
+      }
+      final bytes = response.bodyBytes;
+      final dir = await getTemporaryDirectory();
+      final safeVersion = version.replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_');
+      final file = File('${dir.path}/curatedfeeds-$safeVersion.apk');
+      await file.writeAsBytes(bytes, flush: true);
+      return UpdateDownloadHandle(
+        file: file,
+        version: version,
+        sizeBytes: bytes.length,
       );
+    } finally {
+      ownedClient?.close();
     }
-    final bytes = response.bodyBytes;
-    final dir = await getTemporaryDirectory();
-    final safeVersion = version.replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_');
-    final file = File('${dir.path}/curatedfeeds-$safeVersion.apk');
-    await file.writeAsBytes(bytes, flush: true);
-    return UpdateDownloadHandle(
-      file: file,
-      version: version,
-      sizeBytes: bytes.length,
-    );
   }
 
   /// Hand the cached APK to the Android system installer. Returns
