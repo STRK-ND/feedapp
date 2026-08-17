@@ -166,15 +166,21 @@ class _Group {
   _Group(this.label, this.density, this.items);
 }
 
-List<_Group> _groupByRecency(List<Article> articles) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
+/// Recency buckets for the Saved view. Public so the grouping logic (a
+/// three-way Today / Yesterday / Earlier split — the prior code had a
+/// dead "this week" branch that folded everything older-than-yesterday
+/// together and could never reach Earlier) has a runnable check.
+List<({String label, List<Article> items})> groupSavedByRecency(
+  List<Article> articles, {
+  DateTime? now,
+}) {
+  final n = now ?? DateTime.now();
+  final today = DateTime(n.year, n.month, n.day);
   final yesterday = today.subtract(const Duration(days: 1));
-  final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
 
   final List<Article> todayList = [];
   final List<Article> yesterdayList = [];
-  final List<Article> thisWeekList = [];
+  final List<Article> earlierList = [];
 
   for (final a in articles) {
     final dtDay = DateTime(a.pubDate.year, a.pubDate.month, a.pubDate.day);
@@ -182,25 +188,37 @@ List<_Group> _groupByRecency(List<Article> articles) {
       todayList.add(a);
     } else if (dtDay == yesterday) {
       yesterdayList.add(a);
-    } else if (dtDay.isAfter(thisWeekStart)) {
-      thisWeekList.add(a);
     } else {
-      thisWeekList.add(a);
+      earlierList.add(a);
     }
   }
 
-  todayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
-  yesterdayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
-  thisWeekList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+  void newestFirst(List<Article> l) =>
+      l.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+  newestFirst(todayList);
+  newestFirst(yesterdayList);
+  newestFirst(earlierList);
 
   return [
-    if (todayList.isNotEmpty)
-      _Group('Saved today', SectionDensity.relaxed, todayList),
-    if (yesterdayList.isNotEmpty)
-      _Group('Yesterday', SectionDensity.moderate, yesterdayList),
-    if (thisWeekList.isNotEmpty)
-      _Group('Earlier', SectionDensity.compact, thisWeekList),
+    if (todayList.isNotEmpty) (label: 'Saved today', items: todayList),
+    if (yesterdayList.isNotEmpty) (label: 'Yesterday', items: yesterdayList),
+    if (earlierList.isNotEmpty) (label: 'Earlier', items: earlierList),
   ];
+}
+
+List<_Group> _groupByRecency(List<Article> articles) {
+  final groups = groupSavedByRecency(articles);
+  return groups
+      .map(
+        (g) => _Group(
+          g.label,
+          g.label == 'Saved today'
+              ? SectionDensity.relaxed
+              : (g.label == 'Yesterday' ? SectionDensity.moderate : SectionDensity.compact),
+          g.items,
+        ),
+      )
+      .toList();
 }
 
 /// Single saved-article row — mono source, Playfair title + truncated

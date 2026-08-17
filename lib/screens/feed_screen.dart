@@ -82,7 +82,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   // "no filter applied yet" (first run before _loadSubscribedIds returns).
   Set<String> _subscribedIds = {};
 
-  int get _unreadCount => _articles.where((a) => !a.isRead).length;
+  int get _unreadCount =>
+      _articles.where((a) => !a.isRead && !a.isSaved).length;
   TextTheme get _textTheme => Theme.of(context).textTheme;
 
   /// App-bar title. A source drill-in shows the source name so the view
@@ -447,7 +448,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _savedArticles.insert(0, article);
       }
 
-      _articles.removeAt(articleIndex);
+      // Flag-and-keep, not remove: the worker returns the full feed every
+      // refresh and the merge keeps existing articles by id (dropping the
+      // fresh copy). Removing the article left its isSaved flag un-persisted
+      // and the merge re-added it unread+unsaved — saved articles reappeared
+      // in triage after the next refresh. The feed filter excludes isSaved
+      // (see _getFilteredArticles) so it leaves the stack by filtering, not
+      // deletion.
       _displayedArticles = _getFilteredArticles();
     });
 
@@ -465,7 +472,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     setState(() {
       _articles[articleIndex].isRead = true;
-      _articles.removeAt(articleIndex);
+      // Flag-and-keep, not remove: same reason as _onSwipeRight. The merge
+      // in fetchNewArticles keeps existing articles by id; removing here
+      // left isRead un-persisted and the worker re-added the article
+      // unread. The feed filter hides isRead, so it leaves triage by
+      // filtering, not deletion.
       _displayedArticles = _getFilteredArticles();
     });
 
@@ -557,7 +568,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   List<Article> _getFilteredArticles() {
     var articles = _selectedTab == 0
-        ? _articles.where((a) => !a.isRead).toList()
+        ? _articles.where((a) => !a.isRead && !a.isSaved).toList()
         : _savedArticles;
 
     // Filter by subscribed sources (empty set = no filter applied yet).

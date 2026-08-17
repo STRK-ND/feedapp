@@ -86,6 +86,26 @@ void main() {
         expect(result.hasMore, false);
         expect(result.total, 0);
       });
+
+      // Regression: the endpoint is built from the worker BASE — it must
+      // resolve to /articles, not stay on the base path. A plain
+      // Uri.parse(base).replace(qp) kept "/" and the worker 404'd in
+      // production (the default base has no per-endpoint override in CI).
+      test('requests the /articles path, not the bare worker base', () async {
+        String requestedPath = '';
+        final mockClient = MockClient((request) async {
+          requestedPath = request.url.path;
+          return http.Response(
+            jsonEncode({'items': [], 'hasMore': false, 'total': 0}),
+            200,
+          );
+        });
+
+        service = WorkerFeedService(httpClient: mockClient);
+        await service.fetchArticles();
+
+        expect(requestedPath, '/articles');
+      });
     });
   });
 }
