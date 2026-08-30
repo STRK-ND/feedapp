@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
 import '../services/notification_service.dart';
@@ -61,6 +62,8 @@ class CuratedFeedsApp extends StatelessWidget {
             title: 'Curated Feeds',
             debugShowCheckedModeBanner: false,
             navigatorKey: appNavigatorKey,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
@@ -107,6 +110,13 @@ class _MainNavigationState extends State<MainNavigation> {
     // only for foreground taps; cold-start taps are handled in
     // [MainNavigation.didChangeDependencies] below.
     NotificationService().setUpdateNotificationTapHandler(_onUpdateTap);
+    // "New articles" push taps (warm and cold-start) land on the feed tab.
+    NotificationService().setNewArticleTapHandler(_onNewArticleTap);
+  }
+
+  void _onNewArticleTap(Map<String, dynamic> data) {
+    if (!mounted) return;
+    setState(() => _selectedIndex = 0);
   }
 
   Future<void> _onUpdateTap(String payload) async {

@@ -1,103 +1,74 @@
+import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 
-/// Analytics service for tracking user events in the app
+import 'posthog_service.dart';
+
+/// Analytics service for tracking user events in the app.
+/// Every event fans out to Firebase Analytics and PostHog; the PostHog
+/// leg is a no-op until POSTHOG_API_KEY is configured (see
+/// docs/monitoring-setup.md).
 class AnalyticsService {
   static FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
+  /// Single fan-out point for all named events.
+  static Future<void> _log(String name, Map<String, Object>? params) async {
+    unawaited(PostHogService.capture(name, params));
+    await analytics.logEvent(name: name, parameters: params);
+  }
+
   // App lifecycle events
   static Future<void> logAppOpen() async {
+    unawaited(PostHogService.capture('app_open'));
     await analytics.logAppOpen();
   }
 
-  static Future<void> logAppStart() async {
-    await analytics.logEvent(name: 'app_start', parameters: {});
-  }
+  static Future<void> logAppStart() => _log('app_start', {});
 
   // Feed events
-  static Future<void> logFeedRefresh() async {
-    await analytics.logEvent(name: 'feed_refresh', parameters: {});
-  }
+  static Future<void> logFeedRefresh() => _log('feed_refresh', {});
 
-  static Future<void> logFeedLoad({required int articleCount}) async {
-    await analytics.logEvent(
-      name: 'feed_load',
-      parameters: {'article_count': articleCount},
-    );
-  }
+  static Future<void> logFeedLoad({required int articleCount}) =>
+      _log('feed_load', {'article_count': articleCount});
 
-  static Future<void> logFilterChange({required String filter}) async {
-    await analytics.logEvent(
-      name: 'filter_change',
-      parameters: {'filter': filter},
-    );
-  }
+  static Future<void> logFilterChange({required String filter}) =>
+      _log('filter_change', {'filter': filter});
 
   // Article events
   static Future<void> logArticleOpen({
     required String articleId,
     required String title,
-  }) async {
-    await analytics.logEvent(
-      name: 'article_open',
-      parameters: {'article_id': articleId, 'title': title},
-    );
-  }
+  }) =>
+      _log('article_open', {'article_id': articleId, 'title': title});
 
-  static Future<void> logArticleShare({required String articleId}) async {
-    await analytics.logEvent(
-      name: 'article_share',
-      parameters: {'article_id': articleId},
-    );
-  }
+  static Future<void> logArticleShare({required String articleId}) =>
+      _log('article_share', {'article_id': articleId});
 
-  static Future<void> logArticleLinkOpen({required String articleId}) async {
-    await analytics.logEvent(
-      name: 'article_link_open',
-      parameters: {'article_id': articleId},
-    );
-  }
+  static Future<void> logArticleLinkOpen({required String articleId}) =>
+      _log('article_link_open', {'article_id': articleId});
 
-  static Future<void> logArticleSave({required String articleId}) async {
-    await analytics.logEvent(
-      name: 'article_save',
-      parameters: {'article_id': articleId},
-    );
-  }
+  static Future<void> logArticleSave({required String articleId}) =>
+      _log('article_save', {'article_id': articleId});
 
   static Future<void> logArticleReadComplete({
     required String articleId,
-  }) async {
-    await analytics.logEvent(
-      name: 'article_read_complete',
-      parameters: {'article_id': articleId},
-    );
-  }
+  }) =>
+      _log('article_read_complete', {'article_id': articleId});
 
   // Search events
-  static Future<void> logSearch({required String query}) async {
-    await analytics.logEvent(name: 'search', parameters: {'query': query});
-  }
+  static Future<void> logSearch({required String query}) =>
+      _log('search', {'query': query});
 
   // User engagement
-  static Future<void> logSessionStart() async {
-    await analytics.logEvent(name: 'session_start', parameters: {});
-  }
+  static Future<void> logSessionStart() => _log('session_start', {});
 
-  static Future<void> logSessionEnd({required int durationSeconds}) async {
-    await analytics.logEvent(
-      name: 'session_end',
-      parameters: {'duration_seconds': durationSeconds},
-    );
-  }
+  static Future<void> logSessionEnd({required int durationSeconds}) =>
+      _log('session_end', {'duration_seconds': durationSeconds});
 
   // Error tracking
   static Future<void> logError({
     required String error,
     String? stackTrace,
-  }) async {
-    await analytics.logEvent(
-      name: 'error',
-      parameters: {'error': error, 'stack_trace': ?stackTrace},
-    );
-  }
+  }) =>
+      _log('error', {'error': error, 'stack_trace': ?stackTrace});
 }

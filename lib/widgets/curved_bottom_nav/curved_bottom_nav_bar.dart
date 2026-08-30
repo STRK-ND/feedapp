@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../utils/constants.dart';
@@ -97,39 +96,33 @@ class _CurvedBottomNavBarState extends State<CurvedBottomNavBar>
                   borderRadius: BorderRadius.circular(
                     CurvedNavTokens.barRadius,
                   ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: CurvedNavTokens.blurSigmaX,
-                      sigmaY: CurvedNavTokens.blurSigmaY,
-                    ),
-                    child: RepaintBoundary(
-                      child: CustomPaint(
-                        painter: CurvedNavBarPainter(
-                          isDark: isDark,
-                          animationProgress: _slideAnimation.value,
-                          previousIndex: _previousIndex,
-                          targetIndex: _displayedIndex,
-                          itemCount: widget.itemCount,
-                          tabCenterXs: List.from(_tabCenterXs),
-                        ),
-                        size: Size(barWidth, CurvedNavTokens.barHeight),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            for (int i = 0; i < widget.itemCount; i++)
-                              Expanded(
-                                child: CurvedNavItem(
-                                  index: i,
-                                  icon: _iconForTab(i, false),
-                                  selectedIcon: _iconForTab(i, true),
-                                  label: _labelForTab(i),
-                                  isSelected: _displayedIndex == i,
-                                  onTap: () => widget.onItemSelected(i),
-                                ),
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: CurvedNavBarPainter(
+                        isDark: isDark,
+                        animationProgress: _slideAnimation.value,
+                        previousIndex: _previousIndex,
+                        targetIndex: _displayedIndex,
+                        itemCount: widget.itemCount,
+                        tabCenterXs: List.from(_tabCenterXs),
+                      ),
+                      size: Size(barWidth, CurvedNavTokens.barHeight),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (int i = 0; i < widget.itemCount; i++)
+                            Expanded(
+                              child: CurvedNavItem(
+                                index: i,
+                                icon: _iconForTab(i, false),
+                                selectedIcon: _iconForTab(i, true),
+                                label: _labelForTab(i),
+                                isSelected: _displayedIndex == i,
+                                onTap: () => widget.onItemSelected(i),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

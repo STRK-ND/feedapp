@@ -11,6 +11,7 @@ library;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../di/service_locator.dart';
 import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
@@ -162,7 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Text(
               'SKIP',
               style: AppType.monoEyebrow(
-                color: AppColors.inkSoft,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ).copyWith(letterSpacing: 1.0),
             ),
           ),
@@ -187,7 +188,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Text(
                 'BACK',
                 style: AppType.monoEyebrow(
-                  color: AppColors.inkSoft,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ).copyWith(letterSpacing: 1.0),
               ),
             ),
@@ -205,10 +206,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: Text(
               _step < 2
-                  ? 'CONTINUE'
+                  ? AppLocalizations.of(context).obContinueCta
                   : (_pickedSources.isNotEmpty
-                        ? 'ADD ${_pickedSources.length}  ·  CONTINUE'
-                        : 'CONTINUE WITHOUT'),
+                        ? AppLocalizations.of(context).obAddAndContinueCta(_pickedSources.length)
+                        : AppLocalizations.of(context).obContinueWithoutCta),
               style: AppType.labelLarge(
                 color: Colors.white,
               ).copyWith(letterSpacing: 1.2),
@@ -265,6 +266,7 @@ class _StepPickRoom extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s6,
@@ -275,42 +277,37 @@ class _StepPickRoom extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'PICK A ROOM',
-            style: AppType.monoEyebrow(color: AppColors.inkSoft),
-          ),
+          Text(AppLocalizations.of(context).obStep1Eyebrow, style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
           const SizedBox(height: AppSpacing.s3),
           Text(
-            'How should\nthis feel?',
-            style: AppType.displayLarge(
-              color: AppColors.ink,
-            ).copyWith(height: 1.05),
+            AppLocalizations.of(context).obStep1Title,
+            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
-            'Three rooms. Pick the one that\nmakes you want to settle in.',
-            style: AppType.bodyLarge(color: AppColors.inkSoft),
+            AppLocalizations.of(context).obStep1Subtitle,
+            style: AppType.bodyLarge(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.s8),
           _RoomSwatch(
-            label: 'PAPER',
-            description: 'Daytime. Bright. Off-white stock.',
+            label: AppLocalizations.of(context).roomPaperLabel,
+            description: AppLocalizations.of(context).roomPaperDesc,
             mode: ThemeMode.light,
             selected: selected == ThemeMode.light,
             onTap: () => onChange(ThemeMode.light),
           ),
           const SizedBox(height: AppSpacing.s3),
           _RoomSwatch(
-            label: 'LAMPLIGHT',
-            description: 'After dark. Warm amber. The default.',
+            label: AppLocalizations.of(context).roomLamplightLabel,
+            description: AppLocalizations.of(context).roomLamplightDesc,
             mode: ThemeMode.dark,
             selected: selected == ThemeMode.dark,
             onTap: () => onChange(ThemeMode.dark),
           ),
           const SizedBox(height: AppSpacing.s3),
           _RoomSwatch(
-            label: 'FOLLOW YOUR PHONE',
-            description: 'Switches with the system.',
+            label: AppLocalizations.of(context).roomSystemLabel,
+            description: AppLocalizations.of(context).roomSystemDesc,
             mode: ThemeMode.system,
             selected: selected == ThemeMode.system,
             onTap: () => onChange(ThemeMode.system),
@@ -361,16 +358,6 @@ class _RoomSwatch extends StatelessWidget {
                   : (isDarkGround ? AppColors.ruleOnGround : AppColors.rule),
               width: selected ? 2 : 1,
             ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.18),
-                      blurRadius: 24,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,7 +408,7 @@ class _RoomSwatch extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.s2),
                     Text(
-                      'A heading that earns\nthe reader.',
+                      AppLocalizations.of(context).sampleHeading,
                       style: AppType.titleLarge(color: ink),
                     ),
                   ],
@@ -467,6 +454,9 @@ class _StepReaderPrefs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final previewInk = isDark ? AppColors.paperOnGround : AppColors.ink;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s6,
@@ -477,25 +467,23 @@ class _StepReaderPrefs extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'TUNE THE READING',
-            style: AppType.monoEyebrow(color: AppColors.inkSoft),
-          ),
+          Text(AppLocalizations.of(context).obStep2Eyebrow, style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
           const SizedBox(height: AppSpacing.s3),
           Text(
-            'Make it\ncomfortable.',
-            style: AppType.displayLarge(
-              color: AppColors.ink,
-            ).copyWith(height: 1.05),
+            AppLocalizations.of(context).obStep2Title,
+            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s6),
-          // Live preview
+          // Live preview — a mode-matched card (dark groundElev / light raised),
+          // not a fixed white box that floats on dark.
           Container(
             padding: const EdgeInsets.all(AppSpacing.s5),
             decoration: BoxDecoration(
-              color: AppColors.paperRaised,
+              color: isDark ? AppColors.groundElev : AppColors.paperRaised,
               borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: AppColors.rule),
+              border: Border.all(
+                color: isDark ? AppColors.ruleOnGround : AppColors.rule,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,27 +492,29 @@ class _StepReaderPrefs extends StatelessWidget {
                   Text(
                     'CURATED · 07.07 · 14:03',
                     style: AppType.monoEyebrow(
-                      color: AppColors.inkSoft,
+                      color: isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft,
                     ).copyWith(letterSpacing: 0.6),
                   ),
                 const SizedBox(height: AppSpacing.s2),
                 Text(
-                  'How a sentence reads at this size.',
+                  AppLocalizations.of(context).sampleSentence,
                   style: AppType.displayMedium(
-                    color: AppColors.ink,
+                    color: previewInk,
                   ).copyWith(fontSize: fontSize, height: lineHeight),
                 ),
                 const SizedBox(height: AppSpacing.s3),
                 Text(
-                  'Line-height is the breath between lines. Wider is calmer; tighter accelerates.',
-                  style: AppType.bodyMedium(color: AppColors.inkSoft),
+                  AppLocalizations.of(context).lineHeightExplainer,
+                  style: AppType.bodyMedium(
+                    color: isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.s6),
           _SliderRow(
-            label: 'FONT SIZE',
+            label: AppLocalizations.of(context).fontSizeLabel,
             value: fontSize,
             min: 14,
             max: 22,
@@ -533,7 +523,7 @@ class _StepReaderPrefs extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s4),
           _SliderRow(
-            label: 'LINE HEIGHT',
+            label: AppLocalizations.of(context).lineHeightLabel,
             value: lineHeight,
             min: 1.4,
             max: 1.8,
@@ -544,12 +534,12 @@ class _StepReaderPrefs extends StatelessWidget {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
-              'TYPEWRITER DATELINES',
-              style: AppType.monoEyebrow(color: AppColors.inkSoft),
+              AppLocalizations.of(context).typewriterDatelinesLabel,
+              style: AppType.monoEyebrow(color: cs.onSurfaceVariant),
             ),
             subtitle: Text(
-              'Show dates and counts in JetBrains Mono.',
-              style: AppType.bodyMedium(color: AppColors.ink),
+              AppLocalizations.of(context).typewriterDatelinesDesc,
+              style: AppType.bodyMedium(color: cs.onSurface),
             ),
             value: monoDatelines,
             onChanged: onMono,
@@ -579,6 +569,7 @@ class _SliderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -587,7 +578,7 @@ class _SliderRow extends StatelessWidget {
             Text(
               label,
               style: AppType.monoEyebrow(
-                color: AppColors.inkSoft,
+                color: cs.onSurfaceVariant,
               ).copyWith(letterSpacing: 0.8),
             ),
             const Spacer(),
@@ -628,8 +619,8 @@ class _StepAddSources extends StatelessWidget {
 
   const _StepAddSources({required this.picked, required this.onToggle});
 
-  // Curated first-issue picks — real IDs only, mapped through
-  // RssFeedService.predefinedSources so name/category/icon stay in sync.
+  // Curated first-issue picks — real IDs only, resolved through the
+  // source registry so name/category/icon stay in sync.
   static const _sourceIds = [
     'verge',
     'wired',
@@ -642,13 +633,16 @@ class _StepAddSources extends StatelessWidget {
     'ign',
     'nasa',
   ];
-  static final _sources = RssFeedService.predefinedSources
+  List<({String id, String name, String category, IconData icon})>
+  get _sources => getIt<RssFeedService>()
+      .sources
       .where((s) => _sourceIds.contains(s.id))
       .map((s) => (id: s.id, name: s.name, category: s.category, icon: s.icon))
       .toList();
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s6,
@@ -659,21 +653,16 @@ class _StepAddSources extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'PICK A FIRST SOURCE',
-            style: AppType.monoEyebrow(color: AppColors.inkSoft),
-          ),
+          Text('PICK A FIRST SOURCE', style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
           const SizedBox(height: AppSpacing.s3),
           Text(
-            'Start with one\nor twenty.',
-            style: AppType.displayLarge(
-              color: AppColors.ink,
-            ).copyWith(height: 1.05),
+            AppLocalizations.of(context).obStep3Title,
+            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
-            'These are first-issue picks. You can change them any time from Settings.',
-            style: AppType.bodyLarge(color: AppColors.inkSoft),
+            AppLocalizations.of(context).obStep3Subtitle,
+            style: AppType.bodyLarge(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.s6),
           for (final s in _sources) ...[
@@ -712,6 +701,11 @@ class _SourceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ruleColor =
+        Theme.of(context).brightness == Brightness.dark
+            ? AppColors.ruleOnGround
+            : AppColors.rule;
     return Semantics(
       button: true,
       selected: picked,
@@ -731,20 +725,20 @@ class _SourceRow extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(
-              color: picked ? AppColors.primary : AppColors.rule,
+              color: picked ? AppColors.primary : ruleColor,
               width: picked ? 1.5 : 1,
             ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.inkSoft, size: 22),
+              Icon(icon, color: cs.onSurfaceVariant, size: 22),
               const SizedBox(width: AppSpacing.s4),
-              Text(name, style: AppType.titleMedium(color: AppColors.ink)),
+              Text(name, style: AppType.titleMedium(color: cs.onSurface)),
               const Spacer(),
               Text(
                 category,
                 style: AppType.monoEyebrow(
-                  color: AppColors.inkSoft,
+                  color: cs.onSurfaceVariant,
                 ).copyWith(letterSpacing: 0.6),
               ),
               const SizedBox(width: AppSpacing.s3),
@@ -755,7 +749,7 @@ class _SourceRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: picked ? AppColors.primary : Colors.transparent,
                   border: Border.all(
-                    color: picked ? AppColors.primary : AppColors.rule,
+                    color: picked ? AppColors.primary : ruleColor,
                     width: 1.5,
                   ),
                   borderRadius: BorderRadius.circular(4),

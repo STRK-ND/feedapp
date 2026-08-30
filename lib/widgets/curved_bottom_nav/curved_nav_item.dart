@@ -26,9 +26,10 @@ class CurvedNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final selectedColor = colorScheme.primary;
-    final unselectedColor = colorScheme.onSurfaceVariant;
-    final color = isSelected ? selectedColor : unselectedColor;
+    // Reskin: the amber dot above the bar (see CurvedNavBarPainter) is the
+    // only attention signal. Icon + label use the surface text colors, so
+    // the bar reads as a quiet rail, not a lit bubble.
+    final color = isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
 
     return Material(
       color: Colors.transparent,

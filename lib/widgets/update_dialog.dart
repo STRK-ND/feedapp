@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
 import '../services/update_service.dart';
 
 /// Show update dialog — now drives the in-app install path, with the
@@ -27,7 +28,8 @@ class UpdateDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final releaseDate = _formatReleaseDate(updateInfo.releaseDate);
+    final l10n = AppLocalizations.of(context);
+    final releaseDate = _formatReleaseDate(updateInfo.releaseDate, l10n.recentlyLabel);
 
     return AlertDialog(
       backgroundColor: theme.colorScheme.surface,
@@ -48,7 +50,7 @@ class UpdateDialog extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Update Available',
+              l10n.updateAvailableTitle,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -68,7 +70,7 @@ class UpdateDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'Version ${updateInfo.version}',
+                l10n.versionLabel(updateInfo.version),
                 style: TextStyle(
                   color: theme.colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w600,
@@ -77,7 +79,7 @@ class UpdateDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Released: $releaseDate',
+              l10n.releasedLabel(releaseDate),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -85,7 +87,7 @@ class UpdateDialog extends StatelessWidget {
             const SizedBox(height: 16),
             if (updateInfo.releaseNotes.isNotEmpty) ...[
               Text(
-                'What\'s new:',
+                l10n.whatsNewLabel,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -114,18 +116,18 @@ class UpdateDialog extends StatelessWidget {
             final confirm = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('Ignore this update?'),
+                title: Text(l10n.ignoreDialogTitle),
                 content: Text(
-                  'You won\'t be notified about version ${updateInfo.version} again. You can still update later.',
+                  l10n.ignoreDialogBody(updateInfo.version),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
+                    child: Text(l10n.dialogCancel),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Ignore'),
+                    child: Text(l10n.ignoreAction),
                   ),
                 ],
               ),
@@ -138,12 +140,12 @@ class UpdateDialog extends StatelessWidget {
               }
             }
           },
-          child: const Text('Skip this version'),
+          child: Text(l10n.skipVersionAction),
         ),
         // "Open in browser" — fallback path
         TextButton(
           onPressed: () => _openInBrowser(context),
-          child: const Text('Open in browser'),
+          child: Text(l10n.openInBrowserAction),
         ),
         // Primary path: in-app download + install
         _DownloadAndInstallButton(updateInfo: updateInfo),
@@ -169,12 +171,12 @@ class UpdateDialog extends StatelessWidget {
     if (context.mounted && success) Navigator.pop(context);
   }
 
-  String _formatReleaseDate(String dateStr) {
+  String _formatReleaseDate(String dateStr, String fallback) {
     try {
       final date = DateTime.parse(dateStr);
       return '${date.day}/${date.month}/${date.year}';
     } catch (e) {
-      return 'Recently';
+      return fallback;
     }
   }
 
@@ -204,8 +206,9 @@ class _DownloadAndInstallButton extends StatefulWidget {
 
 class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
   /// Three states: idle → downloading → installing. Stays simple on
-  /// purpose — silent install, no progress UI per spec.
+  /// purpose - silent install, no progress UI per spec.
   _Stage _stage = _Stage.idle;
+  AppLocalizations get l10n => AppLocalizations.of(context);
   String? _errorText;
 
   bool get _busy => _stage == _Stage.downloading || _stage == _Stage.installing;
@@ -213,12 +216,13 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final label = switch (_stage) {
-      _Stage.idle => 'Update Now',
+      _Stage.idle => l10n.updateNowCta,
       _Stage.downloading => 'Downloading…',
       _Stage.installing => 'Installing…',
       _Stage.done => 'Opening…',
-      _Stage.failed => 'Try again',
+      _Stage.failed => l10n.tryAgainCta,
     };
 
     return Column(
@@ -285,7 +289,7 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
       if (!mounted) return;
       setState(() {
         _stage = _Stage.failed;
-        _errorText = 'Update failed. Try again.';
+        _errorText = l10n.updateFailedError;
       });
       debugPrint('[UpdateDialog] In-app install threw: $e');
     }

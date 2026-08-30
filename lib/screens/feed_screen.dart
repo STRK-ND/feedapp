@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../repositories/article_repository.dart';
 import '../services/storage_service.dart';
+import '../services/cloud_sync_service.dart';
 import '../services/settings_service.dart';
 import '../services/update_service.dart';
 import '../providers/theme_provider.dart';
@@ -64,7 +67,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _autoRefreshTimer;
   Timer? _searchDebounceTimer;
-  Timer? _saveDebounceTimer;
+  StreamSubscription<void>? _cloudSyncSub;
   // Single-flight guard for refresh calls (manually tap, connectivity
   // tick, auto-refresh tick can all fire close together). Drains the
   // call heap to one in-flight; the rest become no-ops.
@@ -85,19 +88,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   int get _unreadCount =>
       _articles.where((a) => !a.isRead && !a.isSaved).length;
   TextTheme get _textTheme => Theme.of(context).textTheme;
+  AppLocalizations get _l10n => AppLocalizations.of(context);
 
   /// App-bar title. A source drill-in shows the source name so the view
   /// reads as "the Verge" rather than a generic feed header.
   String get _appBarTitle {
     final sourceId = widget.sourceId;
     if (sourceId != null) {
-      return getIt<RssFeedService>().getSourceById(sourceId)?.name ?? 'Feed';
+      return getIt<RssFeedService>().getSourceById(sourceId)?.name ??
+          _l10n.navFeed;
     }
     switch (_selectedTab) {
       case 1:
-        return 'Saved';
+        return _l10n.navSaved;
       case 2:
-        return 'Settings';
+        return _l10n.navSettings;
       default:
         return 'Curated Feeds';
     }
@@ -122,6 +127,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _checkForUpdates();
     _loadViewMode();
     _loadSubscribedIds();
+    // Reload from local storage when a cloud sync lands (sign-in restore,
+    // cross-device changes). Guarded: tests run without the sync service.
+    if (getIt.isRegistered<CloudSyncService>()) {
+      _cloudSyncSub = getIt<CloudSyncService>().articlesRestored.listen((_) {
+        if (mounted) unawaited(_loadData());
+      });
+    }
   }
 
   @override
@@ -141,11 +153,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         _autoRefreshTimer?.cancel();
         _autoRefreshTimer = null;
         _connectivitySubscription?.pause();
-        _flushSaveDebounce();
         break;
       case AppLifecycleState.detached:
-        // App is on its way out; flush anything still in the debounce.
-        _flushSaveDebounce();
         break;
     }
   }
@@ -226,8 +235,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
-    _flushSaveDebounce();
     _searchDebounceTimer?.cancel();
+    _cloudSyncSub?.cancel();
     super.dispose();
   }
 
@@ -300,38 +309,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     }
   }
 
-  void _saveArticles() {
-    // Keep the repository cache in sync with the UI's authoritative lists so
-    // the next refresh / mark-all-read merge operates on current read/save
-    // state, not a stale splash-time snapshot (data-layer H1).
-    _articleRepository.syncFrom(_articles, _savedArticles);
-    _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(
-      const Duration(milliseconds: 500),
-      _persistArticles,
-    );
-  }
-
-  /// Flush a pending debounced write immediately. Called on lifecycle pause
-  /// and dispose so a read/save can't be lost to the debounce window when
-  /// the process is killed (data-layer L6).
-  void _flushSaveDebounce() {
-    if (_saveDebounceTimer?.isActive != true) return;
-    _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = null;
-    unawaited(_persistArticles());
-  }
-
-  Future<void> _persistArticles() async {
-    try {
-      await _storage.saveArticles(_articles);
-      await _storage.saveSavedArticles(_savedArticles);
-      await _storage.saveLastRefreshTime(_lastRefreshTime);
-    } catch (e) {
-      unawaited(ErrorHandler.logError('Failed to save articles', error: e));
-    }
-  }
-
   Future<void> _refreshFeeds() async {
     // Single-flight + short minimum-interval guard. Connectivity
     // changes, manual taps, and auto-refresh can all trigger this
@@ -371,7 +348,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       debugPrint('[Feed] Device is offline!');
       setState(() {
         _isLoading = false;
-        _errorMessage = 'You are offline. Showing cached content.';
+        _errorMessage = _l10n.offlineBanner;
       });
       return;
     }
@@ -403,6 +380,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _lastRefreshTime = DateTime.now();
           _isLoading = false;
         });
+        unawaited(_storage.saveLastRefreshTime(_lastRefreshTime));
 
         // Bump the editorial edition number on every successful refresh.
         if (mounted) {
@@ -417,7 +395,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       } else {
         debugPrint('[Feed] ERROR: ${result.error}');
         setState(() {
-          _errorMessage = result.error ?? 'Failed to refresh feeds';
+          _errorMessage = result.error ?? _l10n.refreshFailedFallback;
           _isLoading = false;
         });
       }
@@ -458,8 +436,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       _displayedArticles = _getFilteredArticles();
     });
 
-    _saveArticles();
-    _showSnackBar('Article saved');
+    // Row-level persist: a save touches two rows, not the whole cache.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.saveArticle(_articles[articleIndex]));
+    unawaited(_storage.saveSavedArticle(_articles[articleIndex]));
+    _showSnackBar(_l10n.articleSavedSnack);
   }
 
   void _onSwipeLeft(int index) {
@@ -480,8 +461,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       _displayedArticles = _getFilteredArticles();
     });
 
-    _saveArticles();
-    _showSnackBar('Article marked as read');
+    // Row-level persist: a read flag touches one row, not the whole cache.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.saveArticle(_articles[articleIndex]));
+    _showSnackBar(_l10n.articleMarkedReadSnack);
   }
 
   void _onToggleSave(Article article) {
@@ -494,7 +477,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       final isPro = context.read<SettingsNotifier>().isPro;
       if (!isPro && _savedArticles.length >= AppConfig.freeSavedArticlesCap) {
         _showSnackBar(
-          'Free limit of ${AppConfig.freeSavedArticlesCap} saved articles reached — Go Pro for unlimited saves',
+          _l10n.freeSavedLimitReached(AppConfig.freeSavedArticlesCap),
         );
         return;
       }
@@ -522,7 +505,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       }
     });
 
-    _saveArticles();
+    // Row-level persist: a toggle touches one feed row plus one saved row.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.saveArticle(article));
+    if (article.isSaved) {
+      unawaited(_storage.saveSavedArticle(article));
+    } else {
+      unawaited(_storage.removeSavedArticle(article.id));
+    }
   }
 
   void _onTapCard(int index) {
@@ -546,7 +536,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     setState(() {
       _articles[articleIndex].isRead = true;
     });
-    _saveArticles();
+    // Row-level persist: a read flag touches one row.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.saveArticle(_articles[articleIndex]));
 
     showModalBottomSheet(
       context: context,
@@ -556,7 +548,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         article: _articles[articleIndex],
         onClose: () {
           // Persist fetchedFullContent set in the reader (data-layer L9).
-          _saveArticles();
+          _articleRepository.syncFrom(_articles, _savedArticles);
+          unawaited(_storage.saveArticle(_articles[articleIndex]));
           Navigator.pop(context);
         },
         onToggleSave: () {
@@ -644,7 +637,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     final result = await _articleRepository.markAllAsRead();
     if (!mounted) return;
     if (result.isFailure) {
-      _showSnackBar(result.error ?? 'Couldn\'t mark all read.');
+      _showSnackBar(result.error ?? _l10n.markAllReadFailedSnack);
       return;
     }
 
@@ -658,8 +651,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     final flipped = snapshot.length;
     _showSnackBar(
-      'Marked $flipped article${flipped == 1 ? '' : 's'} as read.',
-      actionLabel: 'Undo',
+      _l10n.markedAsReadSnack(flipped),
+      actionLabel: _l10n.undoAction,
       onAction: () => _undoMarkAllRead(snapshot),
       duration: const Duration(milliseconds: 4000),
     );
@@ -676,7 +669,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           .toList();
       _displayedArticles = _getFilteredArticles();
     });
-    _showSnackBar('Restored.');
+    _showSnackBar(_l10n.restoredSnack);
   }
 
   Widget _buildEmptyState() {
@@ -688,10 +681,10 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         ? Icons.style_outlined
         : Icons.bookmark_outline_rounded;
     final title = isSearchEmpty
-        ? 'No results for "$_searchQuery"'
+        ? _l10n.searchNoResultsTitle(_searchQuery)
         : _selectedTab == 0
-        ? 'The day is quiet.'
-        : 'Nothing saved yet.';
+        ? _l10n.emptyFeedTitle
+        : _l10n.savedEmptyTitle;
 
     return Center(
       child: Column(
@@ -726,7 +719,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
             FilledButton.icon(
               onPressed: _refreshFeeds,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Retry'),
+              label: Text(_l10n.retryCta),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -748,14 +741,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 });
               },
               icon: const Icon(Icons.clear_rounded, size: 18),
-              label: const Text('Clear search'),
+              label: Text(_l10n.clearSearchCta),
             ),
           ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
-                'Tap the refresh button to load articles',
+                _l10n.emptyFeedHint,
                 textAlign: TextAlign.center,
                 style: _textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
@@ -789,16 +782,18 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                   ),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                      horizontal: 14,
+                      vertical: 8,
                     ),
+                    // Reskin: refreshing banner reads as a quiet groundElev
+                    // strip + hairline + mono label, not an amber container.
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(
                         AppCardStyles.badgeRadius,
                       ),
                       border: Border.all(
-                        color: colorScheme.primary.withValues(alpha: 0.25),
+                        color: colorScheme.outlineVariant,
                         width: 1,
                       ),
                     ),
@@ -806,21 +801,23 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         SizedBox(
-                          width: 16,
-                          height: 16,
+                          width: 14,
+                          height: 14,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                            strokeWidth: 1.6,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              colorScheme.primary,
+                              colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'Refreshing feeds...',
-                          style: _textTheme.labelLarge?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
-                            fontSize: 13,
+                          _l10n.refreshingBanner,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.4,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -884,8 +881,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       article.isSaved = false;
       _savedArticles = _savedArticles.where((a) => a.id != article.id).toList();
     });
-    _saveArticles();
-    _showSnackBar('Article removed from saved');
+    // Row-level persist: un-save deletes one saved row and clears the
+    // feed-row flag so the article can reappear in triage.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.removeSavedArticle(article.id));
+    unawaited(_storage.saveArticle(article));
+    _showSnackBar(_l10n.articleRemovedSnack);
   }
 
   void _onTapSavedArticle(int index) {
@@ -898,7 +899,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     setState(() {
       article.isRead = true;
     });
-    _saveArticles();
+    // Row-level persist: a read flag on the saved copy touches one row.
+    _articleRepository.syncFrom(_articles, _savedArticles);
+    unawaited(_storage.saveSavedArticle(article));
 
     showModalBottomSheet(
       context: context,
@@ -962,8 +965,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 Semantics(
                   button: true,
                   label: _unreadCount > 0
-                      ? 'Mark $_unreadCount unread articles as read'
-                      : 'No unread to mark as read',
+                      ? _l10n.markAllReadSemantic(_unreadCount)
+                      : _l10n.noUnreadToMark,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: IconButton(
@@ -974,8 +977,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               _onMarkAllRead();
                             },
                       tooltip: _unreadCount > 0
-                          ? 'Mark all as read'
-                          : 'All caught up',
+                          ? _l10n.markAllAsReadAction
+                          : _l10n.sourceUnsubscribedSubtitle,
                       icon: Icon(
                         _unreadCount == 0
                             ? Icons.done_all_rounded
@@ -990,8 +993,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 Semantics(
                   button: true,
                   label: _viewMode == 'stack'
-                      ? 'Switch to continuous list'
-                      : 'Switch to card stack',
+                      ? _l10n.switchToContinuousTooltip
+                      : _l10n.switchToStackTooltip,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: IconButton(
@@ -1000,8 +1003,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         _toggleViewMode();
                       },
                       tooltip: _viewMode == 'stack'
-                          ? 'Continuous'
-                          : 'Card stack',
+                          ? _l10n.continuousModeLabel
+                          : _l10n.cardStackModeLabel,
                       icon: Icon(
                         _viewMode == 'stack'
                             ? Icons.view_agenda_outlined
@@ -1015,34 +1018,46 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 10,
+                    vertical: 6,
                   ),
+                  // Reskin: unread count reads as a data chip, not a brand
+                  // pill. groundElev fill + hairline + mono number; the amber
+                  // dot earns the attention, not the whole container. Folio
+                  // carries the same count on the feed tab; this chip shows
+                  // on the source drill-in where Folio is hidden.
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(
                       AppCardStyles.badgeRadius,
                     ),
                     border: Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.2),
+                      color: colorScheme.outlineVariant,
                       width: 1,
                     ),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Semantics(
                         label: '$_unreadCount unread articles',
-                        child: Icon(
-                          Icons.article_outlined,
-                          size: 16,
-                          color: appBarTitleColor.withValues(alpha: 0.85),
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _unreadCount > 0
+                                ? colorScheme.primary
+                                : colorScheme.outline,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '$_unreadCount',
-                        style: _textTheme.labelLarge?.copyWith(
-                          fontSize: 14,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                           color: appBarTitleColor,
                         ),
                       ),
@@ -1052,7 +1067,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               if (_selectedTab == 0)
                 Semantics(
                   button: true,
-                  label: _isLoading ? 'Loading' : 'Refresh feeds',
+                  label: _isLoading ? _l10n.loadingLabel : _l10n.refreshFeedsLabel,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: IconButton(
@@ -1082,7 +1097,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 ),
               Semantics(
                 button: true,
-                label: _isSearchActive ? 'Close search' : 'Search articles',
+                label: _isSearchActive
+                        ? _l10n.closeSearchLabel
+                        : _l10n.searchArticlesLabel,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: IconButton(
@@ -1107,7 +1124,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               ),
               Semantics(
                 button: true,
-                label: 'More options',
+                label: _l10n.moreOptionsLabel,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: PopupMenuButton<String>(
@@ -1129,10 +1146,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "You're using the latest version!",
-                                ),
+                              SnackBar(
+                                content: Text(_l10n.upToDateMessage),
                               ),
                             );
                           }
@@ -1148,14 +1163,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         );
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
                       PopupMenuItem(
                         value: 'check_updates',
                         child: Row(
                           children: [
-                            Icon(Icons.system_update),
-                            SizedBox(width: 12),
-                            Text('Check for updates'),
+                            const Icon(Icons.system_update),
+                            const SizedBox(width: 12),
+                            Text(_l10n.checkForUpdates),
                           ],
                         ),
                       ),
@@ -1163,9 +1178,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         value: 'settings',
                         child: Row(
                           children: [
-                            Icon(Icons.settings),
-                            SizedBox(width: 12),
-                            Text('Settings'),
+                            const Icon(Icons.settings),
+                            const SizedBox(width: 12),
+                            Text(_l10n.settingsTitle),
                           ],
                         ),
                       ),
@@ -1209,7 +1224,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       autofocus: true,
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Search articles, sources, or content...',
+                        hintText: _l10n.searchHint,
                         hintStyle: _textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 15,
@@ -1246,7 +1261,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         suffixIcon: _searchQuery.isNotEmpty
                             ? Semantics(
                                 button: true,
-                                label: 'Clear search',
+                                label: _l10n.clearSearchCta,
                                 child: IconButton(
                                   icon: Icon(
                                     Icons.clear_rounded,
@@ -1324,29 +1339,40 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               ),
                               child: AnimatedContainer(
                                 duration: AppCardStyles.quickDuration,
+                                // §10 quality floor: ≥44dp touch target.
+                                constraints: const BoxConstraints(
+                                  minHeight: 44,
+                                ),
+                                alignment: Alignment.center,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 12,
                                 ),
+                                // Reskin: chip is not an amber fill. Selected =
+                                // surface + paper text + amber underline; idle =
+                                // transparent surface w/ hairline. Amber is the
+                                // attention color, not a neutral accent.
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.surfaceContainerHighest,
+                                      ? colorScheme.surfaceContainerHighest
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(
                                     AppCardStyles.badgeRadius,
                                   ),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? colorScheme.primary
-                                        : colorScheme.outlineVariant,
-                                    width: 1,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: isSelected
+                                          ? colorScheme.primary
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
                                   ),
                                 ),
                                 child: Text(
                                   category,
                                   style: _textTheme.labelLarge?.copyWith(
                                     color: isSelected
-                                        ? colorScheme.onPrimary
+                                        ? colorScheme.onSurface
                                         : colorScheme.onSurfaceVariant,
                                     fontSize: 14,
                                   ),
@@ -1376,8 +1402,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '${_displayedArticles.length} result${_displayedArticles.length != 1 ? 's' : ''} for "$_searchQuery"',
+                          Text(
+                            _l10n.searchResultsCount(
+                              _displayedArticles.length,
+                              _searchQuery,
+                            ),
                           style: _textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 13,
@@ -1397,7 +1426,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppCardStyles.badgeRadius,
+                      ),
                       border: Border.all(
                         color: colorScheme.error.withValues(alpha: 0.3),
                         width: 1,
@@ -1413,10 +1444,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Offline - Showing cached content',
-                            style: _textTheme.bodyMedium?.copyWith(
+                            'Offline — showing cached content',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
                               color: colorScheme.onErrorContainer,
-                              fontSize: 13,
                             ),
                           ),
                         ),

@@ -1,11 +1,16 @@
 import 'dart:async';
-import 'dart:ui';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:workmanager/workmanager.dart';
 
+import 'services/background_sync_service.dart';
+import 'services/posthog_service.dart';
 import 'screens/splash_screen.dart';
 import 'utils/error_handler.dart';
 
@@ -14,6 +19,12 @@ Future<void> main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
+    // Crashlytics only sees the app once splash has initialized Firebase.
+    if (Firebase.apps.isNotEmpty) {
+      unawaited(
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details),
+      );
+    }
     unawaited(
       ErrorHandler.logError(
         'FlutterError',
@@ -24,6 +35,15 @@ Future<void> main() async {
     );
   };
   PlatformDispatcher.instance.onError = (error, stack) {
+    if (Firebase.apps.isNotEmpty) {
+      unawaited(
+        FirebaseCrashlytics.instance.recordError(
+          error,
+          stack,
+          fatal: true,
+        ),
+      );
+    }
     unawaited(
       ErrorHandler.logError(
         'PlatformDispatcher error',
@@ -34,6 +54,8 @@ Future<void> main() async {
     );
     return true;
   };
+  // Inert until POSTHOG_API_KEY is provided via --dart-define.
+  unawaited(PostHogService.init().catchError((Object _) {}));
 
   const sentryDsn = String.fromEnvironment('SENTRY_DSN');
   if (sentryDsn.isNotEmpty) {
@@ -57,6 +79,14 @@ Future<void> main() async {
       debugPrint('Sentry init failed: $e');
     }
   }
+  // Register the background-isolate entrypoint for periodic feed sync.
+  // Must happen before runApp; failure must never block startup.
+  try {
+    await Workmanager().initialize(callbackDispatcher);
+  } catch (e) {
+    debugPrint('[Main] Workmanager init skipped: $e');
+  }
+
   runApp(const SplashScreen());
 
   SystemChrome.setSystemUIOverlayStyle(

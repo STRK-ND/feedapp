@@ -36,33 +36,39 @@ class ContinuousFeedList extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final List<Widget> items = [];
+    // Flat lazy item list: cards are constructed only for visible rows,
+    // and each entry carries its global index so the tap callback needs
+    // no per-card indexOf lookup.
+    final items = <_Item>[];
     for (final g in groups) {
-      items.add(
-        SectionEyebrow(
-          label: g.label,
-          count: g.items.length,
-          density: g.density,
-        ),
-      );
-      for (var i = 0; i < g.items.length; i++) {
-        // Look up global index for tap-callback.
-        final globalIndex = articles.indexOf(g.items[i]);
-        items.add(
-          ListArticleCard(
-            article: g.items[i],
-            index: globalIndex,
-            measure: measure,
-            onTap: () => onTap(globalIndex),
-          ),
-        );
+      items.add(_Item.header(g));
+      for (final e in g.items) {
+        items.add(_Item.card(e));
       }
     }
 
-    return ListView(
+    return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.only(bottom: AppSpacing.s16),
-      children: items,
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        final header = item.section;
+        if (header != null) {
+          return SectionEyebrow(
+            label: header.label,
+            count: header.items.length,
+            density: header.density,
+          );
+        }
+        final entry = item.entry!;
+        return ListArticleCard(
+          article: entry.article,
+          index: entry.index,
+          measure: measure,
+          onTap: () => onTap(entry.index),
+        );
+      },
     );
   }
 }
@@ -70,8 +76,21 @@ class ContinuousFeedList extends StatelessWidget {
 class _Section {
   final String label;
   final SectionDensity density;
-  final List<Article> items;
+  final List<_Entry> items;
   _Section(this.label, this.density, this.items);
+}
+
+class _Entry {
+  final Article article;
+  final int index;
+  const _Entry(this.article, this.index);
+}
+
+class _Item {
+  final _Section? section;
+  final _Entry? entry;
+  const _Item.header(this.section) : entry = null;
+  const _Item.card(this.entry) : section = null;
 }
 
 List<_Section> _groupByRecency(List<Article> articles) {
@@ -79,25 +98,28 @@ List<_Section> _groupByRecency(List<Article> articles) {
   final today = DateTime(now.year, now.month, now.day);
   final yesterday = today.subtract(const Duration(days: 1));
 
-  final List<Article> todayList = [];
-  final List<Article> yesterdayList = [];
-  final List<Article> earlierList = [];
+  final todayList = <_Entry>[];
+  final yesterdayList = <_Entry>[];
+  final earlierList = <_Entry>[];
 
-  for (final a in articles) {
+  for (var i = 0; i < articles.length; i++) {
+    final a = articles[i];
     final dtDay = DateTime(a.pubDate.year, a.pubDate.month, a.pubDate.day);
     if (dtDay == today) {
-      todayList.add(a);
+      todayList.add(_Entry(a, i));
     } else if (dtDay == yesterday) {
-      yesterdayList.add(a);
+      yesterdayList.add(_Entry(a, i));
     } else {
-      earlierList.add(a);
+      earlierList.add(_Entry(a, i));
     }
   }
 
   // Sort newest first within each group.
-  todayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
-  yesterdayList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
-  earlierList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
+  int byNewest(_Entry a, _Entry b) =>
+      b.article.pubDate.compareTo(a.article.pubDate);
+  todayList.sort(byNewest);
+  yesterdayList.sort(byNewest);
+  earlierList.sort(byNewest);
 
   return [
     if (todayList.isNotEmpty)

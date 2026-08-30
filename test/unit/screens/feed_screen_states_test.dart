@@ -9,6 +9,7 @@ import 'package:connectivity_plus_platform_interface/connectivity_plus_platform_
 import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/models/filter_params.dart';
 import 'package:curatedfeeds/models/paginated_response.dart';
+import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/providers/settings_notifier.dart';
 import 'package:curatedfeeds/repositories/article_repository.dart';
 import 'package:curatedfeeds/screens/feed_screen.dart';
@@ -16,6 +17,7 @@ import 'package:curatedfeeds/services/settings_service.dart';
 import 'package:curatedfeeds/services/storage_service.dart';
 import 'package:curatedfeeds/services/worker_feed_service.dart';
 import 'package:firebase_analytics_platform_interface/firebase_analytics_platform_interface.dart';
+import 'package:curatedfeeds/l10n/generated/app_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
 import 'package:flutter/material.dart';
@@ -105,6 +107,33 @@ class _ThrowingWorker extends WorkerFeedService {
   }
 }
 
+/// In-memory StorageService double. Only the article-list surface is
+/// faked; the base constructor never touches disk until a method runs.
+class _MemStorageService extends StorageService {
+  final List<Article> _articles = [];
+  final List<Article> _saved = [];
+
+  @override
+  Future<void> saveArticles(List<Article> articles) async {
+    _articles
+      ..clear()
+      ..addAll(articles);
+  }
+
+  @override
+  Future<List<Article>> loadArticles() async => List.of(_articles);
+
+  @override
+  Future<void> saveSavedArticles(List<Article> articles) async {
+    _saved
+      ..clear()
+      ..addAll(articles);
+  }
+
+  @override
+  Future<List<Article>> loadSavedArticles() async => List.of(_saved);
+}
+
 Future<void> _pumpFeed(
   WidgetTester tester, {
   required WorkerFeedService worker,
@@ -116,8 +145,12 @@ Future<void> _pumpFeed(
   await notifier.setAutoRefresh(false);
   await notifier.setRefreshInterval(0);
 
-  getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<SettingsService>(() => settings);
+  // Pure-Dart storage double: sqlite (ffi) cannot run inside a
+  // testWidgets FakeAsync zone — real I/O futures never complete there.
+  getIt.registerLazySingleton<StorageService>(
+    () => _MemStorageService(),
+  );
   getIt.registerLazySingleton<ArticleRepository>(
     () => ArticleRepository(
       storageService: getIt<StorageService>(),
@@ -128,7 +161,11 @@ Future<void> _pumpFeed(
   await tester.pumpWidget(
     ChangeNotifierProvider<SettingsNotifier>(
       create: (_) => notifier,
-      child: const MaterialApp(home: RssFeedScreen()),
+      child: const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: RssFeedScreen(),
+      ),
     ),
   );
 

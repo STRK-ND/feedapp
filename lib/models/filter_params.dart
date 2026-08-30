@@ -74,10 +74,12 @@ class FilterParams {
       params['q'] = searchQuery!;
     }
     if (since != null) {
-      params['since'] = since!.toIso8601String();
+      // Worker expects epoch millis (article.pubDate is stored as ms).
+      params['since'] = since!.millisecondsSinceEpoch.toString();
     }
     if (until != null) {
-      params['until'] = until!.toIso8601String();
+      // Same epoch-ms contract as `since` — worker parses both identically.
+      params['until'] = until!.millisecondsSinceEpoch.toString();
     }
     if (sortBy != null) {
       params['sort'] = sortBy!.value;

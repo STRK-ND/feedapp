@@ -5,7 +5,11 @@ import '../services/settings_service.dart';
 /// Theme provider for managing app theme state
 class ThemeProvider extends ChangeNotifier {
   final SettingsService _settingsService;
-  ThemeMode _themeMode = ThemeMode.system;
+  // ponytail: default dark — the reskin is dark-first. An explicit saved
+  // preference always wins (loadSettings() overwrites this), so we only
+  // ship dark when the user has never set a theme. Upgrade path: if a
+  // future default wants to honor OS choice again, set system here.
+  ThemeMode _themeMode = ThemeMode.dark;
   Color _primaryColor = const Color(0xFFC4944E); // Stitch warm amber
   final Color _accentColor = const Color(0xFFC4944E); // Stitch accent
 
@@ -15,26 +19,11 @@ class ThemeProvider extends ChangeNotifier {
   Color get primaryColor => _primaryColor;
   Color get accentColor => _accentColor;
 
-  /// Light theme colors - Stitch "Curated" design
-  static const Color _lightBackground = Color(
-    0xFFF7F5F8,
-  ); // Stitch light background
-  static const Color _lightSurface = Color(0xFFFFFFFF);
-  static const Color _lightTextPrimary = Color(0xFF1A1B2E);
-  static const Color _lightTextSecondary = Color(0xFF6B7280);
-  static const Color _lightDivider = Color(0xFFE5E7EB);
-
-  /// Dark theme colors
-  static const Color _darkBackground = Color(0xFF190F23);
-  static const Color _darkSurface = Color(0xFF1E1E2E);
-  static const Color _darkTextPrimary = Color(0xFFF8F7F4);
-  static const Color _darkTextSecondary = Color(0xFF9CA3AF);
-  static const Color _darkDivider = Color(0xFF374151);
-
-  // Dark gradient colors — sophisticated near-black to charcoal
-  static const Color darkGradientStart = Color(0xFF121214);
-  static const Color darkGradientMid = Color(0xFF18181B);
-  static const Color darkGradientEnd = Color(0xFF1C1C1F);
+  // Dark gradient colors — ground scale for depth. Lighter at top so the
+  // feed reads as a lit surface fading to ink at the bottom edge.
+  static const Color darkGradientStart = Color(0xFF1A1423); // groundElev
+  static const Color darkGradientMid = Color(0xFF120B1B);
+  static const Color darkGradientEnd = Color(0xFF0E0814); // ground
 
   /// Initialize theme from settings
   Future<void> init() async {
@@ -141,59 +130,79 @@ class ThemeProvider extends ChangeNotifier {
     );
   }
 
-  /// Get light theme data
+  /// Get light theme data — matched-but-secondary path. Paper ground, ink
+  /// text, amber still attention-only. Cards drop to paperRaised (not a
+  /// tinted container) so the surface reads flat-editorial, not glass.
   ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _primaryColor,
+      colorScheme: ColorScheme(
         brightness: Brightness.light,
         primary: _primaryColor,
-        secondary: _accentColor,
-        surface: _lightSurface,
+        onPrimary: Colors.white,
+        secondary: _primaryColor,
+        onSecondary: Colors.white,
+        tertiary: _primaryColor,
+        onTertiary: Colors.white,
+        error: const Color(0xFFDC3640),
+        onError: Colors.white,
+        surface: const Color(0xFFFFFFFF),
+        onSurface: const Color(0xFF15131C),
+        surfaceContainerHighest: const Color(0xFFF4F1F8),
+        onSurfaceVariant: const Color(0xFF6B6877),
+        outline: const Color(0xFFE5E7EB),
+        outlineVariant: const Color(0xFFE5E7EB),
+        inverseSurface: const Color(0xFF15131C),
+        onInverseSurface: const Color(0xFFF4F1F8),
       ),
-      scaffoldBackgroundColor: _lightBackground,
+      scaffoldBackgroundColor: const Color(0xFFF4F1F8),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.playfairDisplay(
-          color: _lightTextPrimary,
+          color: const Color(0xFF15131C),
           fontSize: 24,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
-        iconTheme: const IconThemeData(color: _lightTextPrimary),
+        iconTheme: const IconThemeData(color: Color(0xFF15131C)),
       ),
       cardTheme: CardThemeData(
-        color: _lightSurface,
+        color: const Color(0xFFFFFFFF),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: _lightSurface,
-        selectedItemColor: _primaryColor,
-        unselectedItemColor: _lightTextSecondary,
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFFFFFFFF),
+        selectedItemColor: Color(0xFFC4944E),
+        unselectedItemColor: Color(0xFF6B6877),
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 0,
       ),
-      textTheme: _buildTextTheme(_lightTextPrimary, _lightTextSecondary),
-      dividerTheme: const DividerThemeData(color: _lightDivider, thickness: 1),
-      iconTheme: const IconThemeData(color: _lightTextPrimary),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: _primaryColor,
+      textTheme: _buildTextTheme(const Color(0xFF15131C), const Color(0xFF6B6877)),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFFE5E7EB),
+        thickness: 1,
+      ),
+      iconTheme: const IconThemeData(color: Color(0xFF15131C)),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Color(0xFFC4944E),
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 0,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: _lightSurface,
-        contentTextStyle: GoogleFonts.dmSans(color: _lightTextPrimary),
+        backgroundColor: const Color(0xFFFFFFFF),
+        contentTextStyle: GoogleFonts.dmSans(color: const Color(0xFF15131C)),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: _lightSurface,
+        backgroundColor: const Color(0xFFFFFFFF),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       switchTheme: SwitchThemeData(
@@ -201,76 +210,101 @@ class ThemeProvider extends ChangeNotifier {
           if (states.contains(WidgetState.selected)) {
             return _primaryColor;
           }
-          return _lightTextSecondary;
+          return const Color(0xFF6B6877);
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return _primaryColor.withValues(alpha: 0.5);
           }
-          return _lightDivider;
+          return const Color(0xFFE5E7EB);
         }),
       ),
-      listTileTheme: ListTileThemeData(
-        tileColor: _lightSurface,
-        textColor: _lightTextPrimary,
-        iconColor: _primaryColor,
+      listTileTheme: const ListTileThemeData(
+        tileColor: Color(0xFFFFFFFF),
+        textColor: Color(0xFF15131C),
+        iconColor: Color(0xFF15131C),
       ),
+      // Spec §10 quality floor: keyboard/d-pad focus must be visible on
+      // every IconButton and tappable card — amber at 12%.
+      focusColor: _primaryColor.withValues(alpha: 0.12),
+      splashColor: _primaryColor.withValues(alpha: 0.08),
     );
   }
 
-  /// Get dark theme data
+  /// Get dark theme data — the reskin's hero surface. Near-black ground,
+  /// paper-on-ground text, amber reserved for attention (colorScheme.primary
+  /// *only*). Surface tokens map to the ground elevation scale so cards
+  /// and sheets read as layered stone, not lit glass.
   ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _primaryColor,
+      colorScheme: ColorScheme(
         brightness: Brightness.dark,
         primary: _primaryColor,
-        secondary: _accentColor,
-        surface: _darkSurface,
+        onPrimary: const Color(0xFF0E0814),
+        secondary: _primaryColor,
+        onSecondary: const Color(0xFF0E0814),
+        tertiary: _primaryColor,
+        onTertiary: const Color(0xFF0E0814),
+        error: const Color(0xFFE0626A),
+        onError: const Color(0xFF0E0814),
+        surface: const Color(0xFF1A1423), // groundElev
+        onSurface: const Color(0xFFF8F7F4), // paperOnGround
+        surfaceContainerHighest: const Color(0xFF12091A),
+        onSurfaceVariant: const Color(0xFF8A8590), // paperSoft
+        outline: const Color(0xFF27212E), // ruleOnGround
+        outlineVariant: const Color(0xFF27212E),
+        inverseSurface: const Color(0xFFF8F7F4),
+        onInverseSurface: const Color(0xFF0E0814),
       ),
-      scaffoldBackgroundColor: _darkBackground,
+      scaffoldBackgroundColor: const Color(0xFF0E0814), // ground
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.playfairDisplay(
-          color: _darkTextPrimary,
+          color: const Color(0xFFF8F7F4),
           fontSize: 24,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
-        iconTheme: const IconThemeData(color: _darkTextPrimary),
+        iconTheme: const IconThemeData(color: Color(0xFFF8F7F4)),
       ),
       cardTheme: CardThemeData(
-        color: _darkSurface,
+        color: const Color(0xFF1A1423), // groundElev — no amber tint
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: _darkSurface,
-        selectedItemColor: _accentColor,
-        unselectedItemColor: _darkTextSecondary,
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF1A1423),
+        selectedItemColor: Color(0xFFC4944E),
+        unselectedItemColor: Color(0xFF8A8590),
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 0,
       ),
-      textTheme: _buildTextTheme(_darkTextPrimary, _darkTextSecondary),
-      dividerTheme: const DividerThemeData(color: _darkDivider, thickness: 1),
-      iconTheme: const IconThemeData(color: _darkTextPrimary),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: _primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 4,
+      textTheme: _buildTextTheme(const Color(0xFFF8F7F4), const Color(0xFF8A8590)),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF27212E),
+        thickness: 1,
+      ),
+      iconTheme: const IconThemeData(color: Color(0xFFF8F7F4)),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Color(0xFFC4944E),
+        foregroundColor: Color(0xFF0E0814),
+        elevation: 0,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: _darkSurface,
-        contentTextStyle: GoogleFonts.dmSans(color: _darkTextPrimary),
+        backgroundColor: const Color(0xFF1A1423),
+        contentTextStyle: GoogleFonts.dmSans(color: const Color(0xFFF8F7F4)),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFF27212E), width: 1),
+        ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: _darkSurface,
+        backgroundColor: const Color(0xFF1A1423),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       switchTheme: SwitchThemeData(
@@ -278,20 +312,23 @@ class ThemeProvider extends ChangeNotifier {
           if (states.contains(WidgetState.selected)) {
             return _accentColor;
           }
-          return _darkTextSecondary;
+          return const Color(0xFF8A8590);
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return _accentColor.withValues(alpha: 0.5);
           }
-          return _darkDivider;
+          return const Color(0xFF27212E);
         }),
       ),
-      listTileTheme: ListTileThemeData(
-        tileColor: _darkSurface,
-        textColor: _darkTextPrimary,
-        iconColor: _accentColor,
+      listTileTheme: const ListTileThemeData(
+        tileColor: Color(0xFF1A1423),
+        textColor: Color(0xFFF8F7F4),
+        iconColor: Color(0xFFF8F7F4),
       ),
+      // Spec §10 quality floor: visible focus on dark, same amber rule.
+      focusColor: _accentColor.withValues(alpha: 0.12),
+      splashColor: _accentColor.withValues(alpha: 0.08),
     );
   }
 }

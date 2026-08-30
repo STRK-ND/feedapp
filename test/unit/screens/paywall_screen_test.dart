@@ -8,6 +8,7 @@ import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_inte
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:curatedfeeds/l10n/generated/app_localizations.dart';
 import 'package:curatedfeeds/providers/settings_notifier.dart';
 import 'package:curatedfeeds/screens/paywall_screen.dart';
 import 'package:curatedfeeds/services/settings_service.dart';
@@ -73,7 +74,11 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<SettingsNotifier>(
         create: (_) => SettingsNotifier(SettingsService()),
-        child: const MaterialApp(home: PaywallScreen()),
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PaywallScreen(),
+        ),
       ),
     );
 

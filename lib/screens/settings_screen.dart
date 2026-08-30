@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/generated/app_localizations.dart';
+import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../providers/settings_notifier.dart';
 import '../services/storage_service.dart';
 import '../services/in_app_notification_manager.dart';
 import '../services/notification_service.dart';
+import '../services/background_sync_service.dart';
 import '../repositories/article_repository.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
@@ -17,6 +21,7 @@ import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
 import 'sources_screen.dart' show SourcesScreen;
 import 'paywall_screen.dart';
+import 'login_screen.dart';
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -27,6 +32,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   late StorageService _storageService;
   late SettingsService _settingsService;
   bool _isLoading = true;
@@ -39,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _newArticleNotifs = true;
   bool _inAppNotifsEnabled = true;
+  List<String> _notifCategories = const [];
   int _cachedArticles = 0;
   int _savedArticles = 0;
 
@@ -62,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _settingsService.getInAppNotificationsEnabled(),
       _settingsService.getNotificationsEnabled(),
       _settingsService.getNewArticleNotifications(),
+      _settingsService.getNotificationCategories(),
     ]);
 
     if (mounted) {
@@ -71,6 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _inAppNotifsEnabled = results[2] as bool;
         _notificationsEnabled = results[3] as bool;
         _newArticleNotifs = results[4] as bool;
+        _notifCategories = results[5] as List<String>;
         _isLoading = false;
       });
     }
@@ -80,21 +89,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Cache'),
+        title: Text(_l10n.clearCacheDialogTitle),
         content: Text(
-          'This will delete $_cachedArticles cached articles. This action cannot be undone.',
+          _l10n.clearCacheDialogBody(_cachedArticles),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(_l10n.dialogCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Clear'),
+            child: Text(_l10n.dialogClearAction),
           ),
         ],
       ),
@@ -102,16 +111,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirmed == true && mounted) {
       final messenger = ScaffoldMessenger.of(context);
-      await _storageService.clearAll();
+      // Targeted clear: only the fetched feed cache goes. clearAll() would
+      // also wipe savedArticles — user data — under a "cache" label.
+      await _storageService.clearFeedCache();
       getIt<ArticleRepository>().clearCache();
       if (!mounted) return;
       setState(() {
         _cachedArticles = 0;
-        _savedArticles = 0;
       });
       messenger.showSnackBar(
-        const SnackBar(content: Text('Cache cleared successfully')),
+        SnackBar(content: Text(_l10n.cacheClearedSnack)),
       );
+    }
+  }
+
+  String _categorySubtitle() {
+    final all = AppConfig.categories.where((c) => c != 'All').toList();
+    if (_notifCategories.isEmpty || _notifCategories.length == all.length) {
+      return _l10n.alertCategoriesAll;
+    }
+    return _notifCategories.join(', ');
+  }
+
+  /// Multi-select picker for which categories trigger new-article pushes.
+  /// Saving re-POSTs /subscribe so the worker's stored row narrows future
+  /// announcements for this device.
+  Future<void> _editNotificationCategories() async {
+    final all = AppConfig.categories.where((c) => c != 'All').toList();
+    final selected = Set<String>.from(
+      _notifCategories.isEmpty ? all : _notifCategories,
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(_l10n.alertCategoriesTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final cat in all)
+                  CheckboxListTile(
+                    value: selected.contains(cat),
+                    onChanged: (v) => setDialogState(
+                      () => v == true
+                          ? selected.add(cat)
+                          : selected.remove(cat),
+                    ),
+                    title: Text(cat),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(_l10n.dialogCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(_l10n.dialogSaveAction),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved != true || !mounted) return;
+    final next = selected.toList();
+    await _settingsService.setNotificationCategories(next);
+    if (!mounted) return;
+    setState(() => _notifCategories = next);
+    if (_notificationsEnabled && _newArticleNotifs) {
+      try {
+        await NotificationService.enablePushNotifications();
+      } catch (_) {
+        // Server sync failed silently; prefs apply on next app start.
+      }
     }
   }
 
@@ -124,17 +203,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           Icons.timer_outlined,
           size: 20,
-          color: colorScheme.onPrimaryContainer,
+          color: colorScheme.onSurfaceVariant,
         ),
       ),
       title: Text(
-        'Refresh Interval',
+        _l10n.refreshIntervalTitle,
         style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
@@ -147,7 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : 30,
         dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: colorScheme.primary),
+        icon: Icon(Icons.expand_more, color: colorScheme.onSurfaceVariant),
         items: [15, 30, 60, 120].map((interval) {
           return DropdownMenuItem(
             value: interval,
@@ -163,6 +242,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (value) async {
           if (value != null) {
             await settings.setRefreshInterval(value);
+            // Keep the OS-level periodic job's frequency in sync; the
+            // cancel+register in scheduleBackgroundSync replaces the job.
+            unawaited(scheduleBackgroundSync(_settingsService));
           }
         },
       ),
@@ -197,39 +279,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: Text('Settings', style: AppType.headlineSmall()),
+            title: Text(_l10n.settingsTitle, style: AppType.headlineSmall()),
             centerTitle: false,
           ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             children: [
-              _buildSectionHeader('Appearance'),
+              _buildSectionHeader(_l10n.sectionAccount),
+              const _AccountCard(),
+              const SizedBox(height: 24),
+              _buildSectionHeader(_l10n.sectionAppearance),
               _buildSettingsCard([
                 _buildThemeSelector(themeMode),
                 _buildDivider(),
                 _buildSwitchTile(
                   icon: Icons.image_outlined,
-                  title: 'Show Images',
-                  subtitle: 'Display article images in feed',
+                  title: _l10n.showImagesTitle,
+                  subtitle: _l10n.showImagesSubtitle,
                   value: notifier.showImages,
                   onChanged: notifier.setShowImages,
                 ),
                 _buildDivider(),
                 _buildSwitchTile(
                   icon: Icons.data_saver_off_outlined,
-                  title: 'Data Saver',
-                  subtitle: 'Reduce data usage by limiting image quality',
+                  title: _l10n.dataSaverTitle,
+                  subtitle: _l10n.dataSaverSubtitle,
                   value: notifier.dataSaverMode,
                   onChanged: notifier.setDataSaverMode,
                 ),
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Notifications'),
+              _buildSectionHeader(_l10n.sectionNotifications),
               _buildSettingsCard([
                 _buildSwitchTile(
                   icon: Icons.notifications_outlined,
-                  title: 'Push Notifications',
-                  subtitle: 'Receive notifications for new content',
+                  title: _l10n.pushNotificationsTitle,
+                  subtitle: _l10n.pushNotificationsSubtitle,
                   value: _notificationsEnabled,
                   onChanged: (value) async {
                     final previous = _notificationsEnabled;
@@ -245,10 +330,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (!context.mounted) return;
                       setState(() => _notificationsEnabled = previous);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Could not reach notification server — try again',
-                          ),
+                        SnackBar(
+                          content: Text(_l10n.pushServerFailSnack),
                         ),
                       );
                     }
@@ -258,8 +341,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildDivider(),
                   _buildSwitchTile(
                     icon: Icons.article_outlined,
-                    title: 'New Articles',
-                    subtitle: 'Notify when new articles are available',
+                    title: _l10n.newArticlesTitle,
+                    subtitle: _l10n.newArticlesSubtitle,
                     value: _newArticleNotifs,
                     onChanged: (value) async {
                       setState(() => _newArticleNotifs = value);
@@ -275,11 +358,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                     indented: true,
                   ),
+                  if (_newArticleNotifs) ...[
+                    _buildDivider(),
+                    _buildActionTile(
+                      icon: Icons.filter_list_rounded,
+                      title: _l10n.alertCategoriesTitle,
+                      subtitle: _categorySubtitle(),
+                      onTap: _editNotificationCategories,
+                    ),
+                  ],
                   _buildDivider(),
                   _buildSwitchTile(
                     icon: Icons.notifications_active_outlined,
-                    title: 'In-App Notifications',
-                    subtitle: 'Show notification banners inside the app',
+                    title: _l10n.inAppNotifsTitle,
+                    subtitle: _l10n.inAppNotifsSubtitle,
                     value: _inAppNotifsEnabled,
                     onChanged: (value) async {
                       setState(() => _inAppNotifsEnabled = value);
@@ -293,14 +385,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Feed Settings'),
+              _buildSectionHeader(_l10n.sectionFeedSettings),
               _buildSettingsCard([
                 _buildSwitchTile(
                   icon: Icons.refresh_outlined,
-                  title: 'Auto Refresh',
-                  subtitle: 'Automatically refresh feeds in background',
+                  title: _l10n.autoRefreshTitle,
+                  subtitle: _l10n.autoRefreshSubtitle,
                   value: notifier.autoRefresh,
-                  onChanged: notifier.setAutoRefresh,
+                  onChanged: (value) async {
+                    await notifier.setAutoRefresh(value);
+                    unawaited(scheduleBackgroundSync(_settingsService));
+                  },
                 ),
                 if (notifier.autoRefresh) ...[
                   _buildDivider(),
@@ -310,12 +405,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Sources'),
+              _buildSectionHeader(_l10n.sectionSources),
               _buildSettingsCard([
                 _buildActionTile(
                   icon: Icons.rss_feed_outlined,
-                  title: 'Manage sources',
-                  subtitle: 'Subscribe, browse, and unsubscribe',
+                  title: _l10n.manageSourcesTitle,
+                  subtitle: _l10n.manageSourcesSubtitle,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -325,56 +420,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Reading'),
+              _buildSectionHeader(_l10n.sectionReading),
               _buildSettingsCard([
                 _buildReaderPrefsRow(),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.text_fields_outlined,
-                  title: 'Body font',
+                  title: _l10n.bodyFontTitle,
                   value: bodyFont == 'lora' ? 'Lora' : 'DM Sans',
                 ),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.format_line_spacing_outlined,
-                  title: 'Line height',
+                  title: _l10n.lineHeightTitle,
                   value: lineHeight,
                 ),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.format_size_outlined,
-                  title: 'Font size',
+                  title: _l10n.fontSizeTitle,
                   value: fontSizePt,
                 ),
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Edition'),
+              _buildSectionHeader(_l10n.sectionEdition),
               _buildSettingsCard([_buildEditionRow(edition)]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Storage & Data'),
+              _buildSectionHeader(_l10n.sectionStorage),
               _buildSettingsCard([
                 _buildInfoTile(
                   icon: Icons.cached_outlined,
-                  title: 'Cached Articles',
+                  title: _l10n.cachedArticlesTitle,
                   value: '$cachedArticles articles',
                 ),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.bookmark_outline_rounded,
-                  title: 'Saved Articles',
+                  title: _l10n.savedArticlesCountTitle,
                   value: '$savedArticles articles',
                 ),
                 _buildDivider(),
                 _buildActionTile(
                   icon: Icons.delete_outline_rounded,
-                  title: 'Clear Cache',
-                  subtitle: 'Remove all cached data',
+                  title: _l10n.clearCacheTitle,
+                  subtitle: _l10n.clearCacheSubtitle,
                   iconColor: colorScheme.error,
                   onTap: _clearCache,
                 ),
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('About'),
+              _buildSectionHeader(_l10n.sectionAbout),
               _buildSettingsCard([
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(
@@ -385,7 +480,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(
                         AppCardStyles.badgeRadius,
                       ),
@@ -393,11 +488,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Icon(
                       Icons.info_outline_rounded,
                       size: 20,
-                      color: colorScheme.onPrimaryContainer,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                   title: Text(
-                    'App Version',
+                    _l10n.appVersionTitle,
                     style: GoogleFonts.dmSans(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -410,7 +505,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'v${snapshot.data ?? '...'}',
                       style: GoogleFonts.dmSans(
                         fontSize: 14,
-                        color: colorScheme.primary,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -418,8 +513,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildDivider(),
                 _buildActionTile(
                   icon: Icons.code_outlined,
-                  title: 'Open Source Licenses',
-                  subtitle: 'View third-party licenses',
+                  title: _l10n.openSourceLicensesTitle,
+                  subtitle: _l10n.openSourceLicensesSubtitle,
                   onTap: () async {
                     final version = await AppConfig.getVersion();
                     if (context.mounted) {
@@ -433,14 +528,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ]),
               const SizedBox(height: 24),
-              _buildSectionHeader('Support'),
+              _buildSectionHeader(_l10n.sectionSupport),
               _buildSettingsCard([
                 _buildActionTile(
                   icon: Icons.workspace_premium_outlined,
-                  title: isPro ? 'Pro' : 'Support the app',
+                  title: isPro ? _l10n.proBadge : _l10n.supportAppTitle,
                   subtitle: isPro
-                      ? 'Thanks for your support!'
-                      : 'One-time purchase, yours forever',
+                      ? _l10n.thanksSupportSubtitle
+                      : _l10n.supportOneTimeSubtitle,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const PaywallScreen()),
@@ -450,7 +545,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildDivider(),
                 _buildActionTile(
                   icon: Icons.bug_report_outlined,
-                  title: 'Report bug / Feedback',
+                  title: _l10n.reportBugTitle,
                   subtitle: AppConfig.supportEmail,
                   onTap: () async {
                     final uri = Uri(
@@ -468,8 +563,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Email address copied to clipboard'),
+                        SnackBar(
+                          content: Text(_l10n.emailCopiedSnack),
                         ),
                       );
                     }
@@ -504,21 +599,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.menu_book_outlined,
           size: 20,
-          color: AppColors.primary,
+          color: colorScheme.onSurfaceVariant,
         ),
       ),
       title: Text(
-        'Reader preferences',
+        _l10n.readerPrefsTitle,
         style: AppType.titleMedium(color: colorScheme.onSurface),
       ),
       subtitle: Text(
-        'Tune in the article reader, any time',
+        _l10n.readerPrefsSubtitle,
         style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
       ),
       trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
@@ -551,23 +646,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
         child: Text(
           edition.toString().padLeft(2, '0').substring(0, 2),
           textAlign: TextAlign.center,
           style: AppType.folioTop(
-            color: AppColors.primary,
+            color: colorScheme.onSurface,
           ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       title: Text(
-        'Edition Nº ${edition.toString().padLeft(4, '0')}',
+        _l10n.editionNumberLabel(edition.toString().padLeft(4, '0')),
         style: AppType.titleMedium(color: colorScheme.onSurface),
       ),
       subtitle: Text(
-        'Bumps on every refresh.',
+        _l10n.editionBumpsHint,
         style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
       ),
     );
@@ -580,7 +675,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withAlpha(77),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.primary.withAlpha(26)),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -596,7 +691,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       result.add(tiles[i]);
       if (i < tiles.length - 1) {
         result.add(
-          Divider(height: 1, indent: 72, color: colorScheme.primaryContainer),
+          Divider(height: 1, indent: 72, color: colorScheme.outline),
         );
       }
     }
@@ -608,7 +703,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Divider(
       height: 1,
       indent: 72,
-      color: colorScheme.primary.withAlpha(26),
+      color: colorScheme.outline,
     );
   }
 
@@ -628,10 +723,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
-        child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
+        child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
       ),
       title: Text(
         title,
@@ -672,10 +767,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
-        child: Icon(icon, size: 20, color: colorScheme.onPrimaryContainer),
+        child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
       ),
       title: Text(
         title,
@@ -687,7 +782,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Text(
         value,
-        style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.primary),
+        style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -710,13 +805,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: iconColor != null
               ? iconColor.withAlpha(38)
-              : colorScheme.primaryContainer,
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: iconColor ?? colorScheme.onPrimaryContainer,
+          color: iconColor ?? colorScheme.onSurfaceVariant,
         ),
       ),
       title: Text(
@@ -762,14 +857,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: ground,
               borderRadius: BorderRadius.circular(AppRadius.button),
               border: Border.all(
-                color: selected ? colorScheme.primary : AppColors.rule,
+                color: selected ? colorScheme.primary : colorScheme.outline,
                 width: selected ? 2 : 1,
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppType.folioTop(color: AppColors.primary)),
+                Text(label, style: AppType.folioTop(color: ink)),
                 const SizedBox(height: AppSpacing.s2),
                 Row(
                   children: [
@@ -814,27 +909,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               top: AppSpacing.s2,
               bottom: AppSpacing.s3,
             ),
-            child: Text('Theme', style: AppType.titleMedium()),
+            child: Text(_l10n.themeRowLabel, style: AppType.titleMedium()),
           ),
           Row(
             children: [
               tile(
                 mode: ThemeMode.light,
-                label: 'PAPER',
+                label: _l10n.roomPaperLabel,
                 ground: AppColors.paperRaised,
                 ink: AppColors.ink,
               ),
               const SizedBox(width: AppSpacing.s2),
               tile(
                 mode: ThemeMode.dark,
-                label: 'LAMPLIGHT',
+                label: _l10n.roomLamplightLabel,
                 ground: AppColors.ground,
                 ink: AppColors.paperOnGround,
               ),
               const SizedBox(width: AppSpacing.s2),
               tile(
                 mode: ThemeMode.system,
-                label: 'AUTO',
+                label: _l10n.themeAutoLabel,
                 ground: colorScheme.surfaceContainerHighest,
                 ink: colorScheme.onSurface,
               ),
@@ -854,17 +949,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
         ),
         child: Icon(
           Icons.format_list_numbered,
           size: 20,
-          color: colorScheme.onPrimaryContainer,
+          color: colorScheme.onSurfaceVariant,
         ),
       ),
       title: Text(
-        'Max Articles',
+        _l10n.maxArticlesLabel,
         style: GoogleFonts.dmSans(
           fontSize: 16,
           fontWeight: FontWeight.w500,
@@ -877,7 +972,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : 500,
         dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
-        icon: Icon(Icons.expand_more, color: colorScheme.primary),
+        icon: Icon(Icons.expand_more, color: colorScheme.onSurfaceVariant),
         items: [100, 250, 500, 1000, 2000].map((max) {
           return DropdownMenuItem(
             value: max,
@@ -917,6 +1012,8 @@ class _SettingsReaderSheet extends StatefulWidget {
 }
 
 class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   late double _fontSize = widget.initial.fontSize;
   late double _lineHeight = widget.initial.lineHeight;
   late String _bodyFont = widget.initial.bodyFont;
@@ -926,19 +1023,13 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ground = isDark ? AppColors.groundElev : AppColors.paperRaised;
     final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
     return Container(
       decoration: BoxDecoration(
         color: ground,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.sheetTop),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.10),
-            blurRadius: 32,
-            offset: const Offset(0, -16),
-          ),
-        ],
       ),
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s6,
@@ -955,16 +1046,16 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.rule,
+                color: ruleColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.s4),
-          Text('Reader preferences', style: AppType.titleLarge(color: ink)),
+          Text(_l10n.readerPrefsTitle, style: AppType.titleLarge(color: ink)),
           const SizedBox(height: AppSpacing.s5),
           _SliderRow(
-            label: 'FONT SIZE',
+            label: _l10n.fontSizeLabel,
             value: _fontSize,
             min: 14,
             max: 22,
@@ -976,7 +1067,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
           ),
           const SizedBox(height: AppSpacing.s4),
           _SliderRow(
-            label: 'LINE HEIGHT',
+            label: _l10n.lineHeightLabel,
             value: _lineHeight,
             min: 1.4,
             max: 1.8,
@@ -1002,9 +1093,9 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
           const SizedBox(height: AppSpacing.s2),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.paperRaised,
+              color: isDark ? AppColors.ground : AppColors.paperRaised,
               borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: AppColors.rule),
+              border: Border.all(color: ruleColor),
             ),
             padding: const EdgeInsets.all(4),
             child: Row(
@@ -1137,10 +1228,155 @@ class _FontSegment extends StatelessWidget {
           child: Text(
             label,
             style: AppType.monoEyebrow(
-              color: selected ? AppColors.primary : AppColors.inkSoft,
+              color: selected
+                  ? AppColors.primary
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.paperOnGroundSoft
+                      : AppColors.inkSoft),
             ).copyWith(letterSpacing: 0.6),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Account section — sign-in entry point when signed out; avatar, name,
+/// email and sign-out when signed in. Listens to authStateChanges so it
+/// updates the moment sign-in/out completes anywhere in the app.
+class _AccountCard extends StatefulWidget {
+  const _AccountCard();
+
+  @override
+  State<_AccountCard> createState() => _AccountCardState();
+}
+
+class _AccountCardState extends State<_AccountCard> {
+  StreamSubscription<User?>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    if (getIt.isRegistered<AuthService>()) {
+      _sub = getIt<AuthService>().authStateChanges.listen((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_sub?.cancel());
+    super.dispose();
+  }
+
+  Future<void> _openLogin() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.signOutTitle),
+        content: Text(l10n.signOutBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.dialogCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.signOutConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await getIt<AuthService>().signOut();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasAuth = getIt.isRegistered<AuthService>();
+    final user = hasAuth ? getIt<AuthService>().currentUser : null;
+
+    final tile = user == null
+        ? ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.chip),
+              ),
+              child: Icon(
+                Icons.person_outline,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            title: Text(
+              l10n.loginTitle,
+              style: AppType.titleMedium(color: colorScheme.onSurface),
+            ),
+            subtitle: Text(
+              l10n.accountSignedOutSubtitle,
+              style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
+            ),
+            trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+            onTap: hasAuth ? _openLogin : null,
+          )
+        : ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: CircleAvatar(
+              radius: 20,
+              backgroundImage:
+                  (user.photoURL != null && user.photoURL!.isNotEmpty)
+                      ? NetworkImage(user.photoURL!)
+                      : null,
+              child: (user.photoURL == null || user.photoURL!.isEmpty)
+                  ? Text(
+                      (user.displayName?.isNotEmpty ?? false)
+                          ? user.displayName![0].toUpperCase()
+                          : '?',
+                      style: AppType.titleMedium(color: colorScheme.onSurface),
+                    )
+                  : null,
+            ),
+            title: Text(
+              user.displayName?.isNotEmpty ?? false
+                  ? user.displayName!
+                  : (user.email ?? ''),
+              style: AppType.titleMedium(color: colorScheme.onSurface),
+            ),
+            subtitle: Text(
+              user.email ?? '',
+              style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
+            ),
+            trailing: TextButton(
+              onPressed: _confirmSignOut,
+              child: Text(l10n.accountSignOut),
+            ),
+          );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withAlpha(77),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [tile],
       ),
     );
   }

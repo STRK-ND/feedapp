@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/version_provider.dart';
+import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import 'notification_service.dart';
 
@@ -24,9 +25,10 @@ import 'notification_service.dart';
 /// Manifest update only adds new code; existing public surface is
 /// stable. `checkForUpdates` and `ignoreVersion` are unchanged.
 class UpdateService {
-  // GitHub repository URL for OTA update metadata
+  // GitHub repository URL for OTA update metadata. Overridable at build
+  // time (--dart-define=UPDATES_REPO=owner/name) so forks don't edit source.
   static const String githubApiUrl =
-      'https://api.github.com/repos/STRK-ND/feedapp/releases/latest';
+      'https://api.github.com/repos/${String.fromEnvironment('UPDATES_REPO', defaultValue: 'STRK-ND/feedapp')}/releases/latest';
 
   // Android MIME type for an APK file. Used when opening the cached
   // APK with the system installer intent.
@@ -110,7 +112,7 @@ class UpdateService {
     }
   }
 
-  /// Demo of file write — always available in this codebase.
+  /// Extract the .apk asset URL from a GitHub release payload.
   static String _getApkDownloadUrl(Map<String, dynamic> releaseData) {
     final assets = releaseData['assets'] as List<dynamic>?;
     if (assets != null && assets.isNotEmpty) {
@@ -148,38 +150,89 @@ class UpdateService {
   /// dialog) on network/IO failure so the caller can fall back to
   /// `openDownloadUrl`.
   ///
-  /// Streamed via `http.get`, written via `dart:io` `File.writeAsBytes`
-  /// (APKs are <30 MB so we keep it simple — no `flutter_downloader`).
-  /// `client` is optional and injectable for tests, mirroring
-  /// [checkForUpdates].
+  /// Streams via `http.Client().send` straight to disk — the whole APK is
+  /// never held in memory — and aborts as soon as [AppConfig.maxApkDownloadSizeMB]
+  /// is exceeded (the cap was previously declared but never checked, and a
+  /// `bodyBytes` download would OOM long before disk ran out). `onProgress`
+  /// receives 0.0–1.0 when content-length is known; null otherwise means
+  /// indeterminate. `client` is optional and injectable for tests,
+  /// mirroring [checkForUpdates].
   static Future<UpdateDownloadHandle> downloadApk({
     required String url,
     required String version,
     http.Client? client,
+    void Function(double? progress)? onProgress,
   }) async {
-    http.Client? ownedClient;
+    final owned = client ?? http.Client();
+    File? file;
     try {
-      final response = await (client ?? (ownedClient = http.Client()))
-          .get(Uri.parse(url))
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await owned
+          .send(request)
           .timeout(const Duration(minutes: 4));
+
       if (response.statusCode != 200) {
         throw HttpException(
           'Download failed: ${response.statusCode}',
           uri: Uri.parse(url),
         );
       }
-      final bytes = response.bodyBytes;
+
+      final expectedBytes = response.contentLength;
+      const maxBytes = AppConfig.maxApkDownloadSizeMB * 1024 * 1024;
+      if (expectedBytes != null && expectedBytes > maxBytes) {
+        throw HttpException(
+          'Download too large: $expectedBytes bytes',
+          uri: Uri.parse(url),
+        );
+      }
+
       final dir = await getTemporaryDirectory();
       final safeVersion = version.replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_');
-      final file = File('${dir.path}/curatedfeeds-$safeVersion.apk');
-      await file.writeAsBytes(bytes, flush: true);
+      // Write to a .part file first so an interrupted download can't be
+      // mistaken for a complete installable APK.
+      file = File('${dir.path}/curatedfeeds-$safeVersion.apk.part');
+
+      final sink = file.openWrite();
+      var received = 0;
+      try {
+        await for (final chunk in response.stream) {
+          received += chunk.length;
+          if (received > maxBytes) {
+            throw HttpException(
+              'Download exceeded ${AppConfig.maxApkDownloadSizeMB}MB limit',
+              uri: Uri.parse(url),
+            );
+          }
+          sink.add(chunk);
+          if (onProgress != null) {
+            onProgress(
+              expectedBytes != null && expectedBytes > 0
+                  ? (received / expectedBytes).clamp(0.0, 1.0)
+                  : null,
+            );
+          }
+        }
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
+
+      final complete = File(file.path.replaceAll(RegExp(r'\.part$'), ''));
+      await file.rename(complete.path);
       return UpdateDownloadHandle(
-        file: file,
+        file: complete,
         version: version,
-        sizeBytes: bytes.length,
+        sizeBytes: received,
       );
     } finally {
-      ownedClient?.close();
+      // Never leave a partial file behind on failure.
+      if (file != null && await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+      if (client == null) owned.close();
     }
   }
 

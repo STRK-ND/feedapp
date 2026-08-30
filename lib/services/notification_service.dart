@@ -63,6 +63,8 @@ class NotificationService {
       final settingsService = getIt<SettingsService>();
       final newArticlesEnabled = await settingsService
           .getNewArticleNotifications();
+      // [] = unrestricted (all categories) — the worker narrows per token.
+      final categories = await settingsService.getNotificationCategories();
 
       final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
       final headers = _workerHeaders();
@@ -73,7 +75,12 @@ class NotificationService {
             body: jsonEncode({
               'token': token,
               'topic': 'new-articles',
-              'preferences': {'newArticles': newArticlesEnabled},
+              'preferences': {
+                'newArticles': newArticlesEnabled,
+                if (categories.length <
+                    AppConfig.categories.length - 1)
+                  'categories': categories,
+              },
             }),
           )
           .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
@@ -333,6 +340,14 @@ class NotificationService {
     _updateTapHandler = h;
   }
 
+  /// Tap-handler for "new articles" FCM pushes. The UI layer registers
+  /// a callback that navigates to the feed tab; without it, tapping the
+  /// push only logs (the previous behavior).
+  void Function(Map<String, dynamic> data)? _newArticleTapHandler;
+  void setNewArticleTapHandler(void Function(Map<String, dynamic> data)? h) {
+    _newArticleTapHandler = h;
+  }
+
   /// Called from cold-start / background-tap callback when the local
   /// notification plugin hand the tap to us. Pulls the cached JSON
   /// out of SharedPreferences so a cold-start launch (the plugin
@@ -423,6 +438,16 @@ class NotificationService {
   /// Handle notification tap from terminated/background
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('[Notification] Tapped from: ${message.from}');
+
+    // Route "new articles" pushes into the app: the registered handler
+    // (MainNavigation) switches to the feed tab. Data-only or notification
+    // messages without our type marker still route — any tap on a push we
+    // sent means "show me what's new".
+    final data = <String, dynamic>{...message.data};
+    if (message.notification?.title != null) {
+      data['title'] ??= message.notification!.title;
+    }
+    _newArticleTapHandler?.call(data);
   }
 
   /// Show in-app notification banner
@@ -444,18 +469,6 @@ class NotificationService {
       payload: data?.toString(),
       type: notificationType,
     );
-  }
-
-  /// Subscribe to topic (for category-based notifications)
-  Future<void> subscribeToTopic(String topic) async {
-    await _firebaseMessaging.subscribeToTopic(topic);
-    debugPrint('[Notification] Subscribed to topic: $topic');
-  }
-
-  /// Unsubscribe from topic
-  Future<void> unsubscribeFromTopic(String topic) async {
-    await _firebaseMessaging.unsubscribeFromTopic(topic);
-    debugPrint('[Notification] Unsubscribed from topic: $topic');
   }
 
   /// Get FCM token

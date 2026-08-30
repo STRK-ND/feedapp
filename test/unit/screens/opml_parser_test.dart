@@ -1,44 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:curatedfeeds/services/rss_feed_service.dart';
-import 'package:xml/xml.dart';
+import 'package:curatedfeeds/utils/opml.dart';
 
-// Mirror of _parseOpmlUrls in sources_screen.dart — kept testable.
-// Faithful to the screen: XmlDocument.parse first, then a regex
-// fallback for slightly malformed OPML. If the screen's parser
-// changes, this mirror drifts and these tests start failing.
-Set<String> parseOpmlUrls(String opmlText) {
-  final urls = <String>{};
-  try {
-    final doc = XmlDocument.parse(opmlText);
-    for (final outline in doc.findAllElements('outline')) {
-      final xmlUrl = outline.getAttribute('xmlUrl');
-      if (xmlUrl != null && xmlUrl.isNotEmpty) {
-        urls.add(xmlUrl);
-        continue;
-      }
-      final htmlUrl = outline.getAttribute('htmlUrl');
-      if (htmlUrl != null && htmlUrl.isNotEmpty) {
-        urls.add(htmlUrl);
-      }
-    }
-  } catch (e) {
-    // Fallback regex for slightly malformed OPML — grabs xmlUrl attributes.
-    final xmlUrlRe = RegExp(r'xmlUrl="([^"]+)"');
-    for (final m in xmlUrlRe.allMatches(opmlText)) {
-      urls.add(m.group(1)!);
-    }
-  }
-  return urls;
-}
+// Tests exercise the real lib/utils/opml.dart implementation — no mirror.
+// parseOpmlUrls / matchCanonicalSources / buildOpmlDocument are public.
 
-// Mirror of the screen's match step: subscribe to every canonical source
-// whose url appears in the parsed OPML. Unknown URLs are skipped.
-Set<String> matchSubscriptions(Set<String> urls) {
-  return RssFeedService.predefinedSources
-      .where((s) => urls.contains(s.url))
-      .map((s) => s.id)
-      .toSet();
-}
+/// The registry's bundled seed list (worker list not fetched in unit tests).
+final registrySources = RssFeedService().sources;
 
 void main() {
   group('OPML parsing', () {
@@ -96,7 +64,7 @@ void main() {
     test('canonical sources include known URLs that OPML would target', () {
       // Make sure at least some of the canonical URLs match what users
       // would import from a typical OPML file (Verge, BBC, Ars).
-      final canonicalUrls = RssFeedService.predefinedSources
+      final canonicalUrls = registrySources
           .map((s) => s.url)
           .toList();
       expect(
@@ -119,7 +87,10 @@ void main() {
         </body>
       </opml>
       ''';
-      final subs = matchSubscriptions(parseOpmlUrls(opml));
+      final subs = matchCanonicalSources(
+        parseOpmlUrls(opml),
+        registrySources,
+      );
       expect(subs, {'verge'});
     });
 
@@ -133,7 +104,10 @@ void main() {
       ''';
       final urls = parseOpmlUrls(opml);
       expect(urls, {'https://example.com/feed.xml'});
-      expect(matchSubscriptions(urls), isEmpty);
+      expect(
+        matchCanonicalSources(urls, registrySources),
+        isEmpty,
+      );
     });
 
     test('mixed OPML subscribes only the matching subset', () {
@@ -146,15 +120,58 @@ void main() {
         </body>
       </opml>
       ''';
-      final subs = matchSubscriptions(parseOpmlUrls(opml));
+      final subs = matchCanonicalSources(
+        parseOpmlUrls(opml),
+        registrySources,
+      );
       expect(subs, {'wired', 'nasa'});
     });
 
     test('malformed OPML with a matching url still subscribes via regex', () {
       const opml =
           '<opml><body><outline xmlUrl="https://feeds.bbci.co.uk/news/rss.xml">';
-      final subs = matchSubscriptions(parseOpmlUrls(opml));
+      final subs = matchCanonicalSources(
+        parseOpmlUrls(opml),
+        registrySources,
+      );
       expect(subs, {'bbc'});
+    });
+  });
+
+  group('OPML export', () {
+    test('built document round-trips back into subscriptions', () {
+      final sources = registrySources
+          .where((s) => {'verge', 'bbc'}.contains(s.id))
+          .toList();
+
+      final xml = buildOpmlDocument(sources);
+      final urls = parseOpmlUrls(xml);
+      final subs = matchCanonicalSources(
+        urls,
+        registrySources,
+      );
+
+      expect(subs, {'verge', 'bbc'});
+    });
+
+    test('document carries name, type=rss and category per source', () {
+      final verge = registrySources.firstWhere(
+        (s) => s.id == 'verge',
+      );
+      final xml = buildOpmlDocument([verge]);
+
+      expect(xml, contains('<opml version="2.0">'));
+      expect(xml, contains('text="${verge.name}"'));
+      expect(xml, contains('type="rss"'));
+      expect(xml, contains('xmlUrl="${verge.url}"'));
+      expect(xml, contains('category="${verge.category}"'));
+    });
+
+    test('empty source list still yields a valid empty body', () {
+      final xml = buildOpmlDocument([]);
+      expect(parseOpmlUrls(xml), isEmpty);
+      // XmlBuilder self-closes an empty element: <body/>
+      expect(xml, contains('<body'));
     });
   });
 }

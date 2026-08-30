@@ -8,8 +8,11 @@
 /// `older` sections compress the gap and use a smaller headline.
 library;
 
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
@@ -47,7 +50,10 @@ class ListArticleCard extends StatelessWidget {
           '${article.title}. From ${article.sourceName}. ${article.isSaved ? 'Saved. ' : ''}Tap to read.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTap: () {
+          unawaited(HapticFeedback.selectionClick());
+          onTap();
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.s6,

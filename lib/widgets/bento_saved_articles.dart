@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../providers/settings_notifier.dart';
 import '../utils/design_tokens.dart';
 import 'section_eyebrow.dart';
@@ -142,13 +143,13 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
             ),
             const SizedBox(height: AppSpacing.s5),
             Text(
-              'Nothing saved yet.',
+              AppLocalizations.of(context).savedEmptyTitle,
               style: AppType.headlineSmall(color: ink),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.s3),
             Text(
-              'Swipe right on the feed to keep\narticles for later.',
+              AppLocalizations.of(context).savedEmptyHint,
               style: AppType.bodyLarge(color: soft),
               textAlign: TextAlign.center,
             ),

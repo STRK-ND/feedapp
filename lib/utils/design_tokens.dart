@@ -46,31 +46,42 @@ class AppMotion {
   static const Curve springOut = Cubic(0.34, 1.56, 0.64, 1);
 }
 
-/// Color tokens. Light / Dark ground colors kept from the existing palette;
-/// the deeper dark ground `#0E0814` replaces `#190F23` to push the editorial
-/// mood further.
+/// Color tokens. Dark-first reskin: dark is the hero surface, light is a
+/// matched-but-secondary path. Amber (`curation`) is the UNREAD-ATTENTION
+/// color only — never a neutral UI accent for chips, app-bar text, nav
+/// fill, or buttons. That single rule is what keeps the app off the
+/// generic "cream-paper + serif + terracotta" default. See the reskin
+/// plan for the reasoning.
+/// ponytail: two static Color painted numbers (light/dark pairs) per token
+/// instead of a runtime palette generator — the ground values never
+/// branch on content, so a flat list is enough and shadows nothing a
+/// generator would compute.
 class AppColors {
   AppColors._();
 
-  // Amber primary — kept
-  static const Color primary = Color(0xFFC4944E);
-  static const Color primaryDeep = Color(0xFFA0773A);
+  /// Amber — attention color only. `primary` is kept as an alias so the
+  /// many existing `AppColors.primary` call sites compile, but new code
+  /// should read `AppColors.curation` to self-document intent.
+  static const Color curation = Color(0xFFC4944E);
+  static const Color edition = Color(0xFFA0773A); // dimmed amber, edges
+  static const Color primary = curation;
+  static const Color primaryDeep = edition;
 
-  // Light mode — paper aesthetic
-  static const Color paper = Color(0xFFF7F5F8);
+  // Light mode — paper aesthetic (secondary path)
+  static const Color paper = Color(0xFFF4F1F8);
   static const Color paperRaised = Color(0xFFFFFFFF);
-  static const Color ink = Color(0xFF1A1B2E);
-  static const Color inkSoft = Color(0xFF6B7280);
-  static const Color inkFaint = Color(0xFF9CA3AF);
+  static const Color ink = Color(0xFF15131C);
+  static const Color inkSoft = Color(0xFF6B6877);
+  static const Color inkFaint = Color(0xFF9A97A6);
   static const Color rule = Color(0xFFE5E7EB);
 
-  // Dark mode — editorial near-black
+  // Dark mode — editorial near-black (hero surface)
   static const Color ground = Color(0xFF0E0814);
   static const Color groundElev = Color(0xFF1A1423);
   static const Color groundDeep = Color(0xFF050308);
   static const Color paperOnGround = Color(0xFFF8F7F4);
-  static const Color paperOnGroundSoft = Color(0xFFB5B0A8);
-  static const Color paperOnGroundFaint = Color(0xFF6F6A64);
+  static const Color paperOnGroundSoft = Color(0xFF8A8590);
+  static const Color paperOnGroundFaint = Color(0xFF5E5A66);
   static const Color ruleOnGround = Color(0xFF27212E);
 
   // Sepia reader theme — paperback
@@ -95,20 +106,32 @@ class AppType {
   AppType._();
 
   static TextStyle displayLarge({Color? color}) => GoogleFonts.playfairDisplay(
-    fontSize: 32,
-    fontWeight: FontWeight.w700,
-    letterSpacing: -0.5,
-    height: 1.15,
+    fontSize: 34,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.6,
+    height: 1.12,
     color: color,
   );
 
   static TextStyle displayMedium({Color? color}) => GoogleFonts.playfairDisplay(
     fontSize: 28,
-    fontWeight: FontWeight.w700,
-    letterSpacing: -0.4,
-    height: 1.2,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.5,
+    height: 1.15,
     color: color,
   );
+
+  /// Italic accent — the one soft moment against the heavy dark. Use for
+  /// the Folio weekday and section-eyebrow alternates. Sparingly.
+  static TextStyle displayItalic({Color? color, double fontSize = 22}) =>
+      GoogleFonts.playfairDisplay(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w600,
+        fontStyle: FontStyle.italic,
+        letterSpacing: -0.2,
+        height: 1.2,
+        color: color,
+      );
 
   static TextStyle headlineSmall({Color? color}) => GoogleFonts.playfairDisplay(
     fontSize: 22,
@@ -163,11 +186,13 @@ class AppType {
     color: color,
   );
 
-  /// Numeric dateline — date / time / counts.
+  /// Numeric dateline — date / time / counts. Tabular figures so
+  /// `08.17 · 14:03` columns stay aligned across rows.
   static TextStyle monoDateline({Color? color}) => GoogleFonts.jetBrainsMono(
     fontSize: 12,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     letterSpacing: 0.05,
+    fontFeatures: const [FontFeature.tabularFigures()],
     color: color,
   );
 

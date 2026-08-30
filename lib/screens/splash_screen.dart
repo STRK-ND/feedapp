@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart' show AppColors;
 import '../widgets/folio_rule.dart';
@@ -13,6 +14,8 @@ import 'onboarding_screen.dart';
 import '../repositories/article_repository.dart';
 import '../services/settings_service.dart';
 import '../services/notification_service.dart';
+import '../services/background_sync_service.dart';
+import '../services/rss_feed_service.dart';
 import '../services/analytics_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,6 +27,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   // Three beat intro: draw (600ms) → reveal (300ms) → subtitle (200ms).
   // Total ~1.4s. Init code runs in parallel underneath — the animation
   // is never a loader.
@@ -96,6 +100,11 @@ class _SplashScreenState extends State<SplashScreen>
       final articleRepository = getIt<ArticleRepository>();
       final settingsService = getIt<SettingsService>();
       await settingsService.init();
+      // Load the cached source registry, then refresh the worker's
+      // canonical GET /sources list in the background.
+      final rssFeedService = getIt<RssFeedService>();
+      await rssFeedService.init();
+      unawaited(rssFeedService.refreshFromWorker());
       // Pre-load articles into repository cache
       await Future.wait([
         articleRepository.fetchSavedArticles(),
@@ -105,6 +114,9 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Hydrate the in-process editorial edition counter from prefs.
       unawaited(FolioRuleBootstrap.hydrate(settingsService));
+
+      // Mirror autoRefresh into an OS-level periodic job (Android).
+      unawaited(scheduleBackgroundSync(settingsService));
     } catch (e) {
       debugPrint('[Splash] Initialization error: $e');
       // Continue to main screen even if init fails — app can still work with cache
@@ -225,7 +237,9 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'EDITION Nº ${EditionState.current.toString().padLeft(4, '0')}',
+                          _l10n.splashEditionLabel(
+                            EditionState.current.toString().padLeft(4, '0'),
+                          ),
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 10,
                             color: colorScheme.onSurfaceVariant.withValues(

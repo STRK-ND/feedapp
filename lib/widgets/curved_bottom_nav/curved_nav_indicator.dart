@@ -1,10 +1,17 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-import '../../utils/constants.dart';
+import '../../utils/constants.dart' hide AppColors;
+import '../../utils/design_tokens.dart';
 
-/// CustomPainter that draws the frosted glass pill background,
-/// the animated curved indicator (with upward dome), and the glow effect.
+/// CustomPainter for the reskinned bottom nav. Out: frosted-glass pill +
+/// amber domed indicator + glow (reads as a glowing bubble). In: a solid
+/// groundElev rail with a hairline top edge, and a small amber dot that
+/// slides under the selected label. The amber appears only at the one
+/// point that means "you are here" — consistent with the rest of the
+/// reskin's "amber = attention only" rule. ponytail: kept the domed-path
+/// math out — a flat dot is all the structure the bar needs, and a 2px
+/// cap dot tracks the tab center exactly.
 class CurvedNavBarPainter extends CustomPainter {
   final bool isDark;
   final double animationProgress; // 0.0–1.0 slide progress
@@ -27,87 +34,41 @@ class CurvedNavBarPainter extends CustomPainter {
     final width = size.width;
     final height = size.height;
 
-    // ── 1. Background pill ────────────────────────────────────────
+    // ── 1. Solid rail fill + hairline top edge ─────────────────────
     final bgRect = Rect.fromLTWH(0, 0, width, height);
     final bgRRect = RRect.fromRectAndRadius(
       bgRect,
       const Radius.circular(CurvedNavTokens.barRadius),
     );
 
-    final bgFillPaint = Paint()
-      ..color =
-          (isDark ? CurvedNavTokens.darkBarFill : CurvedNavTokens.lightBarFill)
-              .withValues(
-                alpha: isDark
-                    ? CurvedNavTokens.darkBarFillAlpha
-                    : CurvedNavTokens.lightBarFillAlpha,
-              );
-    canvas.drawRRect(bgRRect, bgFillPaint);
+    canvas.drawRRect(
+      bgRRect,
+      Paint()
+        ..color = isDark
+            ? AppColors.groundElev
+            : CurvedNavTokens.lightBarFill,
+    );
+    canvas.drawRRect(
+      bgRRect,
+      Paint()
+        ..color = (isDark ? AppColors.ruleOnGround : AppColors.rule)
+            .withValues(alpha: 1)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5,
+    );
 
-    // Border
-    final borderPaint = Paint()
-      ..color =
-          (isDark
-                  ? CurvedNavTokens.darkBarBorder
-                  : CurvedNavTokens.lightBarBorder)
-              .withValues(
-                alpha: isDark
-                    ? CurvedNavTokens.darkBarBorderAlpha
-                    : CurvedNavTokens.lightBarBorderAlpha,
-              )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    canvas.drawRRect(bgRRect, borderPaint);
-
-    // ── 2. Indicator position ─────────────────────────────────────
+    // ── 2. Sliding amber dot — the only amber on the bar ───────────
     final fromX = _interpolateX(previousIndex, tabCenterXs);
     final toX = _interpolateX(targetIndex, tabCenterXs);
     final currentX = fromX + ((toX - fromX) * _easeCurve(animationProgress));
 
-    final indicatorWidth =
-        (width / itemCount) - (CurvedNavTokens.itemPadding * 2);
-    final indicatorHeight =
-        height -
-        CurvedNavTokens.indicatorTopInset -
-        CurvedNavTokens.indicatorBottomInset;
-
-    final indicatorRect = Rect.fromCenter(
-      center: Offset(currentX, height / 2),
-      width: indicatorWidth,
-      height: indicatorHeight,
+    // Dot rides at the top edge of the bar, centered on the active tab.
+    const dotR = 1.75;
+    canvas.drawCircle(
+      Offset(currentX, CurvedNavTokens.indicatorTopInset + dotR),
+      dotR,
+      Paint()..color = AppColors.curation,
     );
-
-    // ── 3. Glow shadow behind indicator ───────────────────────────
-    final glowPaint = Paint()
-      ..color = AppColors.primary.withValues(
-        alpha: isDark
-            ? CurvedNavTokens.darkGlowAlpha
-            : CurvedNavTokens.lightGlowAlpha,
-      )
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        indicatorRect.inflate(4),
-        const Radius.circular(CurvedNavTokens.indicatorCornerRadius),
-      ),
-      glowPaint,
-    );
-
-    // ── 4. Indicator pill with domed top ──────────────────────────
-    final indicatorPath = _buildDomedPath(
-      indicatorRect,
-      domeHeight: CurvedNavTokens.indicatorDomeHeight,
-      cornerRadius: CurvedNavTokens.indicatorCornerRadius,
-    );
-
-    final indicatorPaint = Paint()
-      ..color = AppColors.primary.withValues(
-        alpha: isDark
-            ? CurvedNavTokens.darkIndicatorFillAlpha
-            : CurvedNavTokens.lightIndicatorFillAlpha,
-      );
-    canvas.drawPath(indicatorPath, indicatorPaint);
   }
 
   /// Get center X for a given tab index from the pre-calculated positions
@@ -124,51 +85,6 @@ class CurvedNavBarPainter extends CustomPainter {
   /// Ease-in-out curve for smooth indicator slide
   double _easeCurve(double t) {
     return t < 0.5 ? 4 * t * t * t : 1 - (pow(-2 * t + 2, 3) / 2);
-  }
-
-  /// Builds a custom path: rounded rectangle with a subtle upward
-  /// dome (convex arc) on the top edge.
-  Path _buildDomedPath(
-    Rect rect, {
-    required double domeHeight,
-    required double cornerRadius,
-  }) {
-    final path = Path();
-    final w = rect.width;
-    final h = rect.height;
-    final left = rect.left;
-    final top = rect.top;
-    final r = cornerRadius;
-    final dome = domeHeight;
-
-    // Start at top-left, just before the dome begins
-    path.moveTo(left + r, top + dome);
-
-    // Top edge: quadratic bezier dome (center rises above the flat top)
-    path.quadraticBezierTo(
-      left + w / 2,
-      top - dome * 0.5,
-      left + w - r,
-      top + dome,
-    );
-
-    // Right edge down to bottom-right corner
-    path.lineTo(left + w - r, top + h - r);
-
-    // Bottom-right rounded corner
-    path.quadraticBezierTo(left + w, top + h, left + w, top + h);
-
-    // Bottom edge
-    path.lineTo(left + r, top + h);
-
-    // Bottom-left rounded corner
-    path.quadraticBezierTo(left, top + h, left, top + h - r);
-
-    // Left edge back up to dome start
-    path.lineTo(left + r, top + dome);
-
-    path.close();
-    return path;
   }
 
   @override

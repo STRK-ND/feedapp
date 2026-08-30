@@ -85,6 +85,7 @@ class _ThemeSwatches extends StatelessWidget {
     Widget swatch(ReaderTheme t, Color c) {
       final selected = current == t;
       final locked = isReaderThemeLocked(t, isPro);
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Semantics(
         button: true,
         label: locked
@@ -107,7 +108,9 @@ class _ThemeSwatches extends StatelessWidget {
                   border: Border.all(
                     color: selected
                         ? AppColors.primary
-                        : AppColors.rule.withValues(alpha: 0.6),
+                        : (isDark
+                            ? AppColors.paperOnGroundFaint
+                            : AppColors.rule).withValues(alpha: 0.6),
                     width: selected ? 2.5 : 1,
                   ),
                 ),
@@ -182,7 +185,7 @@ class _AaButton extends StatelessWidget {
               child: Text(
                 'Aa',
                 style: AppType.titleLarge(
-                  color: AppColors.primary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
               ),
             ),
@@ -247,25 +250,17 @@ class _AaPanelState extends State<_AaPanel> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final groundColor = brightness == Brightness.dark
-        ? AppColors.groundElev
-        : AppColors.paperRaised;
-    final ink = brightness == Brightness.dark
-        ? AppColors.paperOnGround
-        : AppColors.ink;
+    final isDark = brightness == Brightness.dark;
+    final groundColor = isDark ? AppColors.groundElev : AppColors.paperRaised;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
     return Container(
       decoration: BoxDecoration(
         color: groundColor,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.sheetTop),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.10),
-            blurRadius: 32,
-            offset: const Offset(0, -16),
-          ),
-        ],
       ),
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s6,
@@ -282,7 +277,7 @@ class _AaPanelState extends State<_AaPanel> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.rule,
+                color: ruleColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -290,28 +285,25 @@ class _AaPanelState extends State<_AaPanel> {
           const SizedBox(height: AppSpacing.s4),
           Text('Type & spacing', style: AppType.titleLarge(color: ink)),
           const SizedBox(height: AppSpacing.s5),
-          // Live preview
+          // Live preview — mode-matched inset, not a white island on dark.
           Container(
             padding: const EdgeInsets.all(AppSpacing.s4),
             decoration: BoxDecoration(
-              color: AppColors.paperRaised,
+              color: isDark ? AppColors.ground : AppColors.paperRaised,
               borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: AppColors.rule),
+              border: Border.all(color: ruleColor),
             ),
             child: Text(
               'A river of words at the\nsize you prefer.',
               style: AppType.displayMedium(
-                color: AppColors.ink,
+                color: ink,
               ).copyWith(fontSize: _fontSize, height: _lineHeight),
             ),
           ),
           const SizedBox(height: AppSpacing.s5),
           Row(
             children: [
-              Text(
-                'FONT SIZE',
-                style: AppType.monoEyebrow(color: AppColors.inkSoft),
-              ),
+              Text('FONT SIZE', style: AppType.monoEyebrow(color: soft)),
               const Spacer(),
               Text(
                 '${_fontSize.round()} PT',
@@ -335,10 +327,7 @@ class _AaPanelState extends State<_AaPanel> {
           const SizedBox(height: AppSpacing.s2),
           Row(
             children: [
-              Text(
-                'LINE HEIGHT',
-                style: AppType.monoEyebrow(color: AppColors.inkSoft),
-              ),
+              Text('LINE HEIGHT', style: AppType.monoEyebrow(color: soft)),
               const Spacer(),
               Text(
                 _lineHeight.toStringAsFixed(2),
@@ -362,13 +351,10 @@ class _AaPanelState extends State<_AaPanel> {
           const SizedBox(height: AppSpacing.s3),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text(
-              'WIDEN MEASURE',
-              style: AppType.monoEyebrow(color: AppColors.inkSoft),
-            ),
+            title: Text('WIDEN MEASURE', style: AppType.monoEyebrow(color: soft)),
             subtitle: Text(
               'Cap line length at 64 characters. Reads as a column.',
-              style: AppType.bodyMedium(color: AppColors.ink),
+              style: AppType.bodyMedium(color: ink),
             ),
             value: _widenMeasure,
             activeThumbColor: AppColors.primary,
@@ -383,7 +369,7 @@ class _AaPanelState extends State<_AaPanel> {
             children: [
               Text(
                 'BODY FONT',
-                style: AppType.monoEyebrow(color: AppColors.inkSoft),
+                style: AppType.monoEyebrow(color: soft),
               ),
             ],
           ),
@@ -410,11 +396,14 @@ class _BodyFontSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.paperRaised,
+        color: isDark ? AppColors.ground : AppColors.paperRaised,
         borderRadius: BorderRadius.circular(AppRadius.button),
-        border: Border.all(color: AppColors.rule),
+        border: Border.all(color: ruleColor),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -424,7 +413,7 @@ class _BodyFontSegment extends StatelessWidget {
             sample: 'Aa',
             style: GoogleFonts.dmSans(
               fontWeight: FontWeight.w600,
-              color: AppColors.ink,
+              color: ink,
             ),
             selected: value == 'dm',
             onTap: () => onChange('dm'),
@@ -434,7 +423,7 @@ class _BodyFontSegment extends StatelessWidget {
             sample: 'Aa',
             style: GoogleFonts.lora(
               fontWeight: FontWeight.w600,
-              color: AppColors.ink,
+              color: ink,
             ),
             selected: value == 'lora',
             onTap: () => onChange('lora'),
@@ -462,6 +451,9 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final soft = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.paperOnGroundSoft
+        : AppColors.inkSoft;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -489,7 +481,7 @@ class _Segment extends StatelessWidget {
               Text(
                 label,
                 style: AppType.monoEyebrow(
-                  color: selected ? AppColors.primary : AppColors.inkSoft,
+                  color: selected ? AppColors.primary : soft,
                 ).copyWith(letterSpacing: 0.6),
               ),
             ],

@@ -8,12 +8,17 @@
 /// + notify themselves.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
+import '../services/cloud_sync_service.dart';
 import '../services/settings_service.dart';
 import '../utils/reader_theme.dart';
 
 class SettingsNotifier extends ChangeNotifier {
   final SettingsService _settingsService;
+  StreamSubscription<void>? _cloudRestoreSub;
 
   // ----- Visual / data preferences (pre-existing fields) -----
   bool _showImages = true;
@@ -38,7 +43,23 @@ class SettingsNotifier extends ChangeNotifier {
   // ----- Monetization -----
   bool _isPro = false;
 
-  SettingsNotifier(this._settingsService);
+  SettingsNotifier(this._settingsService) {
+    // Reload the UI when a cloud restore lands on this device (sign-in on
+    // a new phone, edits from another device). Guarded so tests that build
+    // the notifier without the sync service keep working.
+    if (GetIt.instance.isRegistered<CloudSyncService>()) {
+      _cloudRestoreSub = GetIt.instance<CloudSyncService>().settingsRestored
+          .listen((_) {
+        unawaited(loadSettings());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _cloudRestoreSub?.cancel();
+    super.dispose();
+  }
 
   // Getters
   bool get showImages => _showImages;

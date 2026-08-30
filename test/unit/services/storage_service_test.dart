@@ -1,30 +1,67 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:curatedfeeds/services/feed_database.dart';
 import 'package:curatedfeeds/services/storage_service.dart';
 import 'package:curatedfeeds/models/article.dart';
 
+int _dbCounter = 0;
+
+/// Fresh SQLite database per call. The ffi factory caches instances by
+/// path, so ':memory:' alone would leak rows across tests — a unique
+/// temp-file path guarantees isolation.
+Future<Database> openMemoryDb() async {
+  sqfliteFfiInit();
+  final dir = await Directory.systemTemp.createTemp('curatedfeeds_test');
+  return databaseFactoryFfi.openDatabase(
+    '${dir.path}${Platform.pathSeparator}feed-${_dbCounter++}.db',
+  );
+}
+
+Future<StorageService> makeService(MockFlutterSecureStorage storage) async {
+  final db = await openMemoryDb();
+  return StorageService(
+    storage: storage,
+    database: FeedDatabase(db: db),
+  );
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('StorageService', () {
     late StorageService service;
     late MockFlutterSecureStorage mockStorage;
 
-    setUp(() {
+    setUp(() async {
       mockStorage = MockFlutterSecureStorage();
-      service = StorageService(storage: mockStorage);
+      service = await makeService(mockStorage);
     });
 
     group('saveArticles / loadArticles', () {
       test('saves and loads articles roundtrip', () async {
         final articles = [
-          _makeArticle(id: '1', title: 'Article 1'),
-          _makeArticle(id: '2', title: 'Article 2'),
+          _makeArticle(
+            id: '1',
+            title: 'Article 1',
+            pubDate: DateTime.utc(2026, 1, 2),
+          ),
+          _makeArticle(
+            id: '2',
+            title: 'Article 2',
+            pubDate: DateTime.utc(2026, 1, 1),
+          ),
         ];
 
         await service.saveArticles(articles);
         final loaded = await service.loadArticles();
 
         expect(loaded.length, 2);
+        // Newest first (pub_date DESC).
         expect(loaded[0].title, 'Article 1');
         expect(loaded[1].title, 'Article 2');
       });
@@ -43,22 +80,28 @@ void main() {
         expect(loaded[0].title, 'New');
       });
 
-      test('enforces article limit when saving', () async {
+      test('enforces article limit when saving, keeping newest', () async {
         final manyArticles = List.generate(
           1500,
-          (i) => _makeArticle(id: '$i', title: 'Article $i'),
+          (i) => _makeArticle(
+            id: '$i',
+            title: 'Article $i',
+            pubDate: DateTime.utc(2026, 1, 1).add(Duration(minutes: i)),
+          ),
         );
 
         await service.saveArticles(manyArticles);
         final loaded = await service.loadArticles();
 
-        // Should be limited to maxCachedArticles (1000)
-        expect(loaded.length, lessThanOrEqualTo(1000));
+        expect(loaded.length, 1000); // AppConfig.maxCachedArticles
+        // The oldest entries were dropped.
+        expect(loaded.any((a) => a.id == '0'), isFalse);
+        expect(loaded.any((a) => a.id == '1499'), isTrue);
       });
     });
 
     group('saveSavedArticles / loadSavedArticles', () {
-      test('saves and loads saved articles roundtrip', () async {
+      test('saves and loads saved articles roundtrip preserving order', () async {
         final articles = [
           _makeArticle(id: '1', title: 'Saved 1', isSaved: true),
           _makeArticle(id: '2', title: 'Saved 2', isSaved: true),
@@ -68,13 +111,36 @@ void main() {
         final loaded = await service.loadSavedArticles();
 
         expect(loaded.length, 2);
+        // Insertion order preserved (position column), not date order.
+        expect(loaded[0].title, 'Saved 1');
+        expect(loaded[1].title, 'Saved 2');
         expect(loaded[0].isSaved, true);
-        expect(loaded[1].isSaved, true);
       });
 
       test('returns empty list when no saved articles', () async {
         final loaded = await service.loadSavedArticles();
         expect(loaded, isEmpty);
+      });
+    });
+
+    group('corruption recovery', () {
+      test('skips corrupt payload rows instead of losing the list', () async {
+        final db = await openMemoryDb();
+        final svc = StorageService(
+          storage: mockStorage,
+          database: FeedDatabase(db: db),
+        );
+        await svc.saveArticles([_makeArticle(id: 'good-1', title: 'Good')]);
+
+        // Inject a row whose payload fails Article.fromJson (title is a
+        // number). Row-level isolation means the good article survives.
+        await db.insert(
+          'articles',
+          {'id': 'bad', 'pub_date': 0, 'payload': '{"id":"bad","title":123}'},
+        );
+
+        final loaded = await svc.loadArticles();
+        expect(loaded.any((a) => a.id == 'good-1'), isTrue);
       });
     });
 
@@ -105,74 +171,89 @@ void main() {
       });
     });
 
-    group('saveViewMode / loadViewMode', () {
-      test('saves and loads view mode', () async {
-        await service.saveViewMode('card');
-        final loaded = await service.loadViewMode();
-
-        expect(loaded, 'card');
-      });
-
-      test('returns null when no view mode saved', () async {
-        final loaded = await service.loadViewMode();
-        expect(loaded, isNull);
-      });
-
-      test('overwrites previous view mode', () async {
-        await service.saveViewMode('card');
-        await service.saveViewMode('list');
-
-        final loaded = await service.loadViewMode();
-        expect(loaded, 'list');
-      });
-    });
-
     group('clearAll', () {
       test('clears all stored data', () async {
         await service.saveArticles([_makeArticle(id: '1', title: 'Test')]);
         await service.saveSavedArticles([
           _makeArticle(id: '2', title: 'Saved'),
         ]);
-        await service.saveViewMode('card');
 
         await service.clearAll();
 
         expect(await service.loadArticles(), isEmpty);
         expect(await service.loadSavedArticles(), isEmpty);
-        expect(await service.loadViewMode(), isNull);
       });
     });
 
-    group('storage corruption recovery', () {
-      test('returns empty list on corrupted JSON', () async {
-        mockStorage.store['articles'] = 'not valid json {{{';
+    group('clearFeedCache', () {
+      test('deletes articles and last refresh but keeps saved articles', () async {
+        await service.saveArticles([_makeArticle(id: '1', title: 'Cached')]);
+        await service.saveSavedArticles([
+          _makeArticle(id: '2', title: 'Saved'),
+        ]);
+        await service.saveLastRefreshTime(DateTime.now());
+
+        await service.clearFeedCache();
+
+        // Cache is gone…
+        expect(await service.loadArticles(), isEmpty);
+        expect(await service.loadLastRefreshTime(), isNull);
+        // …but user data survives.
+        final saved = await service.loadSavedArticles();
+        expect(saved.length, 1);
+        expect(saved.first.title, 'Saved');
+      });
+
+      test('is safe to call on empty storage', () async {
+        await service.clearFeedCache();
+        expect(await service.loadArticles(), isEmpty);
+      });
+    });
+
+    group('legacy blob migration', () {
+      test('imports pre-sqlite blobs once and marks done', () async {
+        final legacyArticles = [
+          _makeArticle(id: 'legacy-1', title: 'Legacy'),
+        ];
+        mockStorage.store['articles'] = jsonEncodeList(legacyArticles);
+        mockStorage.store['savedArticles'] = jsonEncodeList([
+          _makeArticle(id: 'legacy-saved', title: 'LS', isSaved: true),
+        ]);
 
         final loaded = await service.loadArticles();
-        expect(loaded, isEmpty);
+        expect(loaded.map((a) => a.id), contains('legacy-1'));
+
+        final saved = await service.loadSavedArticles();
+        expect(saved.map((a) => a.id), contains('legacy-saved'));
+
+        // Marker written; blobs removed.
+        expect(mockStorage.store['articles_migrated_sqlite_v1'], '1');
+        expect(mockStorage.store.containsKey('articles'), isFalse);
+        expect(mockStorage.store.containsKey('savedArticles'), isFalse);
+
+        // Second call does not re-import (blob already gone anyway).
+        expect(await service.loadArticles().then((a) => a.length), 1);
       });
 
-      test('returns empty saved articles on corrupted JSON', () async {
-        mockStorage.store['savedArticles'] = 'corrupted';
+      test('no migration when marker already present', () async {
+        mockStorage.store['articles'] = '[{"id":"x"}]'; // would fail parse
+        mockStorage.store['articles_migrated_sqlite_v1'] = '1';
 
-        final loaded = await service.loadSavedArticles();
-        expect(loaded, isEmpty);
-      });
-
-      test('returns null for last refresh on invalid date string', () async {
-        mockStorage.store['lastRefresh'] = 'not-a-date';
-
-        final loaded = await service.loadLastRefreshTime();
-        expect(loaded, isNull);
+        expect(await service.loadArticles(), isEmpty);
       });
     });
   });
 }
+
+String jsonEncodeList(List<Article> articles) =>
+    jsonEncode(articles.map((a) => a.toJson()).toList());
 
 Article _makeArticle({
   required String id,
   required String title,
   bool isSaved = false,
   bool isRead = false,
+  DateTime? pubDate,
 }) {
   return Article(
     id: id,
@@ -182,7 +263,7 @@ Article _makeArticle({
     link: 'https://example.com/$id',
     sourceId: 'test',
     sourceName: 'Test Source',
-    pubDate: DateTime.now(),
+    pubDate: pubDate ?? DateTime.now(),
     isSaved: isSaved,
     isRead: isRead,
   );

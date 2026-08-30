@@ -63,6 +63,9 @@ app.*.map.json
 # Wrangler / Cloudflare Workers cache and build artifacts
 workers/.wrangler/
 
+# Kotlin Gradle plugin persistent data
+.kotlin/
+
 # Platform-specific directories (Android only build)
 web/
 linux/

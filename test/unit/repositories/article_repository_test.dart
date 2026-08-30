@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:curatedfeeds/di/service_locator.dart';
 import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/models/filter_params.dart';
 import 'package:curatedfeeds/models/paginated_response.dart';
 import 'package:curatedfeeds/repositories/article_repository.dart';
+import 'package:curatedfeeds/services/feed_database.dart';
+import 'package:curatedfeeds/services/storage_service.dart';
 import 'package:curatedfeeds/services/worker_feed_service.dart';
 import 'package:curatedfeeds/utils/error_handler.dart';
 
@@ -37,6 +42,18 @@ void main() {
 
     setUp(() async {
       await setupServiceLocator();
+      // Swap the default (file-based) storage for an isolated SQLite
+      // database: no platform channel, per-test isolation via a unique
+      // temp path (the ffi factory caches by path).
+      sqfliteFfiInit();
+      final dir = await Directory.systemTemp.createTemp('curatedfeeds_test');
+      final db = await databaseFactoryFfi.openDatabase(
+        '${dir.path}${Platform.pathSeparator}feed.db',
+      );
+      getIt.unregister<StorageService>();
+      getIt.registerLazySingleton<StorageService>(
+        () => StorageService(database: FeedDatabase(db: db)),
+      );
       repository = ArticleRepository();
     });
 

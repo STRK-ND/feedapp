@@ -26,14 +26,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # In-App Purchase
   in_app_purchase: ^3.2.0
 
   # Storage
   shared_preferences: ^2.3.4
-  flutter_secure_storage: ^10.0.0
+  flutter_secure_storage: 10.3.1
   flutter_cache_manager: ^3.3.1
+  sqflite: ^2.4.2
 
   # Networking & Data
   http: ^1.2.0
@@ -50,8 +53,9 @@ dependencies:
   connectivity_plus: ^7.0.0
   package_info_plus: ^10.2.0
   path_provider: ^2.1.4
-  permission_handler: ^12.0.0
+  permission_handler: 12.0.3
   open_filex: ^4.7.0
+  workmanager: ^0.10.9
 
   # State Management & DI
   get_it: ^9.2.1
@@ -63,11 +67,19 @@ dependencies:
   firebase_messaging: ^16.4.1
 
   # Error Tracking
-  sentry_flutter: ^8.9.0
+  sentry_flutter: 9.28.0
 
   # Notifications
   flutter_local_notifications: ^22.0.1
   file_picker: ^12.0.0-beta.1
+
+  # Listen mode (text-to-speech)
+  flutter_tts: ^4.2.5
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
+  google_sign_in: ^7.2.0
+  firebase_crashlytics: ^5.3.0
+  posthog_flutter: ^5.38.1
 
 dev_dependencies:
   flutter_test:
@@ -80,7 +92,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   in_app_purchase_platform_interface: ^1.4.1
+  sqflite_common_ffi: ^2.4.0+3
 
 
 flutter:
   uses-material-design: true
+  generate: true

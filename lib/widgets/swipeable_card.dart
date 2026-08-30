@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/constants.dart';
@@ -59,6 +61,9 @@ class _SwipeableCardState extends State<SwipeableCard>
   void _onAnimationStatusChanged(AnimationStatus status) {
     if (status == AnimationStatus.completed && _isAnimatingOut) {
       final direction = _position.dx > 0 ? 'right' : 'left';
+      // A completed swipe is a committed triage action — confirm it
+      // physically, not just visually (save right / dismiss left).
+      unawaited(HapticFeedback.mediumImpact());
       if (direction == 'right') {
         widget.onSwipeRight();
       } else {

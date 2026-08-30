@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:curatedfeeds/di/service_locator.dart';
+import 'package:curatedfeeds/l10n/generated/app_localizations.dart';
 import 'package:curatedfeeds/screens/onboarding_screen.dart';
 import 'package:curatedfeeds/services/rss_feed_service.dart';
 import 'package:curatedfeeds/services/settings_service.dart';
@@ -14,6 +15,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await getIt.reset();
     getIt.registerLazySingleton<SettingsService>(() => SettingsService());
+    // Step 3 renders picks from the source registry (bundled seed offline).
+    getIt.registerLazySingleton<RssFeedService>(() => RssFeedService());
   });
 
   tearDown(() async {
@@ -52,7 +55,11 @@ void main() {
       'theme/font prefs', (tester) async {
     useTallViewport(tester);
 
-    await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
+    await tester.pumpWidget(const MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: OnboardingScreen(),
+  ));
 
     // Step 1 — pick a room so the theme pref is non-default.
     await tapCard(tester, 'LAMPLIGHT');
@@ -98,7 +105,11 @@ void main() {
   ) async {
     useTallViewport(tester);
 
-    await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
+    await tester.pumpWidget(const MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: OnboardingScreen(),
+  ));
 
     await advanceStep(tester); // step 1 -> 2
     await advanceStep(tester); // step 2 -> 3

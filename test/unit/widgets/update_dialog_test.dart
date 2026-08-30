@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:curatedfeeds/l10n/generated/app_localizations.dart';
 import 'package:curatedfeeds/services/update_service.dart';
 import 'package:curatedfeeds/widgets/update_dialog.dart';
 
@@ -21,6 +22,8 @@ void main() {
   );
 
   Widget harness(UpdateInfo info) => MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: UpdateDialog(updateInfo: info, onLater: () {}, onDownload: () {}),
     ),

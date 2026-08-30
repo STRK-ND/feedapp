@@ -48,31 +48,18 @@ class FolioRuleBootstrap {
   }
 }
 
-/// Format a date as "TUESDAY · 08.07.2026" — paper-style masthead.
-String _formatMasthead(DateTime when) {
-  const weekdays = [
-    'MONDAY',
-    'TUESDAY',
-    'WEDNESDAY',
-    'THURSDAY',
-    'FRIDAY',
-    'SATURDAY',
-    'SUNDAY',
-  ];
-  final wd = weekdays[when.weekday - 1];
-  final dd = when.day.toString().padLeft(2, '0');
-  final mm = when.month.toString().padLeft(2, '0');
-  final yyyy = when.year.toString();
-  return '$wd · $dd.$mm.$yyyy';
+/// Masthead pieces. The weekday is intentionally separate so it can wear
+/// the italic accent — the one soft moment on an otherwise mono rail.
+/// Full form:  *Tuesday* · 08.17 · EDITION Nº 0048
+String _weekdayWord(DateTime when) {
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return weekdays[when.weekday - 1];
 }
 
-/// Compact masthead that drops the weekday on narrow screens, used when
-/// weekday + date + edition all wouldn't fit (sub-360dp).
-String _formatMastheadCompact(DateTime when) {
+String _dateStamp(DateTime when) {
   final dd = when.day.toString().padLeft(2, '0');
   final mm = when.month.toString().padLeft(2, '0');
-  final yyyy = when.year.toString();
-  return '$dd.$mm.$yyyy';
+  return '$mm.$dd.${when.year}';
 }
 
 class FolioRule extends StatelessWidget {
@@ -97,49 +84,51 @@ class FolioRule extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ground = isDark ? AppColors.ground : AppColors.paper;
-    final top = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
-    final bottom = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final mono = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final monoSoft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
     final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
-    const accent = AppColors.primary;
+    const accent = AppColors.curation;
     final hasUnread = unreadCount > 0;
 
+    // Full-bleed masthead band: 1px top rule, 0.5px bottom — reads as a
+    // paper masthead, not a status bar. Italic weekday is the one soft
+    // element against the heavy mono rail.
     return Container(
       decoration: BoxDecoration(
         color: ground,
         border: Border(
-          top: BorderSide(color: ruleColor, width: 0.5),
+          top: BorderSide(color: ruleColor, width: 1),
           bottom: BorderSide(color: ruleColor, width: 0.5),
         ),
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s4,
-        vertical: AppSpacing.s3,
+        vertical: AppSpacing.s2 + 2,
       ),
-      // LayoutBuilder so we can swap to a compact masthead on narrow
-      // screens and keep EDITION Nº + dot from being squeezed off —
-      // turtling the layout when needed beats truncating or wrapping.
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final editionStamp = 'EDITION Nº ${edition.toString().padLeft(4, '0')}';
           final isNarrow = constraints.maxWidth < 360;
+          final weekday = isNarrow ? _weekdayWord(date) : '${_weekdayWord(date)} ·';
+
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // *Tue* — italic Playfair. The signature soft moment.
+              Text(
+                weekday,
+                style: AppType.displayItalic(color: mono, fontSize: 18)
+                    .copyWith(height: 1),
+              ),
+              const SizedBox(width: AppSpacing.s1 + 2),
+              // Mono date + edition.
               Expanded(
                 child: Text(
-                  isNarrow
-                      ? _formatMastheadCompact(date)
-                      : _formatMasthead(date),
-                  style: AppType.folioTop(
-                    color: top,
-                  ).copyWith(fontWeight: FontWeight.w600),
+                  '${_dateStamp(date)}  $editionStamp',
+                  style: AppType.folioTop(color: monoSoft),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.s2),
-              Text(
-                'EDITION Nº ${edition.toString().padLeft(4, '0')}',
-                style: AppType.folioTop(color: bottom),
               ),
               if (isPro) ...[
                 const SizedBox(width: AppSpacing.s2),
@@ -154,20 +143,23 @@ class FolioRule extends StatelessWidget {
                   ),
                   child: Text(
                     'PRO',
-                    style: AppType.folioTop(
-                      color: accent,
-                    ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                    style: AppType.folioTop(color: accent).copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
                   ),
                 ),
               ],
               const SizedBox(width: AppSpacing.s3),
-              Text(
-                '$articleCount curated · $unreadCount unread',
-                style: AppType.folioTop(
-                  color: top,
-                ).copyWith(letterSpacing: 0.4),
-              ),
-              const SizedBox(width: AppSpacing.s3),
+              // Amber dot = the unread count, made readable. The count
+              // rides next to it; no prose ("12 curated · 5 unread").
+              if (hasUnread) ...[
+                Text(
+                  '$unreadCount',
+                  style: AppType.monoDateline(color: mono),
+                ),
+                const SizedBox(width: AppSpacing.s1),
+              ],
               Semantics(
                 button: true,
                 label: hasUnread

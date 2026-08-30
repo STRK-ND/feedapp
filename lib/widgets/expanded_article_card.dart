@@ -6,9 +6,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import '../models/article.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../services/cache_manager.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
+import '../services/tts_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
 import '../utils/constants.dart' hide AppColors;
@@ -40,6 +42,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   bool _isLoadingContent = false;
   String? _fullContent;
 
+  // Listen mode. The service is a lazy singleton; this sheet drives its
+  // state and stops playback on close.
+  TtsService? _tts;
+  TtsState _ttsState = TtsState.stopped;
+
   // Reader preferences are now sourced from the SettingsNotifier (which
   // is the single owner). Local copies are kept only as a brief in-
   // frame cache so we don't `read` on every widget rebuild; the
@@ -56,6 +63,68 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     super.initState();
     _initContent();
     _loadPrefs();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _listenToTts();
+  }
+
+  /// Late-bind the TtsService (getIt may not be ready in initState in
+  /// tests) and subscribe for state changes.
+  void _listenToTts() {
+    if (_tts != null) return;
+    try {
+      final tts = getIt<TtsService>();
+      tts.addListener(_onTtsChanged);
+      setState(() {
+        _tts = tts;
+        _ttsState = tts.state;
+      });
+    } catch (_) {
+      // TTS unavailable — the button hides itself via _tts == null.
+    }
+  }
+
+  void _onTtsChanged() {
+    if (!mounted) return;
+    setState(() => _ttsState = _tts?.state ?? TtsState.stopped);
+  }
+
+  IconData get _ttsIcon => switch (_ttsState) {
+        TtsState.playing => Icons.pause_rounded,
+        TtsState.paused => Icons.play_arrow_rounded,
+        TtsState.stopped => Icons.graphic_eq_rounded,
+      };
+
+  String get _ttsLabel => switch (_ttsState) {
+        TtsState.playing => 'Pause',
+        TtsState.paused => 'Resume',
+        TtsState.stopped => 'Listen',
+      };
+
+  Future<void> _onListenTap() async {
+    final tts = _tts;
+    if (tts == null || !mounted) return;
+    switch (_ttsState) {
+      case TtsState.playing:
+        await tts.pause();
+      case TtsState.paused:
+        await tts.resume();
+      case TtsState.stopped:
+        final body = (_fullContent ?? widget.article.fullContent).trim();
+        final text = '${widget.article.title}. $body';
+        unawaited(tts.speak(text));
+    }
+  }
+
+  @override
+  void dispose() {
+    _tts?.removeListener(_onTtsChanged);
+    // Leaving the reader always silences playback.
+    unawaited(_tts?.stop());
+    super.dispose();
   }
 
   Future<void> _loadPrefs() async {
@@ -76,7 +145,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     if (isReaderThemeLocked(t, notifier.isPro)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${t.label} is a Pro theme — Go Pro to unlock'),
+          content: Text(
+            AppLocalizations.of(context).proThemeLocked(t.label),
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -230,9 +301,10 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
 
   @override
   Widget build(BuildContext context) {
+    final registry = getIt<RssFeedService>();
     final source =
-        getIt<RssFeedService>().getSourceById(widget.article.sourceId) ??
-        RssFeedService.predefinedSources.first;
+        registry.getSourceById(widget.article.sourceId) ??
+        registry.sources.first;
     final sourceColor = source.color;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -364,6 +436,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                           ),
                           Row(
                             children: [
+                              buildHeaderButton(
+                                icon: _ttsIcon,
+                                onPressed: _onListenTap,
+                                color: sourceColor,
+                                label: _ttsLabel,
+                              ),
                               buildHeaderButton(
                                 icon: Icons.open_in_new_rounded,
                                 onPressed: () async {
@@ -521,7 +599,8 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          '${t.label} is a Pro theme — Go Pro to unlock',
+                                          AppLocalizations.of(context)
+                                              .proThemeLocked(t.label),
                                         ),
                                         duration: const Duration(seconds: 2),
                                       ),
@@ -540,7 +619,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
-                                Text(
+                                SelectableText(
                                   widget.article.description,
                                   style: _bodyStyle().copyWith(
                                     fontSize: _fontSize,
@@ -567,7 +646,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                           ),
                                           const SizedBox(height: 16),
                                           Text(
-                                            'Loading full article...',
+                                            AppLocalizations.of(context).loadingFullArticle,
                                             style: GoogleFonts.dmSans(
                                               fontSize: 14,
                                               color: palette.soft,
@@ -579,7 +658,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   )
                                 else if (_fullContent != null &&
                                     _fullContent!.isNotEmpty)
-                                  Text(
+                                  SelectableText(
                                     _fullContent!,
                                     style: _bodyStyle().copyWith(
                                       fontSize: _fontSize - 1,

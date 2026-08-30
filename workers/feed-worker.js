@@ -3,6 +3,8 @@
 // Endpoints:
 //   GET    /articles?page=N&pageSize=M   → paginated merged feed
 //   GET    /articles/refresh             → bypass cache
+//   GET    /sources                      → canonical source list
+//   PUT    /sources                      → override source list (secret-gated)
 //   POST   /subscribe                    → register FCM token for new-articles
 //   DELETE /subscribe                    → remove FCM token
 //   GET    /health                       → liveness
@@ -18,8 +20,9 @@
 //   FCM_PROJECT_ID       — Firebase project id ("curatedfeeds").
 
 // ---------------------------------------------------------------------------
-// Canonical source list — must stay in sync with
-// lib/services/rss_feed_service.dart
+// Canonical source list — served by GET /sources and THE source of truth.
+// The app's bundled seed (lib/services/rss_feed_service.dart) is only an
+// offline bootstrap fallback; keep its entries in sync with this list.
 // ---------------------------------------------------------------------------
 
 const SOURCES = [
@@ -39,6 +42,9 @@ const SOURCES = [
 
 const ARTICLES_CACHE_KEY = 'articles:v1';
 const SEEN_IDS_KEY = 'seen-ids:v1';
+// Admin-managed canonical source list override (PUT /sources). Absent or
+// empty → the bundled SOURCES list is used.
+const SOURCES_OVERRIDE_KEY = 'config:sources';
 const ARTICLES_TTL_SECONDS = 5 * 60;
 const REFRESH_LOCK_KEY = 'refresh:lock';
 const MAX_XML_BYTES = 5 * 1024 * 1024;
@@ -60,8 +66,19 @@ export default {
       if (url.pathname === '/health') {
         return json({ ok: true, ts: Date.now() });
       }
+      if (url.pathname === '/sources' && request.method === 'GET') {
+        const srcIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+        if (!(await consumeRate(env, 'src:' + srcIp, 60, 60))) {
+          return json({ error: 'rate_limited' }, 429);
+        }
+        return json({ sources: await getSourceList(env) });
+      }
+      if (url.pathname === '/sources' && request.method === 'PUT') {
+        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        return await handlePutSources(request, env);
+      }
       if (url.pathname === '/articles' && request.method === 'GET') {
-        return await handleArticles(url, env);
+        return await handleArticles(request, url, env);
       }
       if (url.pathname === '/articles/refresh' && request.method === 'GET') {
         if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
@@ -103,8 +120,13 @@ export default {
 
 function isAuthorized(request, env) {
   if (!env.API_SECRET) {
-    // Not configured yet → open for back-compat. Loud so a live deployment
-    // can't silently run without the gate.
+    // Opt-in hard gate: ops can set REQUIRE_API_SECRET='1' so a missing
+    // secret fails closed instead of serving an open API. Default remains
+    // open-for-back-compat with a loud warning.
+    if (env.REQUIRE_API_SECRET === '1') {
+      console.error('api_secret_required_but_missing');
+      return false;
+    }
     console.warn('api_secret_not_configured');
     return true;
   }
@@ -120,21 +142,99 @@ async function consumeRate(env, key, limit, windowSec) {
   return true;
 }
 
-async function handleArticles(url, env) {
+async function handleArticles(request, url, env) {
+  const { page, pageSize, q, since, until, category, sources, sort } = parseArticleParams(url);
+
+  // Per-IP throttle on the hot path. Generous (the app polls at most a
+  // few times per minute plus retry bursts) but stops raw abuse.
+  const artIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (!(await consumeRate(env, 'art:' + artIp, 120, 60))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  let articles = await loadArticles(env);
+  if (articles === null) {
+    return json({ error: 'busy', message: 'Feed is refreshing' }, 503);
+  }
+
+  articles = applyFilters(articles, { q, since, until, category, sources });
+
+  // Default order is pubDate DESC (how the cache is persisted); date_asc
+  // and source are explicit client requests. Copy before sort — with no
+  // filters active applyFilters returns the shared cached array.
+  const sorted = [...articles].sort(
+    sort === 'date_asc'
+      ? (a, b) => (a.pubDate || 0) - (b.pubDate || 0)
+      : sort === 'source'
+        ? (a, b) =>
+            (a.sourceName || '').localeCompare(b.sourceName || '') ||
+            (b.pubDate || 0) - (a.pubDate || 0)
+        : (a, b) => (b.pubDate || 0) - (a.pubDate || 0),
+  );
+
+  const total = sorted.length;
+  const start = (page - 1) * pageSize;
+  const items = sorted.slice(start, start + pageSize);
+  const hasMore = start + pageSize < total;
+  return json({ items, total, hasMore });
+}
+
+// Parse + clamp the query params /articles understands. Kept pure so
+// unit tests can pin the contract without a Worker runtime.
+function parseArticleParams(url) {
   const pageRaw = parseInt(url.searchParams.get('page') || '1', 10);
   const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
   const sizeRaw = parseInt(url.searchParams.get('pageSize') || '50', 10);
   const pageSize = Number.isFinite(sizeRaw) ? Math.min(100, Math.max(1, sizeRaw)) : 50;
+  const q = (url.searchParams.get('q') || '').trim();
+  const sinceRaw = parseInt(url.searchParams.get('since') || '0', 10);
+  const since = Number.isFinite(sinceRaw) && sinceRaw > 0 ? sinceRaw : 0;
+  const untilRaw = parseInt(url.searchParams.get('until') || '0', 10);
+  const until = Number.isFinite(untilRaw) && untilRaw > 0 ? untilRaw : 0;
+  const category = (url.searchParams.get('category') || '').trim();
+  const sources = (url.searchParams.get('source') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const sortRaw = url.searchParams.get('sort') || '';
+  const sort = ['date_asc', 'date_desc', 'source'].includes(sortRaw) ? sortRaw : 'date_desc';
+  return { page, pageSize, q, since, until, category, sources, sort };
+}
 
-  const articles = await loadArticles(env);
-  if (articles === null) {
-    return json({ error: 'busy', message: 'Feed is refreshing' }, 503);
+// Server-side search (`q`: substring over title/description/source name and
+// category — the app previously sent `q=` and the worker ignored it), delta
+// fetch (`since`/`until`: epoch ms), category + source narrowing. All
+// predicates AND together; unknown values simply match nothing.
+function applyFilters(articles, { q = '', since = 0, until = 0, category = '', sources = [] } = {}) {
+  let out = articles;
+  const needle = (q || '').trim().toLowerCase();
+  if (needle) {
+    out = out.filter(a =>
+      (a.title || '').toLowerCase().includes(needle) ||
+      (a.description || '').toLowerCase().includes(needle) ||
+      (a.sourceName || '').toLowerCase().includes(needle) ||
+      (a.sourceCategory || '').toLowerCase().includes(needle)
+    );
   }
-  const total = articles.length;
-  const start = (page - 1) * pageSize;
-  const items = articles.slice(start, start + pageSize);
-  const hasMore = start + pageSize < total;
-  return json({ items, total, hasMore });
+  const cat = (category || '').trim().toLowerCase();
+  if (cat) {
+    out = out.filter(a => (a.sourceCategory || '').toLowerCase() === cat);
+  }
+  const wanted = new Set(
+    (sources || []).map((s) => s.trim().toLowerCase()).filter(Boolean)
+  );
+  if (wanted.size > 0) {
+    out = out.filter(
+      a => wanted.has((a.sourceId || '').toLowerCase()) || wanted.has((a.sourceName || '').toLowerCase())
+    );
+  }
+  if (since > 0) {
+    out = out.filter(a => (a.pubDate || 0) > since);
+  }
+  if (until > 0) {
+    out = out.filter(a => (a.pubDate || 0) <= until);
+  }
+  return out;
 }
 
 async function handleForceRefresh(ctx, env) {
@@ -226,7 +326,7 @@ async function refreshArticlesAndMaybeNotify(env) {
   // 5-min cron cadence, so the thundering-herd protection is unchanged.
   await env.ARTICLES_KV.put(REFRESH_LOCK_KEY, '1', { expirationTtl: 60 });
   try {
-    const articles = await fetchAllSources();
+    const articles = await fetchAllSources(env);
     // Every source failed this cycle — don't clobber a good cache with an
     // empty feed (the app would read "nothing new" for a full TTL window).
     if (articles.length === 0) {
@@ -270,9 +370,47 @@ async function refreshArticlesAndMaybeNotify(env) {
   }
 }
 
-async function fetchAllSources() {
+// Canonical list the app and tests rely on. Overridable at runtime via
+// KV (PUT /sources) so the list can be managed without a redeploy.
+async function getSourceList(env) {
+  const override = await env.ARTICLES_KV.get(SOURCES_OVERRIDE_KEY, 'json');
+  if (Array.isArray(override) && override.length > 0) return override;
+  return SOURCES;
+}
+
+// PUT /sources body: { sources: [{ id, name, url, category, color?, icon? }] }.
+// Validates shape and caps size; an empty array is rejected so a bad call
+// can never blank the feed.
+async function handlePutSources(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'invalid_json' }, 400);
+  }
+  const sources = body?.sources;
+  if (!Array.isArray(sources) || sources.length === 0 || sources.length > 50) {
+    return json({ error: 'invalid_sources', message: '1..50 sources required' }, 400);
+  }
+  for (const s of sources) {
+    if (
+      !s || typeof s !== 'object' ||
+      typeof s.id !== 'string' || !s.id.trim() ||
+      typeof s.name !== 'string' || !s.name.trim() ||
+      typeof s.url !== 'string' || !/^https?:\/\//.test(s.url) ||
+      typeof s.category !== 'string'
+    ) {
+      return json({ error: 'invalid_source_entry' }, 400);
+    }
+  }
+  await env.ARTICLES_KV.put(SOURCES_OVERRIDE_KEY, JSON.stringify(sources));
+  return json({ ok: true, count: sources.length });
+}
+
+async function fetchAllSources(env) {
+  const sources = await getSourceList(env);
   const results = await Promise.allSettled(
-    SOURCES.map(source => fetchSourceArticles(source)),
+    sources.map(source => fetchSourceArticles(source)),
   );
   const fresh = [];
   for (const r of results) {
@@ -433,10 +571,15 @@ async function announceNewArticles(articles, env) {
 
   // Per-token delivery instead of a topic multicast: read every subscription
   // row and send only to tokens whose owner hasn't opted out of "new
-  // articles". The app re-POSTs /subscribe with preferences.newArticles when
-  // the toggle flips, so the stored row is the source of truth.
+  // articles" and whose category filter (if any) overlaps the fresh
+  // articles' categories. The app re-POSTs /subscribe with the updated
+  // preferences object when any toggle changes, so the stored row is the
+  // source of truth.
   const projectId = env.FCM_PROJECT_ID;
-  const optedIn = await optedInTokens(env);
+  const categories = [...new Set(
+    fresh.map(a => a.sourceCategory).filter(Boolean),
+  )];
+  const optedIn = await matchingTokens(env, categories);
   if (optedIn.length === 0) return;
 
   const latestTitle = fresh[0]?.title || 'Fresh feed is ready';
@@ -479,9 +622,14 @@ async function announceNewArticles(articles, env) {
   }
 }
 
-// All opted-in subscription tokens. Reads every `sub:*` KV row, skipping
-// rows where the owner disabled "new articles".
-async function optedInTokens(env) {
+// All subscription tokens that should receive an announcement about
+// articles in [categories]:
+//   - rows with preferences.newArticles === false never match;
+//   - rows with a non-empty preferences.categories array only match when it
+//     intersects the announced categories (per-category alerts);
+//   - rows with no/empty category list match everything.
+async function matchingTokens(env, categories) {
+  const catSet = new Set(categories || []);
   const tokens = [];
   let cursor;
   do {
@@ -489,12 +637,23 @@ async function optedInTokens(env) {
     for (const { name } of page.keys) {
       const row = await env.ARTICLES_KV.get(name, 'json');
       if (!row || typeof row.token !== 'string') continue;
-      if (row.preferences && row.preferences.newArticles === false) continue;
+      if (!rowMatchesCategories(row, catSet)) continue;
       tokens.push(row.token);
     }
     cursor = page.cursor;
   } while (cursor);
   return tokens;
+}
+
+// Pure predicate so the per-category contract is unit-testable.
+function rowMatchesCategories(row, catSet) {
+  const prefs = row.preferences || {};
+  if (prefs.newArticles === false) return false;
+  if (Array.isArray(prefs.categories) && prefs.categories.length > 0) {
+    if (catSet.size === 0) return true; // nothing to narrow by → announce
+    return prefs.categories.some(c => catSet.has(c));
+  }
+  return true;
 }
 
 const FCM_TOKEN_CACHE_KEY = 'fcm:access-token';
@@ -671,4 +830,4 @@ function cors(response) {
   return r;
 }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY };
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories };

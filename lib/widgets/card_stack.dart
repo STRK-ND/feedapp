@@ -6,9 +6,9 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
-import '../utils/constants.dart';
+import '../utils/constants.dart' hide AppColors;
+import '../utils/design_tokens.dart';
 import 'swipeable_card.dart';
-import 'stitch/stitch_widgets.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
 /// Features: Glassmorphism, tactile press, hero image fade-in
@@ -105,12 +105,13 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     bool showImages,
     int imageMaxWidth,
   ) {
-    final sourceCategory = article.sourceCategory ?? 'Technology';
-    final descText = article.description;
-    final readTime = descText.isEmpty
-        ? 1
-        : (descText.split(RegExp(r'\s+')).length / 200).ceil().clamp(1, 999);
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sourceColor = _sourceColor(article.sourceColor);
+    final cardColor = isDark ? AppColors.groundElev : colorScheme.surface;
+    final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
+    final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
+    final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
 
     return Semantics(
       button: true,
@@ -126,14 +127,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-            color: colorScheme.surface,
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            // Reskin: no amber shadow on a dark ground — it reads muddy.
+            // A hairline border gives the card a quiet edge instead.
+            color: cardColor,
+            border: Border.all(color: ruleColor, width: 0.5),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
@@ -152,6 +149,10 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                             fit: BoxFit.cover,
                             cacheManager: AppCacheManager(),
                             memCacheWidth: imageMaxWidth,
+                            color: isDark
+                                ? const Color(0xFF000000).withValues(alpha: 0.55)
+                                : null,
+                            colorBlendMode: isDark ? BlendMode.darken : null,
                             placeholder: (context, url) => Container(
                               color: colorScheme.surfaceContainerHighest,
                             ),
@@ -166,90 +167,98 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                         : Container(color: colorScheme.surfaceContainerHighest),
                   ),
 
-                  // Content
+                  // Content pinned to the bottom — editorial card on ground.
                   Positioned(
                     bottom: 0,
                     left: 0,
                     right: 0,
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Category badges
-                          Row(
-                            children: [
-                              CategoryBadge(category: sourceCategory),
-                              const SizedBox(width: 8),
-                              ReadTimeBadge(minutes: readTime),
-                            ],
+                          // Source row: color dot + uppercase mono source
+                          // + mono dateline. Replaces the category badges —
+                          // the source's own color IS the categorization.
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: sourceColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    article.sourceName.toUpperCase(),
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.6,
+                                      color: ink.withValues(alpha: 0.85),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (!article.isRead)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.curation,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
 
-                          // Title
+                          // Title — oversized Playfair w800, the card's voice.
                           Text(
                             article.title,
                             style: GoogleFonts.playfairDisplay(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onSurface,
-                              height: 1.2,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: ink,
+                              height: 1.12,
+                              letterSpacing: -0.6,
                             ),
-                            maxLines: 3,
+                            maxLines: 4,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
 
                           // Description
-                          Text(
-                            article.description,
-                            style: TextStyle(
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.8,
+                          if (article.description.isNotEmpty)
+                            Text(
+                              article.description,
+                              style: GoogleFonts.dmSans(
+                                color: soft,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                height: 1.5,
                               ),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              height: 1.5,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
 
-                          // Read more button
-                          GestureDetector(
-                            onTap: () => widget.onTap(index),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 15,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(
-                                  AppCardStyles.buttonRadius,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Read Full Story',
-                                    style: TextStyle(
-                                      color: colorScheme.primary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.arrow_forward,
-                                    size: 16,
-                                    color: colorScheme.primary,
-                                  ),
-                                ],
-                              ),
+                          // Read cue — quiet mono, not an amber button. The
+                          // card is already a tap target; a button is a restatement.
+                          Text(
+                            'READ  →',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
+                              color: ink.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -292,4 +301,14 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
       },
     );
   }
+}
+
+/// Parse a source's brand color (hex) → Color, falling back to the amber
+/// attention color when absent. Mirrors the helper in every row/card so
+/// the source's own identity, not amber, color-tags the article.
+Color _sourceColor(String? hex) {
+  if (hex == null || hex.isEmpty) return AppColors.primary;
+  final cleaned = hex.replaceFirst('#', '');
+  if (cleaned.length == 6) return Color(int.parse('0xFF$cleaned'));
+  return AppColors.primary;
 }

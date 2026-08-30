@@ -15,12 +15,16 @@ import 'package:curatedfeeds/utils/constants.dart' as constants;
 void main() {
   group('Design tokens match the curated-feeds spec', () {
     test('palette §3.1 — primary + light-mode surfaces and ink', () {
+      // Values follow the dark-first reskin (see design_tokens.dart header
+      // comment): paper is a matched-but-secondary light path and the ink
+      // ramp was re-tuned. The old spec §3.1 hexes (#F7F5F8 / #1A1B2E /
+      // #6B7280 / #9CA3AF) are superseded.
       expect(AppColors.primary, const Color(0xFFC4944E));
-      expect(AppColors.paper, const Color(0xFFF7F5F8));
+      expect(AppColors.paper, const Color(0xFFF4F1F8));
       expect(AppColors.paperRaised, const Color(0xFFFFFFFF));
-      expect(AppColors.ink, const Color(0xFF1A1B2E));
-      expect(AppColors.inkSoft, const Color(0xFF6B7280));
-      expect(AppColors.inkFaint, const Color(0xFF9CA3AF));
+      expect(AppColors.ink, const Color(0xFF15131C));
+      expect(AppColors.inkSoft, const Color(0xFF6B6877));
+      expect(AppColors.inkFaint, const Color(0xFF9A97A6));
       expect(AppColors.rule, const Color(0xFFE5E7EB));
     });
 

@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../models/filter_params.dart';
 import '../services/worker_feed_service.dart';
+import '../services/client_feed_service.dart';
 import '../services/storage_service.dart';
+import '../services/settings_service.dart';
 import '../utils/error_handler.dart';
 import '../di/service_locator.dart';
 
@@ -12,12 +14,28 @@ import '../di/service_locator.dart';
 class ArticleRepository {
   final StorageService _storageService;
   final WorkerFeedService _workerFeedService;
+  // Nullable by design: older service graphs (and hand-built test graphs)
+  // may not register these. Custom-source merging degrades to a no-op.
+  final ClientFeedService? _clientFeedService;
+  final SettingsService? _settingsService;
 
   ArticleRepository({
     StorageService? storageService,
     WorkerFeedService? workerFeedService,
+    ClientFeedService? clientFeedService,
+    SettingsService? settingsService,
   }) : _storageService = storageService ?? getIt<StorageService>(),
-       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>();
+       _workerFeedService = workerFeedService ?? getIt<WorkerFeedService>(),
+       _clientFeedService =
+           clientFeedService ??
+           (getIt.isRegistered<ClientFeedService>()
+               ? getIt<ClientFeedService>()
+               : null),
+       _settingsService =
+           settingsService ??
+           (getIt.isRegistered<SettingsService>()
+               ? getIt<SettingsService>()
+               : null);
 
   // Cache for articles to avoid repeated storage reads
   List<Article>? _cachedArticles;
@@ -73,47 +91,71 @@ class ArticleRepository {
     }
   }
 
-  /// Fetch new articles from Worker API and merge with existing
-  /// Now fetches all pages from the paginated API
+  /// Fetch new articles from Worker API and merge with existing.
+  ///
+  /// Delta strategy: when the local cache is non-empty, only articles
+  /// strictly newer than the newest cached article (minus a 1h overlap
+  /// guard for clock skew / late-published items) are requested via the
+  /// `since` param — typically a few KB instead of the full feed. A full
+  /// fetch happens when the cache is empty. Dedupe by id protects the
+  /// overlap window either way.
   Future<Result<List<Article>>> fetchNewArticles() async {
     try {
       debugPrint('[Repository] Fetching new articles from Worker API');
 
-      // Fetch all pages
-      final allArticles = <Article>[];
+      // Existing cache first: it defines the delta watermark.
+      final existingResult = await fetchAllArticles();
+      if (existingResult.isFailure) {
+        return existingResult;
+      }
+      final existingArticles = existingResult.data ?? [];
+
+      DateTime? watermark;
+      if (existingArticles.isNotEmpty) {
+        var maxDate = existingArticles.first.pubDate;
+        for (final a in existingArticles) {
+          if (a.pubDate.isAfter(maxDate)) maxDate = a.pubDate;
+        }
+        // Overlap window absorbs minor clock skew between worker and client.
+        watermark = maxDate.subtract(const Duration(hours: 1));
+      }
+
+      // Fetch pages until exhausted (bounded at 5 pages / 250 articles).
+      final workerArticles = <Article>[];
       int page = 1;
       bool hasMore = true;
 
       while (hasMore && page <= 5) {
-        // Limit to 5 pages (250 articles max)
         final response = await _workerFeedService.fetchArticles(
-          params: FilterParams(page: page, pageSize: 50),
+          params: FilterParams(
+            page: page,
+            pageSize: 50,
+            since: watermark,
+          ),
         );
 
-        allArticles.addAll(response.items);
+        workerArticles.addAll(response.items);
         hasMore = response.hasMore;
         page++;
 
         if (response.items.isEmpty) break;
       }
 
-      if (allArticles.isEmpty) {
-        return Result.success([]);
+      // User-added feeds are fetched client-side every refresh (capped per
+      // source) — the worker doesn't know about them.
+      final customArticles = await _fetchCustomSourceArticles();
+
+      if (workerArticles.isEmpty && customArticles.isEmpty) {
+        return Result.success(existingArticles);
       }
 
-      final newArticles = allArticles;
-
-      // Get existing articles
-      final existingResult = await fetchAllArticles();
-      if (existingResult.isFailure) {
-        return existingResult;
-      }
-
-      final existingArticles = existingResult.data ?? [];
       final existingIds = existingArticles.map((a) => a.id).toSet();
 
       // Filter out duplicates
-      final articlesToAdd = newArticles
+      final articlesToAdd = [
+        ...workerArticles,
+        ...customArticles,
+      ]
           .where((a) => !existingIds.contains(a.id))
           .toList();
 
@@ -144,6 +186,38 @@ class ArticleRepository {
         ),
       );
       return Result.failure(ErrorHandler.getUserMessage(e));
+    }
+  }
+
+  /// Fetch every subscribed custom feed in parallel. One failing source
+  /// never fails the refresh — it's skipped and retried next cycle.
+  /// Any unexpected failure (e.g. storage unavailable in tests) degrades
+  /// to "no custom articles" rather than breaking the worker merge.
+  Future<List<Article>> _fetchCustomSourceArticles() async {
+    final clientFeedService = _clientFeedService;
+    final settingsService = _settingsService;
+    if (clientFeedService == null || settingsService == null) return [];
+    try {
+      final customs = await settingsService.getCustomSources();
+      final subscribed = await settingsService.getSubscribedSourceIds();
+      final active = customs
+          .where((s) => subscribed.isEmpty || subscribed.contains(s.id))
+          .toList();
+      if (active.isEmpty) return [];
+
+      final results = await Future.wait(
+        active.map(
+          (s) => clientFeedService
+              .fetchSourceArticles(s)
+              .catchError((Object _) => <Article>[]),
+        ),
+      );
+      return results.expand((list) => list).toList();
+    } catch (e) {
+      unawaited(
+        ErrorHandler.logError('Custom source fetch skipped', error: e),
+      );
+      return [];
     }
   }
 
@@ -190,7 +264,8 @@ class ArticleRepository {
           final updatedArticles = List<Article>.from(articles);
           updatedArticles[index] = updatedArticle;
           _cachedArticles = updatedArticles;
-          await _storageService.saveArticles(updatedArticles);
+          // Row-level persist: a save touches one feed row, not the cache.
+          await _storageService.saveArticle(updatedArticle);
         }
       }
 
@@ -210,7 +285,12 @@ class ArticleRepository {
         }
 
         _cachedSavedArticles = updatedSavedArticles;
-        await _storageService.saveSavedArticles(updatedSavedArticles);
+        // Row-level persist: one saved row insert/update or delete.
+        if (isSaved) {
+          await _storageService.saveSavedArticle(updatedArticle);
+        } else {
+          await _storageService.removeSavedArticle(article.id);
+        }
       }
 
       return Result.success(null);
@@ -241,26 +321,30 @@ class ArticleRepository {
       }
 
       final previousReadState = <String, bool>{};
-      var touched = 0;
+      final flipped = <Article>[];
       final updated = <Article>[];
       for (final a in articles) {
         if (!a.isRead) {
           previousReadState[a.id] = false; // value irrelevant; key matters
-          updated.add(a.copyWith(isRead: true));
-          touched++;
+          final read = a.copyWith(isRead: true);
+          updated.add(read);
+          flipped.add(read);
         } else {
           updated.add(a);
         }
       }
 
-      if (touched == 0) {
+      if (flipped.isEmpty) {
         return Result.success(<String, bool>{});
       }
 
       _cachedArticles = updated;
-      await _storageService.saveArticles(updated);
+      // Row-level persist: rewrite only the flipped rows, not the whole cache.
+      await _storageService.upsertArticles(flipped);
 
-      debugPrint('[Repository] Marked all read. Flipped $touched article(s).');
+      debugPrint(
+        '[Repository] Marked all read. Flipped ${flipped.length} article(s).',
+      );
       return Result.success(previousReadState);
     } catch (e, stackTrace) {
       unawaited(
@@ -288,19 +372,25 @@ class ArticleRepository {
       final ids = snapshot.keys.toSet();
       if (ids.isEmpty) return Result.success(null);
 
+      final flipped = <Article>[];
       final updated = <Article>[];
       for (final a in articles) {
-        if (ids.contains(a.id)) {
-          updated.add(a.copyWith(isRead: false));
+        if (ids.contains(a.id) && a.isRead) {
+          final unread = a.copyWith(isRead: false);
+          updated.add(unread);
+          flipped.add(unread);
         } else {
           updated.add(a);
         }
       }
 
       _cachedArticles = updated;
-      await _storageService.saveArticles(updated);
+      // Row-level persist: only rows that actually flipped back.
+      await _storageService.upsertArticles(flipped);
 
-      debugPrint('[Repository] Restored ${ids.length} article(s) to unread.');
+      debugPrint(
+        '[Repository] Restored ${flipped.length} article(s) to unread.',
+      );
       return Result.success(null);
     } catch (e, stackTrace) {
       unawaited(
