@@ -1,80 +1,120 @@
 version: 2.1
 
-orbs:
-  android: circleci/android@3.0.1
+# Flutter has no official CircleCI convenience image, so the SDK is
+# git-cloned at a pinned version from flutter/flutter (first-party) and
+# cached across builds. Keep FLUTTER_VERSION in sync in all three jobs.
 
-executors:
-  flutter:
-    docker:
-      - image: ghcr.io/cirruslabs/flutter:stable
-    resource_class: medium
-    environment:
-      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-
-jobs:
-  analyze-and-test:
-    executor: flutter
+commands:
+  install_flutter:
+    description: Install pinned Flutter SDK (cached across builds)
     steps:
-      - checkout
+      - restore_cache:
+          keys:
+            - flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1
       - run:
-          name: flutter pub get
-          command: flutter pub get
-      - run:
-          name: dart format check
-          command: dart format --output=none --set-exit-if-changed lib test
-      - run:
-          name: dart pub audit
-          command: dart pub audit || true  # known/transitive — resolve in a dedicated pass
-      - run:
-          name: flutter analyze
-          command: flutter analyze
-      - run:
-          name: flutter test
-          command: flutter test --reporter expanded
+          name: Install Flutter
+          command: |
+            if [ ! -x "$HOME/flutter-sdk/bin/flutter" ]; then
+              git clone --depth 1 -b "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$HOME/flutter-sdk"
+            fi
+            "$HOME/flutter-sdk/bin/flutter" --version
+            echo "export PATH=\"$HOME/flutter-sdk/bin:$PATH\"" >> "$BASH_ENV"
+      - save_cache:
+          key: flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1
+          paths:
+            - ~/flutter-sdk
 
-  worker:
-    docker:
-      - image: cimg/node:20.15-browsers
+  restore_pub_cache:
+    description: Restore pub cache keyed on pubspec.lock
     steps:
-      - checkout
-      - run:
-          name: Worker syntax check
-          command: node --check workers/feed-worker.js
-      - run:
-          name: Worker tests
-          command: cd workers && npm test
+      - restore_cache:
+          keys:
+            - pub-v1-{{ checksum "pubspec.lock" }}
 
-  build-release:
-    executor: flutter
-    resource_class: large
+  save_pub_cache:
+    description: Save pub cache keyed on pubspec.lock
     steps:
-      - checkout
+      - save_cache:
+          key: pub-v1-{{ checksum "pubspec.lock" }}
+          paths:
+            - ~/.pub-cache
+
+  restore_gradle_cache:
+    description: Restore Gradle wrapper + dependency caches
+    steps:
+      - restore_cache:
+          keys:
+            - gradle-v1-{{ checksum "android/gradle/wrapper/gradle-wrapper.properties" }}
+
+  save_gradle_cache:
+    description: Save Gradle wrapper + dependency caches
+    steps:
+      - save_cache:
+          key: gradle-v1-{{ checksum "android/gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/.gradle/wrapper
+            - ~/.gradle/caches/modules-2
+
+  decode_signing:
+    description: Restore upload keystore + Firebase config from env vars
+    steps:
       - run:
           name: Decode upload keystore
           command: |
             echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-      - run:
-          name: Write key.properties
-          command: |
-            printf '%s\n' \
-              "storePassword=$KEYSTORE_PASSWORD" \
-              "keyPassword=$KEY_PASSWORD" \
-              "keyAlias=$KEY_ALIAS" \
-              "storeFile=upload-keystore.jks" \
-              > android/key.properties
+            cat > android/key.properties <<EOF
+            storePassword=$KEYSTORE_PASSWORD
+            keyPassword=$KEY_PASSWORD
+            keyAlias=$KEY_ALIAS
+            storeFile=upload-keystore.jks
+            EOF
       - run:
           name: Write google-services.json
-          command: |
-            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          command: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
+jobs:
+  # Mirrors .github ci.yml — format gate, analyze, unit tests.
+  verify:
+    docker:
+      - image: cimg/android:2026.08.1
+    environment:
+      FLUTTER_VERSION: "3.47.2"
+    steps:
+      - checkout
+      - install_flutter
       - run:
-          name: flutter pub get
+          name: Check formatting
+          command: dart format --output=none --set-exit-if-changed lib test
+      - run:
+          name: Analyze
+          command: flutter analyze
+      - run:
+          name: Unit tests
+          command: flutter test
+
+  # Mirrors .github build.yml — signed APK + AAB on every master push.
+  build_signed:
+    docker:
+      - image: cimg/android:2026.08.1
+    environment:
+      FLUTTER_VERSION: "3.47.2"
+    steps:
+      - checkout
+      - install_flutter
+      - decode_signing
+      - restore_pub_cache
+      - restore_gradle_cache
+      - run:
+          name: Pub get
           command: flutter pub get
+      - save_pub_cache
       - run:
-          name: Build release APK
-          command: flutter build apk --release
+          name: Build signed APK
+          command: flutter build apk --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
       - run:
-          name: Build release AAB
-          command: flutter build appbundle --release
+          name: Build signed AAB
+          command: flutter build appbundle --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+      - save_gradle_cache
       - store_artifacts:
           path: build/app/outputs/flutter-apk/app-release.apk
           destination: app-release.apk
@@ -82,20 +122,89 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           destination: app-release.aab
 
+  # Mirrors .github release.yml — on a v* tag: version sync, checks, signed
+  # APK + AAB, publish a GitHub Release. The in-app updater reads that
+  # release, so hosting stays on GitHub regardless of who builds.
+  release:
+    docker:
+      - image: cimg/android:2026.08.1
+    environment:
+      FLUTTER_VERSION: "3.47.2"
+    steps:
+      - checkout
+      - install_flutter
+      - decode_signing
+      - restore_pub_cache
+      - restore_gradle_cache
+      - run:
+          name: Sync pubspec version with tag
+          command: |
+            VERSION="${CIRCLE_TAG#v}"
+            # versionCode must exceed any prior upload (local baseline is 22).
+            CODE=$((22 + CIRCLE_BUILD_NUM))
+            sed -i "s/^version: .*/version: $VERSION+$CODE/" pubspec.yaml
+            echo "Synced pubspec version to $VERSION+$CODE"
+      - run: flutter pub get
+      - save_pub_cache
+      - run: flutter analyze
+      - run: flutter test
+      - run:
+          name: Build signed APK
+          command: flutter build apk --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+      - run:
+          name: Build signed AAB
+          command: flutter build appbundle --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+      - save_gradle_cache
+      - run:
+          name: Publish GitHub Release
+          command: |
+            TAG="$CIRCLE_TAG"
+            mv build/app/outputs/flutter-apk/app-release.apk "curated-feeds-$TAG.apk"
+            mv build/app/outputs/bundle/release/app-release.aab "curated-feeds-$TAG.aab"
+
+            REPO="STRK-ND/feedapp"
+            AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json")
+            HTTP_CODE=$(curl -sS -o /tmp/rel.json -w "%{http_code}" "${AUTH[@]}" \
+              "https://api.github.com/repos/$REPO/releases/tags/$TAG")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Release $TAG already exists — uploading assets to it"
+            elif [ "$HTTP_CODE" = "404" ]; then
+              curl -sS -o /tmp/rel.json -X POST "${AUTH[@]}" \
+                "https://api.github.com/repos/$REPO/releases" \
+                -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"generate_release_notes\":true}"
+            else
+              echo "Unexpected response checking release: $HTTP_CODE"; cat /tmp/rel.json; exit 1
+            fi
+            UPLOAD_URL=$(python3 -c 'import json; print(json.load(open("/tmp/rel.json"))["upload_url"].split("{")[0])')
+
+            upload_asset() {
+              local file="$1" mime="$2"
+              HTTP_CODE=$(curl -sS -o /tmp/asset.json -w "%{http_code}" -X POST \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Content-Type: $mime" \
+                --data-binary @"$file" \
+                "$UPLOAD_URL?name=$file")
+              if [ "$HTTP_CODE" != "201" ]; then
+                echo "Asset upload failed ($HTTP_CODE): $(head -c 300 /tmp/asset.json)"; exit 1
+              fi
+            }
+            upload_asset "curated-feeds-$TAG.apk" "application/vnd.android.package-archive"
+            upload_asset "curated-feeds-$TAG.aab" "application/octet-stream"
+            echo "Published release $TAG with APK + AAB"
+
 workflows:
-  main:
+  ci:
     jobs:
-      - analyze-and-test:
-          filters:
-            tags:
-              only: /.*/
-      - worker:
-          filters:
-            tags:
-              only: /.*/
-      - build-release:
-          requires:
-            - analyze-and-test
+      - verify
+      - build_signed:
           filters:
             branches:
               only: master
+  release:
+    jobs:
+      - release:
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
