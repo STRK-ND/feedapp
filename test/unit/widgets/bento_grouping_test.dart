@@ -22,15 +22,15 @@ void main() {
   final today = DateTime(now.year, now.month, now.day);
 
   test('articles older than yesterday land in Earlier, not conflated', () {
-    final out = groupSavedByRecency(
-      [
-        _a('a', today.add(const Duration(hours: 2))),
-        _a('b', today.subtract(const Duration(days: 1)).add(const Duration(hours: 5))),
-        _a('c', today.subtract(const Duration(days: 5))),
-        _a('d', today.subtract(const Duration(days: 40))),
-      ],
-      now: now,
-    );
+    final out = groupSavedByRecency([
+      _a('a', today.add(const Duration(hours: 2))),
+      _a(
+        'b',
+        today.subtract(const Duration(days: 1)).add(const Duration(hours: 5)),
+      ),
+      _a('c', today.subtract(const Duration(days: 5))),
+      _a('d', today.subtract(const Duration(days: 40))),
+    ], now: now);
 
     expect(out.map((g) => g.label).toList(), [
       'Saved today',
@@ -41,24 +41,23 @@ void main() {
     expect(earlier.map((a) => a.id).toList(), ['c', 'd']);
   });
 
-  test('empty buckets are omitted and order is Today → Yesterday → Earlier', () {
-    final out = groupSavedByRecency(
-      [_a('old', today.subtract(const Duration(days: 10)))],
-      now: now,
-    );
+  test(
+    'empty buckets are omitted and order is Today → Yesterday → Earlier',
+    () {
+      final out = groupSavedByRecency([
+        _a('old', today.subtract(const Duration(days: 10))),
+      ], now: now);
 
-    expect(out.length, 1);
-    expect(out.single.label, 'Earlier');
-  });
+      expect(out.length, 1);
+      expect(out.single.label, 'Earlier');
+    },
+  );
 
   test('within-group sort is newest first', () {
-    final out = groupSavedByRecency(
-      [
-        _a('old', today.subtract(const Duration(days: 40))),
-        _a('newer', today.subtract(const Duration(days: 5))),
-      ],
-      now: now,
-    );
+    final out = groupSavedByRecency([
+      _a('old', today.subtract(const Duration(days: 40))),
+      _a('newer', today.subtract(const Duration(days: 5))),
+    ], now: now);
 
     expect(out.single.label, 'Earlier');
     expect(out.single.items.map((a) => a.id).toList(), ['newer', 'old']);

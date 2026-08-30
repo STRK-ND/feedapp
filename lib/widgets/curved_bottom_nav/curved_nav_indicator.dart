@@ -44,15 +44,14 @@ class CurvedNavBarPainter extends CustomPainter {
     canvas.drawRRect(
       bgRRect,
       Paint()
-        ..color = isDark
-            ? AppColors.groundElev
-            : CurvedNavTokens.lightBarFill,
+        ..color = isDark ? AppColors.groundElev : CurvedNavTokens.lightBarFill,
     );
     canvas.drawRRect(
       bgRRect,
       Paint()
-        ..color = (isDark ? AppColors.ruleOnGround : AppColors.rule)
-            .withValues(alpha: 1)
+        ..color = (isDark ? AppColors.ruleOnGround : AppColors.rule).withValues(
+          alpha: 1,
+        )
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.5,
     );

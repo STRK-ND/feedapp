@@ -101,21 +101,24 @@ void main() {
     });
 
     group('saveSavedArticles / loadSavedArticles', () {
-      test('saves and loads saved articles roundtrip preserving order', () async {
-        final articles = [
-          _makeArticle(id: '1', title: 'Saved 1', isSaved: true),
-          _makeArticle(id: '2', title: 'Saved 2', isSaved: true),
-        ];
+      test(
+        'saves and loads saved articles roundtrip preserving order',
+        () async {
+          final articles = [
+            _makeArticle(id: '1', title: 'Saved 1', isSaved: true),
+            _makeArticle(id: '2', title: 'Saved 2', isSaved: true),
+          ];
 
-        await service.saveSavedArticles(articles);
-        final loaded = await service.loadSavedArticles();
+          await service.saveSavedArticles(articles);
+          final loaded = await service.loadSavedArticles();
 
-        expect(loaded.length, 2);
-        // Insertion order preserved (position column), not date order.
-        expect(loaded[0].title, 'Saved 1');
-        expect(loaded[1].title, 'Saved 2');
-        expect(loaded[0].isSaved, true);
-      });
+          expect(loaded.length, 2);
+          // Insertion order preserved (position column), not date order.
+          expect(loaded[0].title, 'Saved 1');
+          expect(loaded[1].title, 'Saved 2');
+          expect(loaded[0].isSaved, true);
+        },
+      );
 
       test('returns empty list when no saved articles', () async {
         final loaded = await service.loadSavedArticles();
@@ -134,10 +137,11 @@ void main() {
 
         // Inject a row whose payload fails Article.fromJson (title is a
         // number). Row-level isolation means the good article survives.
-        await db.insert(
-          'articles',
-          {'id': 'bad', 'pub_date': 0, 'payload': '{"id":"bad","title":123}'},
-        );
+        await db.insert('articles', {
+          'id': 'bad',
+          'pub_date': 0,
+          'payload': '{"id":"bad","title":123}',
+        });
 
         final loaded = await svc.loadArticles();
         expect(loaded.any((a) => a.id == 'good-1'), isTrue);
@@ -186,23 +190,26 @@ void main() {
     });
 
     group('clearFeedCache', () {
-      test('deletes articles and last refresh but keeps saved articles', () async {
-        await service.saveArticles([_makeArticle(id: '1', title: 'Cached')]);
-        await service.saveSavedArticles([
-          _makeArticle(id: '2', title: 'Saved'),
-        ]);
-        await service.saveLastRefreshTime(DateTime.now());
+      test(
+        'deletes articles and last refresh but keeps saved articles',
+        () async {
+          await service.saveArticles([_makeArticle(id: '1', title: 'Cached')]);
+          await service.saveSavedArticles([
+            _makeArticle(id: '2', title: 'Saved'),
+          ]);
+          await service.saveLastRefreshTime(DateTime.now());
 
-        await service.clearFeedCache();
+          await service.clearFeedCache();
 
-        // Cache is gone…
-        expect(await service.loadArticles(), isEmpty);
-        expect(await service.loadLastRefreshTime(), isNull);
-        // …but user data survives.
-        final saved = await service.loadSavedArticles();
-        expect(saved.length, 1);
-        expect(saved.first.title, 'Saved');
-      });
+          // Cache is gone…
+          expect(await service.loadArticles(), isEmpty);
+          expect(await service.loadLastRefreshTime(), isNull);
+          // …but user data survives.
+          final saved = await service.loadSavedArticles();
+          expect(saved.length, 1);
+          expect(saved.first.title, 'Saved');
+        },
+      );
 
       test('is safe to call on empty storage', () async {
         await service.clearFeedCache();
@@ -212,9 +219,7 @@ void main() {
 
     group('legacy blob migration', () {
       test('imports pre-sqlite blobs once and marks done', () async {
-        final legacyArticles = [
-          _makeArticle(id: 'legacy-1', title: 'Legacy'),
-        ];
+        final legacyArticles = [_makeArticle(id: 'legacy-1', title: 'Legacy')];
         mockStorage.store['articles'] = jsonEncodeList(legacyArticles);
         mockStorage.store['savedArticles'] = jsonEncodeList([
           _makeArticle(id: 'legacy-saved', title: 'LS', isSaved: true),

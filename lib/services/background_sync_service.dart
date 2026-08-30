@@ -54,8 +54,11 @@ void callbackDispatcher() {
       // bootstrap Firebase itself. Best-effort: retry still happens below.
       try {
         if (Firebase.apps.isEmpty) await Firebase.initializeApp();
-        await FirebaseCrashlytics.instance
-            .recordError(e, s, reason: kBackgroundSyncTaskName);
+        await FirebaseCrashlytics.instance.recordError(
+          e,
+          s,
+          reason: kBackgroundSyncTaskName,
+        );
       } catch (_) {}
       // Returning false asks WorkManager to retry with backoff.
       return false;
@@ -132,6 +135,8 @@ Future<void> scheduleBackgroundSync(SettingsService settings) async {
     );
   } catch (e) {
     // Expected in widget/unit tests (no platform channel) — stay quiet-ish.
-    unawaited(ErrorHandler.logError('scheduleBackgroundSync skipped', error: e));
+    unawaited(
+      ErrorHandler.logError('scheduleBackgroundSync skipped', error: e),
+    );
   }
 }

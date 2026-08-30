@@ -21,9 +21,7 @@ Future<void> main() async {
     FlutterError.presentError(details);
     // Crashlytics only sees the app once splash has initialized Firebase.
     if (Firebase.apps.isNotEmpty) {
-      unawaited(
-        FirebaseCrashlytics.instance.recordFlutterFatalError(details),
-      );
+      unawaited(FirebaseCrashlytics.instance.recordFlutterFatalError(details));
     }
     unawaited(
       ErrorHandler.logError(
@@ -37,11 +35,7 @@ Future<void> main() async {
   PlatformDispatcher.instance.onError = (error, stack) {
     if (Firebase.apps.isNotEmpty) {
       unawaited(
-        FirebaseCrashlytics.instance.recordError(
-          error,
-          stack,
-          fatal: true,
-        ),
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
       );
     }
     unawaited(

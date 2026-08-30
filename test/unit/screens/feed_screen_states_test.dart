@@ -148,9 +148,7 @@ Future<void> _pumpFeed(
   getIt.registerLazySingleton<SettingsService>(() => settings);
   // Pure-Dart storage double: sqlite (ffi) cannot run inside a
   // testWidgets FakeAsync zone — real I/O futures never complete there.
-  getIt.registerLazySingleton<StorageService>(
-    () => _MemStorageService(),
-  );
+  getIt.registerLazySingleton<StorageService>(() => _MemStorageService());
   getIt.registerLazySingleton<ArticleRepository>(
     () => ArticleRepository(
       storageService: getIt<StorageService>(),

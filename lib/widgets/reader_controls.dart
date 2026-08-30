@@ -109,8 +109,9 @@ class _ThemeSwatches extends StatelessWidget {
                     color: selected
                         ? AppColors.primary
                         : (isDark
-                            ? AppColors.paperOnGroundFaint
-                            : AppColors.rule).withValues(alpha: 0.6),
+                                  ? AppColors.paperOnGroundFaint
+                                  : AppColors.rule)
+                              .withValues(alpha: 0.6),
                     width: selected ? 2.5 : 1,
                   ),
                 ),
@@ -351,7 +352,10 @@ class _AaPanelState extends State<_AaPanel> {
           const SizedBox(height: AppSpacing.s3),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text('WIDEN MEASURE', style: AppType.monoEyebrow(color: soft)),
+            title: Text(
+              'WIDEN MEASURE',
+              style: AppType.monoEyebrow(color: soft),
+            ),
             subtitle: Text(
               'Cap line length at 64 characters. Reads as a column.',
               style: AppType.bodyMedium(color: ink),
@@ -367,10 +371,7 @@ class _AaPanelState extends State<_AaPanel> {
           // Body font — DM Sans (default) vs Lora (editorial contrast).
           Row(
             children: [
-              Text(
-                'BODY FONT',
-                style: AppType.monoEyebrow(color: soft),
-              ),
+              Text('BODY FONT', style: AppType.monoEyebrow(color: soft)),
             ],
           ),
           const SizedBox(height: AppSpacing.s2),
@@ -411,20 +412,14 @@ class _BodyFontSegment extends StatelessWidget {
           _Segment(
             label: 'DM SANS',
             sample: 'Aa',
-            style: GoogleFonts.dmSans(
-              fontWeight: FontWeight.w600,
-              color: ink,
-            ),
+            style: GoogleFonts.dmSans(fontWeight: FontWeight.w600, color: ink),
             selected: value == 'dm',
             onTap: () => onChange('dm'),
           ),
           _Segment(
             label: 'LORA',
             sample: 'Aa',
-            style: GoogleFonts.lora(
-              fontWeight: FontWeight.w600,
-              color: ink,
-            ),
+            style: GoogleFonts.lora(fontWeight: FontWeight.w600, color: ink),
             selected: value == 'lora',
             onTap: () => onChange('lora'),
           ),

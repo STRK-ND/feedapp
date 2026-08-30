@@ -132,22 +132,9 @@ class RssFeedService {
 
   static const String _cacheKey = 'source_registry_v1';
 
-  /// Worker icon name → Material icon. Unknown names fall back to the
-  /// generic feed icon.
-  static const Map<String, IconData> _kIconNames = {
-    'devices': Icons.devices,
-    'memory': Icons.memory,
-    'public': Icons.public,
-    'biotech': Icons.biotech,
-    'sports_soccer': Icons.sports_soccer,
-    'theaters': Icons.theaters_rounded,
-    'computer': Icons.computer,
-    'rocket_launch': Icons.rocket_launch,
-    'devices_other': Icons.devices_other,
-    'newspaper': Icons.newspaper,
-    'sports_esports': Icons.sports_esports,
-    'rocket': Icons.rocket,
-  };
+  /// Worker icon name → Material icon mapping lives in
+  /// `rss_source.dart` (`kSourceIcons`) so the model's cache round-trip
+  /// resolves against the same const icon set.
 
   final http.Client _httpClient;
   Future<SharedPreferences>? _prefsFuture;
@@ -197,8 +184,8 @@ class RssFeedService {
           .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
       if (response.statusCode != 200) return false;
 
-      final items = (jsonDecode(response.body)
-          as Map<String, dynamic>)['sources'];
+      final items =
+          (jsonDecode(response.body) as Map<String, dynamic>)['sources'];
       if (items is! List || items.isEmpty) return false;
 
       final parsed = items
@@ -233,7 +220,7 @@ class RssFeedService {
       url: url,
       category: category,
       color: _colorForName(json['color'] as String?, category),
-      icon: _kIconNames[json['icon'] as String?] ?? RssSource.customIcon,
+      icon: kSourceIcons[json['icon'] as String?] ?? RssSource.customIcon,
     );
   }
 

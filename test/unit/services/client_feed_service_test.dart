@@ -14,9 +14,7 @@ void main() {
 
   ClientFeedService serviceWith(String body, {int status = 200}) {
     return ClientFeedService(
-      httpClient: MockClient(
-        (request) async => http.Response(body, status),
-      ),
+      httpClient: MockClient((request) async => http.Response(body, status)),
     );
   }
 
@@ -119,19 +117,15 @@ void main() {
   group('ClientFeedService.fetchSourceArticles', () {
     test('throws on non-200', () async {
       final service = serviceWith('nope', status: 500);
-      await expectLater(
-        service.fetchSourceArticles(source),
-        throwsException,
-      );
+      await expectLater(service.fetchSourceArticles(source), throwsException);
     });
 
     test('caps items at maxArticlesPerSource', () async {
-      const item = '<item><title>t</title>'
+      const item =
+          '<item><title>t</title>'
           '<link>https://example.com/%ID%</link></item>';
-      final body = '<rss><channel>${List.generate(
-        40,
-        (i) => item.replaceAll('%ID%', '$i'),
-      ).join()}</channel></rss>';
+      final body =
+          '<rss><channel>${List.generate(40, (i) => item.replaceAll('%ID%', '$i')).join()}</channel></rss>';
 
       final service = ClientFeedService(
         httpClient: MockClient((request) async => http.Response(body, 200)),

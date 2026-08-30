@@ -91,7 +91,11 @@ class FeedDatabase {
   /// last-write-wins merges. Legacy rows read as 0 so remote state wins
   /// on the first sync after upgrade.
   @visibleForTesting
-  static Future<void> migrate(Database db, int oldVersion, int newVersion) async {
+  static Future<void> migrate(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     if (oldVersion < 2) {
       await db.execute(
         'ALTER TABLE $_articlesTable ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
@@ -141,16 +145,12 @@ class FeedDatabase {
   /// [AppConfig.maxCachedArticles] rows on every swipe.
   Future<void> upsertArticle(Article article) async {
     final db = await _open();
-    await db.insert(
-      _articlesTable,
-      {
-        'id': article.id,
-        'pub_date': article.pubDate.millisecondsSinceEpoch,
-        'payload': encodeArticle(article),
-        'updated_at': _nowMs(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(_articlesTable, {
+      'id': article.id,
+      'pub_date': article.pubDate.millisecondsSinceEpoch,
+      'payload': encodeArticle(article),
+      'updated_at': _nowMs(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// Upsert several article rows in one transaction — bulk flag flips
@@ -192,7 +192,12 @@ class FeedDatabase {
         limit: 1,
       );
       if (existing.isNotEmpty) {
-        await txn.update(_savedTable, row, where: 'id = ?', whereArgs: [article.id]);
+        await txn.update(
+          _savedTable,
+          row,
+          where: 'id = ?',
+          whereArgs: [article.id],
+        );
       } else {
         await txn.rawUpdate('UPDATE $_savedTable SET position = position + 1');
         await txn.insert(_savedTable, {
@@ -225,10 +230,7 @@ class FeedDatabase {
             flipped = a.copyWith(isSaved: false);
             await txn.update(
               _articlesTable,
-              {
-                'payload': encodeArticle(flipped!),
-                'updated_at': _nowMs(),
-              },
+              {'payload': encodeArticle(flipped!), 'updated_at': _nowMs()},
               where: 'id = ?',
               whereArgs: [id],
             );
@@ -274,10 +276,12 @@ class FeedDatabase {
   Future<Map<String, int>> loadArticleTimestamps() async {
     try {
       final db = await _open();
-      final rows = await db.query(_articlesTable, columns: ['id', 'updated_at']);
+      final rows = await db.query(
+        _articlesTable,
+        columns: ['id', 'updated_at'],
+      );
       return {
-        for (final r in rows)
-          r['id'] as String: (r['updated_at'] as int?) ?? 0,
+        for (final r in rows) r['id'] as String: (r['updated_at'] as int?) ?? 0,
       };
     } catch (e) {
       debugPrint('[FeedDatabase] loadArticleTimestamps failed: $e');
@@ -306,7 +310,10 @@ class FeedDatabase {
   Future<List<Article>> _loadAll(String table) =>
       _loadRows(table, orderBy: 'pub_date DESC, id ASC');
 
-  Future<List<Article>> _loadRows(String table, {required String orderBy}) async {
+  Future<List<Article>> _loadRows(
+    String table, {
+    required String orderBy,
+  }) async {
     final db = await _open();
     try {
       final rows = await db.query(table, orderBy: orderBy);

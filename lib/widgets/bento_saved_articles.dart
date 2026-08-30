@@ -215,7 +215,9 @@ List<_Group> _groupByRecency(List<Article> articles) {
           g.label,
           g.label == 'Saved today'
               ? SectionDensity.relaxed
-              : (g.label == 'Yesterday' ? SectionDensity.moderate : SectionDensity.compact),
+              : (g.label == 'Yesterday'
+                    ? SectionDensity.moderate
+                    : SectionDensity.compact),
           g.items,
         ),
       )

@@ -93,16 +93,16 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   }
 
   IconData get _ttsIcon => switch (_ttsState) {
-        TtsState.playing => Icons.pause_rounded,
-        TtsState.paused => Icons.play_arrow_rounded,
-        TtsState.stopped => Icons.graphic_eq_rounded,
-      };
+    TtsState.playing => Icons.pause_rounded,
+    TtsState.paused => Icons.play_arrow_rounded,
+    TtsState.stopped => Icons.graphic_eq_rounded,
+  };
 
   String get _ttsLabel => switch (_ttsState) {
-        TtsState.playing => 'Pause',
-        TtsState.paused => 'Resume',
-        TtsState.stopped => 'Listen',
-      };
+    TtsState.playing => 'Pause',
+    TtsState.paused => 'Resume',
+    TtsState.stopped => 'Listen',
+  };
 
   Future<void> _onListenTap() async {
     final tts = _tts;
@@ -145,9 +145,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     if (isReaderThemeLocked(t, notifier.isPro)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context).proThemeLocked(t.label),
-          ),
+          content: Text(AppLocalizations.of(context).proThemeLocked(t.label)),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -599,8 +597,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          AppLocalizations.of(context)
-                                              .proThemeLocked(t.label),
+                                          AppLocalizations.of(
+                                            context,
+                                          ).proThemeLocked(t.label),
                                         ),
                                         duration: const Duration(seconds: 2),
                                       ),
@@ -646,7 +645,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                           ),
                                           const SizedBox(height: 16),
                                           Text(
-                                            AppLocalizations.of(context).loadingFullArticle,
+                                            AppLocalizations.of(
+                                              context,
+                                            ).loadingFullArticle,
                                             style: GoogleFonts.dmSans(
                                               fontSize: 14,
                                               color: palette.soft,

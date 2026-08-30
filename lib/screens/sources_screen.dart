@@ -88,7 +88,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
   String _unreadSubtitle(RssSource s) {
     final l10n = AppLocalizations.of(context);
     final count = _unreadBySource[s.id] ?? 0;
-    return count == 0 ? l10n.sourceUnsubscribedSubtitle : l10n.sourceUnreadCount(count);
+    return count == 0
+        ? l10n.sourceUnsubscribedSubtitle
+        : l10n.sourceUnreadCount(count);
   }
 
   Future<void> _toggle(RssSource s) async {
@@ -179,7 +181,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
                 !uri.hasScheme ||
                 !(uri.scheme == 'http' || uri.scheme == 'https') ||
                 uri.host.isEmpty) {
-              setSheetState(() => errorText = AppLocalizations.of(ctx).invalidUrlError);
+              setSheetState(
+                () => errorText = AppLocalizations.of(ctx).invalidUrlError,
+              );
               return;
             }
             final settings = getIt<SettingsService>();
@@ -199,14 +203,16 @@ class _SourcesScreenState extends State<SourcesScreen> {
               left: AppSpacing.s4,
               right: AppSpacing.s4,
               top: AppSpacing.s5,
-              bottom:
-                  MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.s5,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.s5,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(AppLocalizations.of(ctx).addSheetTitle, style: AppType.headlineSmall()),
+                Text(
+                  AppLocalizations.of(ctx).addSheetTitle,
+                  style: AppType.headlineSmall(),
+                ),
                 const SizedBox(height: AppSpacing.s2),
                 Text(
                   AppLocalizations.of(ctx).addSheetSubtitle,
@@ -284,7 +290,8 @@ class _SourcesScreenState extends State<SourcesScreen> {
     final subscribedCustom = _customSources
         .where((s) => _subscriptions.contains(s.id))
         .toList();
-    final subscribedCount = subscribedCanonical.length + subscribedCustom.length;
+    final subscribedCount =
+        subscribedCanonical.length + subscribedCustom.length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -482,9 +489,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
 
       if (bytes.length > AppConfig.maxXmlSizeBytes) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.opmlFileTooLarge)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.opmlFileTooLarge)));
         return;
       }
 
@@ -493,9 +500,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
 
       if (urls.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.opmlNoUrlsFound)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.opmlNoUrlsFound)));
         return;
       }
 
@@ -527,9 +534,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
       unawaited(ErrorHandler.logError('OPML import failed', error: e));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).opmlImportFailed),
-        ),
+        SnackBar(content: Text(AppLocalizations.of(context).opmlImportFailed)),
       );
     }
   }
@@ -542,22 +547,21 @@ class _SourcesScreenState extends State<SourcesScreen> {
       final subscribed = [
         ...getIt<RssFeedService>().sources,
         ..._customSources,
-      ]
-          .where((s) => _subscriptions.contains(s.id))
-          .toList();
+      ].where((s) => _subscriptions.contains(s.id)).toList();
 
       if (subscribed.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              AppLocalizations.of(context).opmlNothingToExport,
-            ),
+            content: Text(AppLocalizations.of(context).opmlNothingToExport),
           ),
         );
         return;
       }
 
-      final xml = buildOpmlDocument(subscribed, title: 'Curated Feeds subscriptions');
+      final xml = buildOpmlDocument(
+        subscribed,
+        title: 'Curated Feeds subscriptions',
+      );
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/curated-feeds-subscriptions.opml');
       await file.writeAsString(xml, flush: true);
@@ -573,14 +577,10 @@ class _SourcesScreenState extends State<SourcesScreen> {
         category: 'sources',
       );
     } catch (e) {
-      unawaited(
-        ErrorHandler.logError('OPML export failed', error: e),
-      );
+      unawaited(ErrorHandler.logError('OPML export failed', error: e));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).opmlExportFailed),
-        ),
+        SnackBar(content: Text(AppLocalizations.of(context).opmlExportFailed)),
       );
     }
   }
@@ -652,8 +652,9 @@ class _SourceTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
-      label: AppLocalizations.of(context)
-          .sourceTileSemantic(source.name, subtitle),
+      label: AppLocalizations.of(
+        context,
+      ).sourceTileSemantic(source.name, subtitle),
       child: GestureDetector(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -748,10 +749,12 @@ class _CategoryGroup extends StatelessWidget {
               button: true,
               selected: subscriptions.contains(s.id),
               label: subscriptions.contains(s.id)
-                  ? AppLocalizations.of(context)
-                        .sourceSubscribedSemantic(s.name)
-                  : AppLocalizations.of(context)
-                        .sourceNotSubscribedSemantic(s.name),
+                  ? AppLocalizations.of(
+                      context,
+                    ).sourceSubscribedSemantic(s.name)
+                  : AppLocalizations.of(
+                      context,
+                    ).sourceNotSubscribedSemantic(s.name),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onToggle(s),

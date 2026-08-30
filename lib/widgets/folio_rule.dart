@@ -107,9 +107,12 @@ class FolioRule extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final editionStamp = 'EDITION Nº ${edition.toString().padLeft(4, '0')}';
+          final editionStamp =
+              'EDITION Nº ${edition.toString().padLeft(4, '0')}';
           final isNarrow = constraints.maxWidth < 360;
-          final weekday = isNarrow ? _weekdayWord(date) : '${_weekdayWord(date)} ·';
+          final weekday = isNarrow
+              ? _weekdayWord(date)
+              : '${_weekdayWord(date)} ·';
 
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -117,8 +120,10 @@ class FolioRule extends StatelessWidget {
               // *Tue* — italic Playfair. The signature soft moment.
               Text(
                 weekday,
-                style: AppType.displayItalic(color: mono, fontSize: 18)
-                    .copyWith(height: 1),
+                style: AppType.displayItalic(
+                  color: mono,
+                  fontSize: 18,
+                ).copyWith(height: 1),
               ),
               const SizedBox(width: AppSpacing.s1 + 2),
               // Mono date + edition.
@@ -143,10 +148,9 @@ class FolioRule extends StatelessWidget {
                   ),
                   child: Text(
                     'PRO',
-                    style: AppType.folioTop(color: accent).copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                    ),
+                    style: AppType.folioTop(
+                      color: accent,
+                    ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
                   ),
                 ),
               ],
@@ -154,10 +158,7 @@ class FolioRule extends StatelessWidget {
               // Amber dot = the unread count, made readable. The count
               // rides next to it; no prose ("12 curated · 5 unread").
               if (hasUnread) ...[
-                Text(
-                  '$unreadCount',
-                  style: AppType.monoDateline(color: mono),
-                ),
+                Text('$unreadCount', style: AppType.monoDateline(color: mono)),
                 const SizedBox(width: AppSpacing.s1),
               ],
               Semantics(

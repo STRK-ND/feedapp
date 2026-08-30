@@ -181,7 +181,10 @@ class ThemeProvider extends ChangeNotifier {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
-      textTheme: _buildTextTheme(const Color(0xFF15131C), const Color(0xFF6B6877)),
+      textTheme: _buildTextTheme(
+        const Color(0xFF15131C),
+        const Color(0xFF6B6877),
+      ),
       dividerTheme: const DividerThemeData(
         color: Color(0xFFE5E7EB),
         thickness: 1,
@@ -283,7 +286,10 @@ class ThemeProvider extends ChangeNotifier {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
-      textTheme: _buildTextTheme(const Color(0xFFF8F7F4), const Color(0xFF8A8590)),
+      textTheme: _buildTextTheme(
+        const Color(0xFFF8F7F4),
+        const Color(0xFF8A8590),
+      ),
       dividerTheme: const DividerThemeData(
         color: Color(0xFF27212E),
         thickness: 1,

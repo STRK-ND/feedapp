@@ -6,19 +6,18 @@ void main() {
     String id, {
     bool isRead = false,
     bool isSaved = false,
-  }) =>
-      {
-        'id': id,
-        'title': 'T $id',
-        'description': '',
-        'fullContent': '',
-        'link': 'https://x/$id',
-        'sourceId': 's',
-        'sourceName': 'S',
-        'pubDate': 1700000000000,
-        'isRead': isRead,
-        'isSaved': isSaved,
-      };
+  }) => {
+    'id': id,
+    'title': 'T $id',
+    'description': '',
+    'fullContent': '',
+    'link': 'https://x/$id',
+    'sourceId': 's',
+    'sourceName': 'S',
+    'pubDate': 1700000000000,
+    'isRead': isRead,
+    'isSaved': isSaved,
+  };
 
   group('mergeArticles', () {
     test('remote newer than local wins; remote older is skipped', () {
@@ -103,11 +102,14 @@ void main() {
   });
 
   group('remoteSnapshotWins', () {
-    test('remote must be strictly newer; unknown local clock (0) always loses', () {
-      expect(remoteSnapshotWins(10, 5), isTrue);
-      expect(remoteSnapshotWins(5, 5), isFalse);
-      expect(remoteSnapshotWins(1, 0), isTrue);
-      expect(remoteSnapshotWins(0, 0), isFalse);
-    });
+    test(
+      'remote must be strictly newer; unknown local clock (0) always loses',
+      () {
+        expect(remoteSnapshotWins(10, 5), isTrue);
+        expect(remoteSnapshotWins(5, 5), isFalse);
+        expect(remoteSnapshotWins(1, 0), isTrue);
+        expect(remoteSnapshotWins(0, 0), isFalse);
+      },
+    );
   });
 }

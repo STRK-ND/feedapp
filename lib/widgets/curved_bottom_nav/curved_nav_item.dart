@@ -29,7 +29,9 @@ class CurvedNavItem extends StatelessWidget {
     // Reskin: the amber dot above the bar (see CurvedNavBarPainter) is the
     // only attention signal. Icon + label use the surface text colors, so
     // the bar reads as a quiet rail, not a lit bubble.
-    final color = isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant;
+    final color = isSelected
+        ? colorScheme.onSurface
+        : colorScheme.onSurfaceVariant;
 
     return Material(
       color: Colors.transparent,

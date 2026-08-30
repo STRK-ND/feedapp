@@ -207,8 +207,9 @@ class CloudSyncService implements SyncHooks {
     }
 
     final stateData = (await _syncStateDoc(uid).get()).data();
-    final deletions = ((stateData?['deletions'] as Map?) ?? const {})
-        .map((k, v) => MapEntry(k as String, (v as num).toInt()));
+    final deletions = ((stateData?['deletions'] as Map?) ?? const {}).map(
+      (k, v) => MapEntry(k as String, (v as num).toInt()),
+    );
 
     final localTs = await _storage.loadArticleTimestamps();
     final merge = mergeArticles(
@@ -229,9 +230,8 @@ class CloudSyncService implements SyncHooks {
     // re-normalizes as the user saves more).
     if (merge.toUpsert.isNotEmpty || merge.toUnsave.isNotEmpty) {
       final merged = await _storage.loadArticles();
-      final savedRows =
-          merged.where((a) => a.isSaved).toList()
-            ..sort((a, b) => b.pubDate.compareTo(a.pubDate));
+      final savedRows = merged.where((a) => a.isSaved).toList()
+        ..sort((a, b) => b.pubDate.compareTo(a.pubDate));
       await _storage.saveSavedArticles(savedRows);
       if (!_articlesRestored.isClosed) _articlesRestored.add(null);
     }
@@ -255,10 +255,10 @@ class CloudSyncService implements SyncHooks {
       final batch = _firestore.batch();
       final now = _now();
       for (final a in articles.sublist(i, end)) {
-        batch.set(
-          _articlesCol(uid).doc(a.id),
-          {'payload': a.toJson(), 'updatedAt': now},
-        );
+        batch.set(_articlesCol(uid).doc(a.id), {
+          'payload': a.toJson(),
+          'updatedAt': now,
+        });
       }
       await batch.commit();
     }

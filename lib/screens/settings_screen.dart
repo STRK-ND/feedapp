@@ -90,9 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_l10n.clearCacheDialogTitle),
-        content: Text(
-          _l10n.clearCacheDialogBody(_cachedArticles),
-        ),
+        content: Text(_l10n.clearCacheDialogBody(_cachedArticles)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -119,9 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _cachedArticles = 0;
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text(_l10n.cacheClearedSnack)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(_l10n.cacheClearedSnack)));
     }
   }
 
@@ -156,9 +152,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CheckboxListTile(
                     value: selected.contains(cat),
                     onChanged: (v) => setDialogState(
-                      () => v == true
-                          ? selected.add(cat)
-                          : selected.remove(cat),
+                      () =>
+                          v == true ? selected.add(cat) : selected.remove(cat),
                     ),
                     title: Text(cat),
                     contentPadding: EdgeInsets.zero,
@@ -330,9 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (!context.mounted) return;
                       setState(() => _notificationsEnabled = previous);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(_l10n.pushServerFailSnack),
-                        ),
+                        SnackBar(content: Text(_l10n.pushServerFailSnack)),
                       );
                     }
                   },
@@ -563,9 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(_l10n.emailCopiedSnack),
-                        ),
+                        SnackBar(content: Text(_l10n.emailCopiedSnack)),
                       );
                     }
                   },
@@ -690,9 +681,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     for (var i = 0; i < tiles.length; i++) {
       result.add(tiles[i]);
       if (i < tiles.length - 1) {
-        result.add(
-          Divider(height: 1, indent: 72, color: colorScheme.outline),
-        );
+        result.add(Divider(height: 1, indent: 72, color: colorScheme.outline));
       }
     }
     return result;
@@ -700,11 +689,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildDivider() {
     final colorScheme = Theme.of(context).colorScheme;
-    return Divider(
-      height: 1,
-      indent: 72,
-      color: colorScheme.outline,
-    );
+    return Divider(height: 1, indent: 72, color: colorScheme.outline);
   }
 
   Widget _buildSwitchTile({
@@ -782,7 +767,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Text(
         value,
-        style: GoogleFonts.dmSans(fontSize: 14, color: colorScheme.onSurfaceVariant),
+        style: GoogleFonts.dmSans(
+          fontSize: 14,
+          color: colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -1231,8 +1219,8 @@ class _FontSegment extends StatelessWidget {
               color: selected
                   ? AppColors.primary
                   : (Theme.of(context).brightness == Brightness.dark
-                      ? AppColors.paperOnGroundSoft
-                      : AppColors.inkSoft),
+                        ? AppColors.paperOnGroundSoft
+                        : AppColors.inkSoft),
             ).copyWith(letterSpacing: 0.6),
           ),
         ),
@@ -1271,9 +1259,9 @@ class _AccountCardState extends State<_AccountCard> {
   }
 
   Future<void> _openLogin() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
   }
 
   Future<void> _confirmSignOut() async {
@@ -1309,7 +1297,10 @@ class _AccountCardState extends State<_AccountCard> {
 
     final tile = user == null
         ? ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: Container(
               width: 40,
               height: 40,
@@ -1331,17 +1322,23 @@ class _AccountCardState extends State<_AccountCard> {
               l10n.accountSignedOutSubtitle,
               style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
             ),
-            trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: colorScheme.onSurfaceVariant,
+            ),
             onTap: hasAuth ? _openLogin : null,
           )
         : ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: CircleAvatar(
               radius: 20,
               backgroundImage:
                   (user.photoURL != null && user.photoURL!.isNotEmpty)
-                      ? NetworkImage(user.photoURL!)
-                      : null,
+                  ? NetworkImage(user.photoURL!)
+                  : null,
               child: (user.photoURL == null || user.photoURL!.isEmpty)
                   ? Text(
                       (user.displayName?.isNotEmpty ?? false)
@@ -1374,10 +1371,7 @@ class _AccountCardState extends State<_AccountCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outline),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [tile],
-      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [tile]),
     );
   }
 }

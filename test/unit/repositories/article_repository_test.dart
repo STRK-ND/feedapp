@@ -108,19 +108,22 @@ void main() {
         pubDate: DateTime.utc(2026, 1, 1),
       );
 
-      test('marked-read survives a refresh that re-serves the article', () async {
-        final worker = _ReplayedWorker(freshArticle());
-        final repo = ArticleRepository(workerFeedService: worker);
+      test(
+        'marked-read survives a refresh that re-serves the article',
+        () async {
+          final worker = _ReplayedWorker(freshArticle());
+          final repo = ArticleRepository(workerFeedService: worker);
 
-        repo.syncFrom([freshArticle()..isRead = true], <Article>[]);
+          repo.syncFrom([freshArticle()..isRead = true], <Article>[]);
 
-        final result = await repo.fetchNewArticles();
-        expect(result.isSuccess, true);
+          final result = await repo.fetchNewArticles();
+          expect(result.isSuccess, true);
 
-        expect(result.data!.length, 1);
-        expect(result.data!.first.id, 'verge-abc');
-        expect(result.data!.first.isRead, true);
-      });
+          expect(result.data!.length, 1);
+          expect(result.data!.first.id, 'verge-abc');
+          expect(result.data!.first.isRead, true);
+        },
+      );
 
       test('saved article stays saved across a refresh', () async {
         final worker = _ReplayedWorker(freshArticle());

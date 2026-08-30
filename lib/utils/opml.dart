@@ -37,35 +37,50 @@ Set<String> parseOpmlUrls(String opmlText) {
 /// Match parsed OPML URLs against canonical sources (by [RssSource.url]).
 /// Unknown URLs are skipped — only feeds from the canonical list are
 /// supported.
-Set<String> matchCanonicalSources(
-  Set<String> urls,
-  List<RssSource> canonical,
-) {
+Set<String> matchCanonicalSources(Set<String> urls, List<RssSource> canonical) {
   return canonical.where((s) => urls.contains(s.url)).map((s) => s.id).toSet();
 }
 
 /// Serialize sources into an OPML 2.0 document. Each source becomes one
 /// `<outline>` with both xmlUrl and htmlUrl so any reader can re-import it.
-String buildOpmlDocument(List<RssSource> sources, {String title = 'Subscriptions'}) {
+String buildOpmlDocument(
+  List<RssSource> sources, {
+  String title = 'Subscriptions',
+}) {
   final builder = XmlBuilder();
   builder.processing('xml', 'version="1.0" encoding="UTF-8"');
-  builder.element('opml', attributes: {'version': '2.0'}, nest: () {
-    builder.element('head', nest: () {
-      builder.element('title', nest: title);
-      builder.element('dateCreated',
-          nest: DateTime.now().toUtc().toIso8601String());
-    });
-    builder.element('body', nest: () {
-      for (final s in sources) {
-        builder.element('outline', attributes: {
-          'text': s.name,
-          'title': s.name,
-          'type': 'rss',
-          'xmlUrl': s.url,
-          if (s.category.isNotEmpty) 'category': s.category,
-        });
-      }
-    });
-  });
+  builder.element(
+    'opml',
+    attributes: {'version': '2.0'},
+    nest: () {
+      builder.element(
+        'head',
+        nest: () {
+          builder.element('title', nest: title);
+          builder.element(
+            'dateCreated',
+            nest: DateTime.now().toUtc().toIso8601String(),
+          );
+        },
+      );
+      builder.element(
+        'body',
+        nest: () {
+          for (final s in sources) {
+            builder.element(
+              'outline',
+              attributes: {
+                'text': s.name,
+                'title': s.name,
+                'type': 'rss',
+                'xmlUrl': s.url,
+                if (s.category.isNotEmpty) 'category': s.category,
+              },
+            );
+          }
+        },
+      );
+    },
+  );
   return builder.buildDocument().toXmlString(pretty: true, indent: '  ');
 }

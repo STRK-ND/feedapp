@@ -44,8 +44,10 @@ class AuthService {
   }
 
   Future<User?> signInWithEmail(String email, String password) async =>
-      (await _auth.signInWithEmailAndPassword(email: email, password: password))
-          .user;
+      (await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      )).user;
 
   Future<User?> registerWithEmail(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
@@ -54,9 +56,7 @@ class AuthService {
     );
     // Verification mail is a courtesy; no feature gates on it.
     unawaited(
-      cred.user
-          ?.sendEmailVerification()
-          .catchError((Object _) => <void>{}),
+      cred.user?.sendEmailVerification().catchError((Object _) => <void>{}),
     );
     return cred.user;
   }

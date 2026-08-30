@@ -34,11 +34,9 @@ class WorkerFeedService {
     // workerApiUrl is the worker base (e.g. ...workers.dev/). Append the
     // articles path so both this and the subscribe concat resolve to real
     // routes — before, replace() stayed on "/" and the worker 404'd.
-    final uri = Uri.parse(
-      AppConfig.workerApiUrl,
-    ).resolve('articles').replace(
-      queryParameters: queryParams.isEmpty ? null : queryParams,
-    );
+    final uri = Uri.parse(AppConfig.workerApiUrl)
+        .resolve('articles')
+        .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
     final url = uri.toString();
 
     debugPrint('[Worker] Fetching articles from $url');

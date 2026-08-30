@@ -12,7 +12,8 @@ import '../models/article.dart';
 
 /// One document from `users/{uid}/articles/{articleId}`.
 class RemoteArticle {
-  final Map<String, dynamic> payload; // Article JSON as stored by the push path.
+  final Map<String, dynamic>
+  payload; // Article JSON as stored by the push path.
   final int updatedAt; // client epoch-ms of the last remote write.
 
   const RemoteArticle(this.payload, this.updatedAt);

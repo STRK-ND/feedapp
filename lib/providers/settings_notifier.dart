@@ -50,8 +50,8 @@ class SettingsNotifier extends ChangeNotifier {
     if (GetIt.instance.isRegistered<CloudSyncService>()) {
       _cloudRestoreSub = GetIt.instance<CloudSyncService>().settingsRestored
           .listen((_) {
-        unawaited(loadSettings());
-      });
+            unawaited(loadSettings());
+          });
     }
   }
 

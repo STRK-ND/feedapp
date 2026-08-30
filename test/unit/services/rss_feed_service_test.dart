@@ -148,10 +148,7 @@ void main() {
         expect(await registry.refreshFromWorker(), isTrue);
         expect(registry.sources.single.id, 'verge');
         expect(registry.sources.single.color.toARGB32(), 0xFF123456);
-        expect(
-          registry.sources.single.icon.codePoint,
-          Icons.memory.codePoint,
-        );
+        expect(registry.sources.single.icon.codePoint, Icons.memory.codePoint);
 
         // Cached for the next launch.
         final prefs = await SharedPreferences.getInstance();

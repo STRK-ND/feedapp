@@ -55,11 +55,13 @@ void main() {
       'theme/font prefs', (tester) async {
     useTallViewport(tester);
 
-    await tester.pumpWidget(const MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: OnboardingScreen(),
-  ));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: OnboardingScreen(),
+      ),
+    );
 
     // Step 1 — pick a room so the theme pref is non-default.
     await tapCard(tester, 'LAMPLIGHT');
@@ -105,11 +107,13 @@ void main() {
   ) async {
     useTallViewport(tester);
 
-    await tester.pumpWidget(const MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: OnboardingScreen(),
-  ));
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: OnboardingScreen(),
+      ),
+    );
 
     await advanceStep(tester); // step 1 -> 2
     await advanceStep(tester); // step 2 -> 3

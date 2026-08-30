@@ -110,22 +110,25 @@ void main() {
       expect(customs.length, 1);
       expect(customs.single.name, 'feeds.example.com');
       expect(customs.single.url, 'https://feeds.example.com/rss.xml');
-      expect(
-        customs.single.id,
-        startsWith('custom-'),
-      );
+      expect(customs.single.id, startsWith('custom-'));
     });
 
     test('adding the same URL twice is a no-op', () async {
       final service = SettingsService();
       await service.addCustomSource('A', 'https://x.example/feed');
-      final again = await service.addCustomSource('B', 'https://X.example/feed');
+      final again = await service.addCustomSource(
+        'B',
+        'https://X.example/feed',
+      );
       expect(again.length, 1);
     });
 
     test('remove deletes the source and unsubscribes it', () async {
       final service = SettingsService();
-      final customs = await service.addCustomSource('Rm', 'https://r.example/f');
+      final customs = await service.addCustomSource(
+        'Rm',
+        'https://r.example/f',
+      );
       final id = customs.single.id;
       await service.setSubscribedSourceIds({'verge', id});
 

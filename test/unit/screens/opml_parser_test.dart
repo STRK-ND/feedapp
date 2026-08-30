@@ -64,9 +64,7 @@ void main() {
     test('canonical sources include known URLs that OPML would target', () {
       // Make sure at least some of the canonical URLs match what users
       // would import from a typical OPML file (Verge, BBC, Ars).
-      final canonicalUrls = registrySources
-          .map((s) => s.url)
-          .toList();
+      final canonicalUrls = registrySources.map((s) => s.url).toList();
       expect(
         canonicalUrls,
         containsAll(<String>[
@@ -87,10 +85,7 @@ void main() {
         </body>
       </opml>
       ''';
-      final subs = matchCanonicalSources(
-        parseOpmlUrls(opml),
-        registrySources,
-      );
+      final subs = matchCanonicalSources(parseOpmlUrls(opml), registrySources);
       expect(subs, {'verge'});
     });
 
@@ -104,10 +99,7 @@ void main() {
       ''';
       final urls = parseOpmlUrls(opml);
       expect(urls, {'https://example.com/feed.xml'});
-      expect(
-        matchCanonicalSources(urls, registrySources),
-        isEmpty,
-      );
+      expect(matchCanonicalSources(urls, registrySources), isEmpty);
     });
 
     test('mixed OPML subscribes only the matching subset', () {
@@ -120,20 +112,14 @@ void main() {
         </body>
       </opml>
       ''';
-      final subs = matchCanonicalSources(
-        parseOpmlUrls(opml),
-        registrySources,
-      );
+      final subs = matchCanonicalSources(parseOpmlUrls(opml), registrySources);
       expect(subs, {'wired', 'nasa'});
     });
 
     test('malformed OPML with a matching url still subscribes via regex', () {
       const opml =
           '<opml><body><outline xmlUrl="https://feeds.bbci.co.uk/news/rss.xml">';
-      final subs = matchCanonicalSources(
-        parseOpmlUrls(opml),
-        registrySources,
-      );
+      final subs = matchCanonicalSources(parseOpmlUrls(opml), registrySources);
       expect(subs, {'bbc'});
     });
   });
@@ -146,18 +132,13 @@ void main() {
 
       final xml = buildOpmlDocument(sources);
       final urls = parseOpmlUrls(xml);
-      final subs = matchCanonicalSources(
-        urls,
-        registrySources,
-      );
+      final subs = matchCanonicalSources(urls, registrySources);
 
       expect(subs, {'verge', 'bbc'});
     });
 
     test('document carries name, type=rss and category per source', () {
-      final verge = registrySources.firstWhere(
-        (s) => s.id == 'verge',
-      );
+      final verge = registrySources.firstWhere((s) => s.id == 'verge');
       final xml = buildOpmlDocument([verge]);
 
       expect(xml, contains('<opml version="2.0">'));

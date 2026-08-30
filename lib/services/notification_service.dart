@@ -77,8 +77,7 @@ class NotificationService {
               'topic': 'new-articles',
               'preferences': {
                 'newArticles': newArticlesEnabled,
-                if (categories.length <
-                    AppConfig.categories.length - 1)
+                if (categories.length < AppConfig.categories.length - 1)
                   'categories': categories,
               },
             }),

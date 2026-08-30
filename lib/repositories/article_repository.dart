@@ -127,11 +127,7 @@ class ArticleRepository {
 
       while (hasMore && page <= 5) {
         final response = await _workerFeedService.fetchArticles(
-          params: FilterParams(
-            page: page,
-            pageSize: 50,
-            since: watermark,
-          ),
+          params: FilterParams(page: page, pageSize: 50, since: watermark),
         );
 
         workerArticles.addAll(response.items);
@@ -155,9 +151,7 @@ class ArticleRepository {
       final articlesToAdd = [
         ...workerArticles,
         ...customArticles,
-      ]
-          .where((a) => !existingIds.contains(a.id))
-          .toList();
+      ].where((a) => !existingIds.contains(a.id)).toList();
 
       if (articlesToAdd.isEmpty) {
         debugPrint('[Repository] No new articles found');
@@ -214,9 +208,7 @@ class ArticleRepository {
       );
       return results.expand((list) => list).toList();
     } catch (e) {
-      unawaited(
-        ErrorHandler.logError('Custom source fetch skipped', error: e),
-      );
+      unawaited(ErrorHandler.logError('Custom source fetch skipped', error: e));
       return [];
     }
   }

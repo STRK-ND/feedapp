@@ -29,7 +29,10 @@ class UpdateDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    final releaseDate = _formatReleaseDate(updateInfo.releaseDate, l10n.recentlyLabel);
+    final releaseDate = _formatReleaseDate(
+      updateInfo.releaseDate,
+      l10n.recentlyLabel,
+    );
 
     return AlertDialog(
       backgroundColor: theme.colorScheme.surface,
@@ -117,9 +120,7 @@ class UpdateDialog extends StatelessWidget {
               context: context,
               builder: (context) => AlertDialog(
                 title: Text(l10n.ignoreDialogTitle),
-                content: Text(
-                  l10n.ignoreDialogBody(updateInfo.version),
-                ),
+                content: Text(l10n.ignoreDialogBody(updateInfo.version)),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),

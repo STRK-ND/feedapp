@@ -224,7 +224,9 @@ class SettingsService {
     final sources = <RssSource>[];
     for (final raw in stored) {
       try {
-        sources.add(RssSource.fromJson(jsonDecode(raw) as Map<String, dynamic>));
+        sources.add(
+          RssSource.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+        );
       } catch (_) {
         // Skip corrupt records instead of losing the whole list.
       }

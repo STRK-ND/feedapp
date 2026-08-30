@@ -123,15 +123,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String _errorText(AppLocalizations l10n) => switch (_errorCode) {
-        'invalid-email' => l10n.authErrorInvalidEmail,
-        'user-not-found' => l10n.authErrorUserNotFound,
-        'wrong-password' || 'invalid-credential' => l10n.authErrorWrongPassword,
-        'email-already-in-use' => l10n.authErrorEmailInUse,
-        'weak-password' => l10n.authErrorWeakPassword,
-        'too-many-requests' => l10n.authErrorTooManyRequests,
-        'network' => l10n.authErrorNetwork,
-        _ => l10n.authErrorGeneric,
-      };
+    'invalid-email' => l10n.authErrorInvalidEmail,
+    'user-not-found' => l10n.authErrorUserNotFound,
+    'wrong-password' || 'invalid-credential' => l10n.authErrorWrongPassword,
+    'email-already-in-use' => l10n.authErrorEmailInUse,
+    'weak-password' => l10n.authErrorWeakPassword,
+    'too-many-requests' => l10n.authErrorTooManyRequests,
+    'network' => l10n.authErrorNetwork,
+    _ => l10n.authErrorGeneric,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -150,11 +150,19 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Text(l10n.loginTitle, style: AppType.headlineSmall(color: onSurface)),
+        title: Text(
+          l10n.loginTitle,
+          style: AppType.headlineSmall(color: onSurface),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.s6, AppSpacing.s4, AppSpacing.s6, AppSpacing.s6),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s6,
+            AppSpacing.s4,
+            AppSpacing.s6,
+            AppSpacing.s6,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
@@ -171,9 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   autofillHints: const [AutofillHints.email],
                   textInputAction: TextInputAction.next,
                   style: AppType.bodyLarge(color: onSurface),
-                  decoration: _fieldDecoration(l10n.emailLabel, fill, ruleColor, onSurfaceVariant),
-                  validator: (v) =>
-                      (v == null || !v.contains('@')) ? l10n.authErrorInvalidEmail : null,
+                  decoration: _fieldDecoration(
+                    l10n.emailLabel,
+                    fill,
+                    ruleColor,
+                    onSurfaceVariant,
+                  ),
+                  validator: (v) => (v == null || !v.contains('@'))
+                      ? l10n.authErrorInvalidEmail
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.s4),
                 TextFormField(
@@ -183,17 +197,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submitEmail(),
                   style: AppType.bodyLarge(color: onSurface),
-                  decoration: _fieldDecoration(
-                    l10n.passwordLabel, fill, ruleColor, onSurfaceVariant,
-                  ).copyWith(
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(
-                        _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: onSurfaceVariant,
+                  decoration:
+                      _fieldDecoration(
+                        l10n.passwordLabel,
+                        fill,
+                        ruleColor,
+                        onSurfaceVariant,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                          icon: Icon(
+                            _obscure
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
                   validator: (v) => (v == null || v.length < 6)
                       ? l10n.authErrorWeakPassword
                       : null,
@@ -219,7 +239,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 FilledButton(
                   onPressed: _busy ? null : _submitEmail,
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s4,
+                    ),
                   ),
                   child: _busy
                       ? SizedBox(
@@ -231,7 +253,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         )
                       : Text(
-                          _register ? l10n.loginRegisterCta : l10n.loginEmailCta,
+                          _register
+                              ? l10n.loginRegisterCta
+                              : l10n.loginEmailCta,
                           style: AppType.labelLarge(color: onSurface),
                         ),
                 ),
@@ -243,7 +267,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           _register = !_register;
                           _errorCode = null;
                         }),
-                  child: Text(_register ? l10n.loginToggleToSignIn : l10n.loginToggleToRegister),
+                  child: Text(
+                    _register
+                        ? l10n.loginToggleToSignIn
+                        : l10n.loginToggleToRegister,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
@@ -251,8 +279,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Expanded(child: Divider(color: ruleColor)),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s3),
-                        child: Text('OR', style: AppType.monoEyebrow(color: onSurfaceVariant)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s3,
+                        ),
+                        child: Text(
+                          'OR',
+                          style: AppType.monoEyebrow(color: onSurfaceVariant),
+                        ),
                       ),
                       Expanded(child: Divider(color: ruleColor)),
                     ],
@@ -261,7 +294,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _signInGoogle,
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.s4,
+                    ),
                     side: BorderSide(color: ruleColor),
                   ),
                   icon: const _GoogleMark(size: 20),
@@ -333,19 +368,31 @@ class _GoogleMarkPainter extends CustomPainter {
     // Angles are clockwise from +x in Flutter's y-down space:
     // 180° = 9 o'clock, 270° = 12 o'clock.
     canvas.drawArc(
-      arcRect, 3.14159, 3.14159, false,
+      arcRect,
+      3.14159,
+      3.14159,
+      false,
       paint..color = const Color(0xFF4285F4),
     ); // blue: 9:00 → 3:00 through the top
     canvas.drawArc(
-      arcRect, 0.35, 0.43, false,
+      arcRect,
+      0.35,
+      0.43,
+      false,
       paint..color = const Color(0xFFEA4335),
     ); // red: just below the bar → 4:30
     canvas.drawArc(
-      arcRect, 0.7854, 1.5708, false,
+      arcRect,
+      0.7854,
+      1.5708,
+      false,
       paint..color = const Color(0xFFFBBC05),
     ); // yellow: 4:30 → 7:30
     canvas.drawArc(
-      arcRect, 2.3562, 0.7854, false,
+      arcRect,
+      2.3562,
+      0.7854,
+      false,
       paint..color = const Color(0xFF34A853),
     ); // green: 7:30 → 9:00
     // Horizontal bar of the G, from center to the right edge.

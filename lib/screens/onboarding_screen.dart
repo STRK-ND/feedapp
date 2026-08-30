@@ -208,7 +208,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               _step < 2
                   ? AppLocalizations.of(context).obContinueCta
                   : (_pickedSources.isNotEmpty
-                        ? AppLocalizations.of(context).obAddAndContinueCta(_pickedSources.length)
+                        ? AppLocalizations.of(
+                            context,
+                          ).obAddAndContinueCta(_pickedSources.length)
                         : AppLocalizations.of(context).obContinueWithoutCta),
               style: AppType.labelLarge(
                 color: Colors.white,
@@ -277,11 +279,16 @@ class _StepPickRoom extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppLocalizations.of(context).obStep1Eyebrow, style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
+          Text(
+            AppLocalizations.of(context).obStep1Eyebrow,
+            style: AppType.monoEyebrow(color: cs.onSurfaceVariant),
+          ),
           const SizedBox(height: AppSpacing.s3),
           Text(
             AppLocalizations.of(context).obStep1Title,
-            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: cs.onSurface,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
@@ -467,11 +474,16 @@ class _StepReaderPrefs extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppLocalizations.of(context).obStep2Eyebrow, style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
+          Text(
+            AppLocalizations.of(context).obStep2Eyebrow,
+            style: AppType.monoEyebrow(color: cs.onSurfaceVariant),
+          ),
           const SizedBox(height: AppSpacing.s3),
           Text(
             AppLocalizations.of(context).obStep2Title,
-            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: cs.onSurface,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s6),
           // Live preview — a mode-matched card (dark groundElev / light raised),
@@ -492,7 +504,9 @@ class _StepReaderPrefs extends StatelessWidget {
                   Text(
                     'CURATED · 07.07 · 14:03',
                     style: AppType.monoEyebrow(
-                      color: isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft,
+                      color: isDark
+                          ? AppColors.paperOnGroundSoft
+                          : AppColors.inkSoft,
                     ).copyWith(letterSpacing: 0.6),
                   ),
                 const SizedBox(height: AppSpacing.s2),
@@ -506,7 +520,9 @@ class _StepReaderPrefs extends StatelessWidget {
                 Text(
                   AppLocalizations.of(context).lineHeightExplainer,
                   style: AppType.bodyMedium(
-                    color: isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft,
+                    color: isDark
+                        ? AppColors.paperOnGroundSoft
+                        : AppColors.inkSoft,
                   ),
                 ),
               ],
@@ -634,8 +650,7 @@ class _StepAddSources extends StatelessWidget {
     'nasa',
   ];
   List<({String id, String name, String category, IconData icon})>
-  get _sources => getIt<RssFeedService>()
-      .sources
+  get _sources => getIt<RssFeedService>().sources
       .where((s) => _sourceIds.contains(s.id))
       .map((s) => (id: s.id, name: s.name, category: s.category, icon: s.icon))
       .toList();
@@ -653,11 +668,16 @@ class _StepAddSources extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('PICK A FIRST SOURCE', style: AppType.monoEyebrow(color: cs.onSurfaceVariant)),
+          Text(
+            'PICK A FIRST SOURCE',
+            style: AppType.monoEyebrow(color: cs.onSurfaceVariant),
+          ),
           const SizedBox(height: AppSpacing.s3),
           Text(
             AppLocalizations.of(context).obStep3Title,
-            style: AppType.displayLarge(color: cs.onSurface).copyWith(height: 1.05),
+            style: AppType.displayLarge(
+              color: cs.onSurface,
+            ).copyWith(height: 1.05),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
@@ -702,10 +722,9 @@ class _SourceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final ruleColor =
-        Theme.of(context).brightness == Brightness.dark
-            ? AppColors.ruleOnGround
-            : AppColors.rule;
+    final ruleColor = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.ruleOnGround
+        : AppColors.rule;
     return Semantics(
       button: true,
       selected: picked,

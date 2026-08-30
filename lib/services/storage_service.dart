@@ -185,7 +185,9 @@ class StorageService {
       final savedJson = await legacySaved;
 
       if (articlesJson != null) {
-        await _database.saveArticles(_decodeArticleList(articlesJson, key: kArticlesKey));
+        await _database.saveArticles(
+          _decodeArticleList(articlesJson, key: kArticlesKey),
+        );
       }
       if (savedJson != null) {
         await _database.saveSavedArticles(
@@ -199,7 +201,9 @@ class StorageService {
     } catch (e) {
       // Migration failure must not break the app: next launch retries.
       _migrationChecked = false;
-      unawaited(ErrorHandler.logError('Legacy storage migration failed', error: e));
+      unawaited(
+        ErrorHandler.logError('Legacy storage migration failed', error: e),
+      );
     }
   }
 

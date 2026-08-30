@@ -25,15 +25,15 @@ class _StubRepository extends ArticleRepository {
 }
 
 Article _article(String id) => Article(
-      id: id,
-      title: id,
-      description: '',
-      fullContent: '',
-      link: 'https://example.com/$id',
-      sourceId: 'verge',
-      sourceName: 'The Verge',
-      pubDate: DateTime.utc(2026, 1, 1),
-    );
+  id: id,
+  title: id,
+  description: '',
+  fullContent: '',
+  link: 'https://example.com/$id',
+  sourceId: 'verge',
+  sourceName: 'The Verge',
+  pubDate: DateTime.utc(2026, 1, 1),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +55,10 @@ void main() {
         outcome: Result.success(<Article>[_article('a')]),
       );
 
-      final cached = await runBackgroundSync(repository: repo, settings: settings);
+      final cached = await runBackgroundSync(
+        repository: repo,
+        settings: settings,
+      );
 
       expect(cached, 0);
       expect(repo.callCount, 0);
@@ -91,15 +94,17 @@ void main() {
   });
 
   group('scheduleBackgroundSync', () {
-    test('completes without throwing when the platform channel is absent',
-        () async {
-      // Unit tests have no WorkManager channel; the service must swallow
-      // that and never break launch or the Settings toggle.
-      await settings.setAutoRefresh(false);
-      await scheduleBackgroundSync(settings);
+    test(
+      'completes without throwing when the platform channel is absent',
+      () async {
+        // Unit tests have no WorkManager channel; the service must swallow
+        // that and never break launch or the Settings toggle.
+        await settings.setAutoRefresh(false);
+        await scheduleBackgroundSync(settings);
 
-      await settings.setAutoRefresh(true);
-      await scheduleBackgroundSync(settings);
-    });
+        await settings.setAutoRefresh(true);
+        await scheduleBackgroundSync(settings);
+      },
+    );
   });
 }

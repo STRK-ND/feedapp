@@ -1,5 +1,30 @@
 import 'package:flutter/material.dart';
 
+/// Worker icon name → Material icon, shared by the source registry and
+/// the cache round-trip. All values are const so release builds can
+/// tree-shake the icon font — dynamic `IconData(...)` construction makes
+/// the shaker bail out and fails `flutter build --release` outright.
+const Map<String, IconData> kSourceIcons = {
+  'devices': Icons.devices,
+  'memory': Icons.memory,
+  'public': Icons.public,
+  'biotech': Icons.biotech,
+  'sports_soccer': Icons.sports_soccer,
+  'theaters': Icons.theaters_rounded,
+  'computer': Icons.computer,
+  'rocket_launch': Icons.rocket_launch,
+  'devices_other': Icons.devices_other,
+  'newspaper': Icons.newspaper,
+  'sports_esports': Icons.sports_esports,
+  'rocket': Icons.rocket,
+};
+
+/// Cached `iconCodePoint` → the same const IconData instance, so a prefs
+/// round-trip never constructs IconData dynamically.
+final Map<int, IconData> _iconByCodePoint = {
+  for (final entry in kSourceIcons.entries) entry.value.codePoint: entry.value,
+};
+
 /// RSS Feed Source Model
 class RssSource {
   final String id;
@@ -39,13 +64,13 @@ class RssSource {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'url': url,
-        'category': category,
-        'color': '#${color.toARGB32().toRadixString(16).substring(2)}',
-        'iconCodePoint': icon.codePoint,
-      };
+    'id': id,
+    'name': name,
+    'url': url,
+    'category': category,
+    'color': '#${color.toARGB32().toRadixString(16).substring(2)}',
+    'iconCodePoint': icon.codePoint,
+  };
 
   factory RssSource.fromJson(Map<String, dynamic> json) {
     return RssSource(
@@ -54,10 +79,9 @@ class RssSource {
       url: json['url'] as String? ?? '',
       category: json['category'] as String? ?? 'Custom',
       color: _parseColor(json['color'] as String?),
-      icon: IconData(
-        (json['iconCodePoint'] as num?)?.toInt() ?? customIcon.codePoint,
-        fontFamily: 'MaterialIcons',
-      ),
+      icon:
+          _iconByCodePoint[(json['iconCodePoint'] as num?)?.toInt()] ??
+          customIcon,
     );
   }
 

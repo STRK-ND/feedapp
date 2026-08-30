@@ -141,7 +141,9 @@ class _PaywallScreenState extends State<PaywallScreen>
       } else if (purchase.status == PurchaseStatus.error) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(purchase.error?.message ?? 'Purchase failed')),
+            SnackBar(
+              content: Text(purchase.error?.message ?? 'Purchase failed'),
+            ),
           );
         }
       }
@@ -154,7 +156,9 @@ class _PaywallScreenState extends State<PaywallScreen>
   void _buy() {
     final product = _product;
     if (product == null) return;
-    _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product));
+    _iap.buyNonConsumable(
+      purchaseParam: PurchaseParam(productDetails: product),
+    );
   }
 
   void _restore() {
@@ -219,16 +223,19 @@ class _PaywallScreenState extends State<PaywallScreen>
                           width: 96,
                           height: 96,
                           child: AnimatedBuilder(
-                            animation: Listenable.merge(
-                                [_drawProgress, _revealProgress]),
+                            animation: Listenable.merge([
+                              _drawProgress,
+                              _revealProgress,
+                            ]),
                             builder: (context, _) {
                               return CustomPaint(
                                 painter: _FolioGlyphPainter(
                                   drawProgress: _drawProgress.value,
                                   revealProgress: _revealProgress.value,
                                   strokeColor: AppColors.primary,
-                                  fillColor: AppColors.primary
-                                      .withValues(alpha: 0.16),
+                                  fillColor: AppColors.primary.withValues(
+                                    alpha: 0.16,
+                                  ),
                                 ),
                               );
                             },
@@ -260,8 +267,8 @@ class _PaywallScreenState extends State<PaywallScreen>
                         AnimatedBuilder(
                           animation: _revealProgress,
                           builder: (context, _) {
-                            final subtitleProgress = (_revealProgress.value - 0.4)
-                                .clamp(0.0, 1.0) /
+                            final subtitleProgress =
+                                (_revealProgress.value - 0.4).clamp(0.0, 1.0) /
                                 0.6;
                             return Opacity(
                               opacity: subtitleProgress,
@@ -283,16 +290,17 @@ class _PaywallScreenState extends State<PaywallScreen>
                         AnimatedBuilder(
                           animation: _revealProgress,
                           builder: (context, _) {
-                            final subtitleProgress = (_revealProgress.value - 0.4)
-                                .clamp(0.0, 1.0) /
+                            final subtitleProgress =
+                                (_revealProgress.value - 0.4).clamp(0.0, 1.0) /
                                 0.6;
                             return Opacity(
                               opacity: subtitleProgress,
                               child: Text(
                                 l10n.splashEditionLabel(
-                                  EditionState.current
-                                      .toString()
-                                      .padLeft(4, '0'),
+                                  EditionState.current.toString().padLeft(
+                                    4,
+                                    '0',
+                                  ),
                                 ),
                                 style: GoogleFonts.jetBrainsMono(
                                   fontSize: 10,
@@ -307,11 +315,7 @@ class _PaywallScreenState extends State<PaywallScreen>
                         ),
                         const SizedBox(height: AppSpacing.s8),
                         // Divider rule
-                        Container(
-                          width: 64,
-                          height: 1,
-                          color: ruleColor,
-                        ),
+                        Container(width: 64, height: 1, color: ruleColor),
                         const SizedBox(height: AppSpacing.s8),
                         // Content
                         _busy
@@ -377,11 +381,7 @@ class _ErrorState extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.cloud_off_outlined,
-          size: 48,
-          color: onSurfaceVariant,
-        ),
+        Icon(Icons.cloud_off_outlined, size: 48, color: onSurfaceVariant),
         const SizedBox(height: AppSpacing.s4),
         Text(
           l10n.paywallStoreUnavailable,
@@ -409,8 +409,9 @@ class _ErrorState extends StatelessWidget {
           ),
           child: Text(
             l10n.retryCta,
-            style: AppType.labelLarge(color: Colors.white)
-                .copyWith(letterSpacing: 1.2),
+            style: AppType.labelLarge(
+              color: Colors.white,
+            ).copyWith(letterSpacing: 1.2),
           ),
         ),
       ],
@@ -451,10 +452,7 @@ class _PurchaseContent extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s6),
         if (price != null)
-          Text(
-            price!,
-            style: AppType.titleLarge(color: AppColors.primary),
-          ),
+          Text(price!, style: AppType.titleLarge(color: AppColors.primary)),
         const SizedBox(height: AppSpacing.s8),
         SizedBox(
           width: double.infinity,
@@ -473,8 +471,9 @@ class _PurchaseContent extends StatelessWidget {
             ),
             child: Text(
               l10n.buyOnce(price ?? ''),
-              style: AppType.labelLarge(color: Colors.white)
-                  .copyWith(letterSpacing: 1.2),
+              style: AppType.labelLarge(
+                color: Colors.white,
+              ).copyWith(letterSpacing: 1.2),
             ),
           ),
         ),
@@ -489,8 +488,9 @@ class _PurchaseContent extends StatelessWidget {
           ),
           child: Text(
             l10n.restorePurchase,
-            style: AppType.monoEyebrow(color: onSurfaceVariant)
-                .copyWith(letterSpacing: 1.0),
+            style: AppType.monoEyebrow(
+              color: onSurfaceVariant,
+            ).copyWith(letterSpacing: 1.0),
           ),
         ),
       ],
@@ -539,8 +539,9 @@ class _ProThanks extends StatelessWidget {
           ),
           child: Text(
             l10n.restorePurchase,
-            style: AppType.monoEyebrow(color: onSurfaceVariant)
-                .copyWith(letterSpacing: 1.0),
+            style: AppType.monoEyebrow(
+              color: onSurfaceVariant,
+            ).copyWith(letterSpacing: 1.0),
           ),
         ),
       ],
@@ -603,8 +604,7 @@ class _FolioGlyphPainter extends CustomPainter {
     final fullPath = _buildGlyphPath(size);
     if (drawProgress < 1.0) {
       for (final metric in fullPath.computeMetrics()) {
-        final extract =
-            metric.extractPath(0, metric.length * drawProgress);
+        final extract = metric.extractPath(0, metric.length * drawProgress);
         canvas.drawPath(extract, strokePaint);
       }
     } else {

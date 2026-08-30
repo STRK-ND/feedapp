@@ -38,8 +38,7 @@ class AnalyticsService {
   static Future<void> logArticleOpen({
     required String articleId,
     required String title,
-  }) =>
-      _log('article_open', {'article_id': articleId, 'title': title});
+  }) => _log('article_open', {'article_id': articleId, 'title': title});
 
   static Future<void> logArticleShare({required String articleId}) =>
       _log('article_share', {'article_id': articleId});
@@ -50,9 +49,7 @@ class AnalyticsService {
   static Future<void> logArticleSave({required String articleId}) =>
       _log('article_save', {'article_id': articleId});
 
-  static Future<void> logArticleReadComplete({
-    required String articleId,
-  }) =>
+  static Future<void> logArticleReadComplete({required String articleId}) =>
       _log('article_read_complete', {'article_id': articleId});
 
   // Search events
@@ -66,9 +63,6 @@ class AnalyticsService {
       _log('session_end', {'duration_seconds': durationSeconds});
 
   // Error tracking
-  static Future<void> logError({
-    required String error,
-    String? stackTrace,
-  }) =>
+  static Future<void> logError({required String error, String? stackTrace}) =>
       _log('error', {'error': error, 'stack_trace': ?stackTrace});
 }

@@ -35,7 +35,8 @@ class ClientFeedService {
           Uri.parse(source.url),
           headers: {
             'User-Agent': 'CuratedFeeds/1.0 (+https://curatedfeeds.app)',
-            'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+            'Accept':
+                'application/rss+xml, application/atom+xml, application/xml, text/xml',
           },
         )
         .timeout(const Duration(seconds: AppConfig.rssTimeoutSeconds));
@@ -93,9 +94,7 @@ class ClientFeedService {
     }
 
     final rawDescription =
-        _textOf(item, 'description') ??
-        _textOf(item, 'content:encoded') ??
-        '';
+        _textOf(item, 'description') ?? _textOf(item, 'content:encoded') ?? '';
     final description = stripHtml(rawDescription);
 
     final pubDate =
@@ -167,8 +166,7 @@ class ClientFeedService {
       author: author,
       imageUrl: imageUrl,
       sourceCategory: source.category,
-      sourceColor:
-          '#${source.color.toARGB32().toRadixString(16).substring(2)}',
+      sourceColor: '#${source.color.toARGB32().toRadixString(16).substring(2)}',
       sourceIcon: 'rss_feed',
     );
   }
@@ -239,16 +237,20 @@ class ClientFeedService {
         if (url != null &&
             url.isNotEmpty &&
             (type.startsWith('image/') ||
-                RegExp(r'\.(jpe?g|png|webp|gif)', caseSensitive: false)
-                    .hasMatch(url))) {
+                RegExp(
+                  r'\.(jpe?g|png|webp|gif)',
+                  caseSensitive: false,
+                ).hasMatch(url))) {
           return url;
         }
       }
     }
     // Inline <img src> inside HTML descriptions.
     final html = item.innerText;
-    final m = RegExp(r'<img\b[^>]*src="([^"]+)"', caseSensitive: false)
-        .firstMatch(html);
+    final m = RegExp(
+      r'<img\b[^>]*src="([^"]+)"',
+      caseSensitive: false,
+    ).firstMatch(html);
     return m?.group(1);
   }
 
@@ -265,8 +267,18 @@ class ClientFeedService {
     if (m == null) return null;
 
     const months = {
-      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+      'jan': 1,
+      'feb': 2,
+      'mar': 3,
+      'apr': 4,
+      'may': 5,
+      'jun': 6,
+      'jul': 7,
+      'aug': 8,
+      'sep': 9,
+      'oct': 10,
+      'nov': 11,
+      'dec': 12,
     };
     final month = months[m.group(2)!.toLowerCase()];
     if (month == null) return null;
@@ -285,13 +297,26 @@ class ClientFeedService {
       final sign = tz[0] == '-' ? -1 : 1;
       final hours = int.parse(tz.substring(1, 3));
       final minutes = int.parse(tz.substring(3, 5));
-      utc = utc.subtract(Duration(hours: sign * hours, minutes: sign * minutes));
+      utc = utc.subtract(
+        Duration(hours: sign * hours, minutes: sign * minutes),
+      );
     } else if (tz != null) {
       const namedOffsets = {
-        'GMT': 0, 'UTC': 0, 'UT': 0,
-        'EST': -5, 'EDT': -4, 'CST': -6, 'CDT': -5,
-        'MST': -7, 'MDT': -6, 'PST': -8, 'PDT': -7,
-        'BST': 1, 'IST': 5.5, 'CET': 1, 'CEST': 2,
+        'GMT': 0,
+        'UTC': 0,
+        'UT': 0,
+        'EST': -5,
+        'EDT': -4,
+        'CST': -6,
+        'CDT': -5,
+        'MST': -7,
+        'MDT': -6,
+        'PST': -8,
+        'PDT': -7,
+        'BST': 1,
+        'IST': 5.5,
+        'CET': 1,
+        'CEST': 2,
       };
       final off = namedOffsets[tz.toUpperCase()];
       if (off != null) {

@@ -150,7 +150,9 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
                             cacheManager: AppCacheManager(),
                             memCacheWidth: imageMaxWidth,
                             color: isDark
-                                ? const Color(0xFF000000).withValues(alpha: 0.55)
+                                ? const Color(
+                                    0xFF000000,
+                                  ).withValues(alpha: 0.55)
                                 : null,
                             colorBlendMode: isDark ? BlendMode.darken : null,
                             placeholder: (context, url) => Container(

@@ -1067,7 +1067,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               if (_selectedTab == 0)
                 Semantics(
                   button: true,
-                  label: _isLoading ? _l10n.loadingLabel : _l10n.refreshFeedsLabel,
+                  label: _isLoading
+                      ? _l10n.loadingLabel
+                      : _l10n.refreshFeedsLabel,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: IconButton(
@@ -1098,8 +1100,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               Semantics(
                 button: true,
                 label: _isSearchActive
-                        ? _l10n.closeSearchLabel
-                        : _l10n.searchArticlesLabel,
+                    ? _l10n.closeSearchLabel
+                    : _l10n.searchArticlesLabel,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: IconButton(
@@ -1146,9 +1148,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(_l10n.upToDateMessage),
-                              ),
+                              SnackBar(content: Text(_l10n.upToDateMessage)),
                             );
                           }
                         }
@@ -1402,11 +1402,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
-                          Text(
-                            _l10n.searchResultsCount(
-                              _displayedArticles.length,
-                              _searchQuery,
-                            ),
+                        Text(
+                          _l10n.searchResultsCount(
+                            _displayedArticles.length,
+                            _searchQuery,
+                          ),
                           style: _textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 13,
