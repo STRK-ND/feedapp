@@ -58,18 +58,18 @@ npx wrangler secret put API_SECRET     # must match --dart-define=WORKER_API_SEC
 ## 2. Every release
 
 ```powershell
-# 1. Bump the version in pubspec.yaml (e.g. 1.2.3+22 -> 1.2.4+23), commit
+# 1. Bump the version in pubspec.yaml (e.g. 1.0.0+23 -> 1.0.1+24), commit
 git add pubspec.yaml
-git commit -m "chore: bump version to 1.2.4"
+git commit -m "chore: bump version to 1.0.1"
 
 # 2. Tag and push — CircleCI does the rest
-git tag v1.2.4
-git push origin master v1.2.4
+git tag v1.0.1
+git push origin master v1.0.1
 ```
 
 The `release` job then: syncs pubspec version to the tag (versionCode
 floored at 22 + build number) → format/analyze/tests → signed APK + AAB →
-creates the GitHub Release `v1.2.4` with `curated-feeds-v1.2.4.apk` / `.aab`
+creates the GitHub Release `v1.0.1` with `curated-feeds-v1.0.1.apk` / `.aab`
 and auto-generated notes. Watch progress under the project's **Pipelines**
 tab on CircleCI. Re-running a failed release job is safe: if the release
 already exists, assets are uploaded to it instead of failing.
@@ -86,7 +86,7 @@ nagged again for that version ("ignore").
 ## Rules that keep it working
 
 - **Tag version must be strictly newer** than what users run
-  (`1.2.4 > 1.2.3`; the comparison ignores the `v` prefix and build number).
+  (`1.0.1 > 1.0.0`; the comparison ignores the `v` prefix and build number).
 - **Never lose `upload-keystore.jks`** — a different signature means Android
   refuses the update and users must uninstall first. Keep a backup outside
   the repo (it is deliberately git-ignored).
@@ -98,3 +98,5 @@ nagged again for that version ("ignore").
   release builds reproducible).
 - **Forks** can point the updater at their own releases with
   `--dart-define=UPDATES_REPO=owner/name`.
+
+

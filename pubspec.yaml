@@ -12,7 +12,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Android, build-name is used as versionName while build-number
 # is used as versionCode. Read more about Android versioning at
 # https://developer.android.com/studio/publish/versioning
-version: 1.2.3+22
+version: 1.0.0+23
 
 environment:
   sdk: ^3.10.8
