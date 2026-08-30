@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/rss_source.dart';
 import '../models/article.dart';
+import '../utils/error_handler.dart';
 import 'posthog_service.dart';
 import 'settings_service.dart';
 import 'storage_service.dart';
@@ -105,7 +106,9 @@ class CloudSyncService implements SyncHooks {
       await _reconcileArticles(user.uid);
       _lastSyncedAt = DateTime.now();
     } catch (e) {
-      debugPrint('[CloudSync] syncNow failed: $e');
+      // Sync failures are invisible by design (offline-first); route them
+      // through the error handler so release builds still report to Sentry.
+      unawaited(ErrorHandler.logError('Cloud sync failed', error: e));
     } finally {
       _syncing = false;
     }
@@ -219,7 +222,9 @@ class CloudSyncService implements SyncHooks {
     );
 
     if (merge.toUpsert.isNotEmpty) {
-      await _storage.upsertArticles(merge.toUpsert);
+      // Adopt the remote clock per row — see FeedDatabase.upsertArticles:
+      // stamping local time here would re-push every pulled row forever.
+      await _storage.upsertArticles(merge.toUpsert, clocks: cloudTs);
     }
     for (final id in merge.toUnsave) {
       await _storage.unsaveArticleLocally(id);
@@ -237,11 +242,15 @@ class CloudSyncService implements SyncHooks {
     }
 
     // Push local rows the cloud lacks or that beat the cloud clock
-    // (covers changes made while signed out / offline).
+    // (covers changes made while signed out / offline). Only touched rows
+    // (read/saved state) sync — the cloud mirror exists for triage state,
+    // and pushing the untouched cache would re-upload the identical feed
+    // after every content refresh.
     final all = await _storage.loadArticles();
     final toPush = [
       for (final a in all)
-        if ((localTs[a.id] ?? 0) > (cloudTs[a.id] ?? 0)) a,
+        if ((a.isRead || a.isSaved) && (localTs[a.id] ?? 0) > (cloudTs[a.id] ?? 0))
+          a,
     ];
     if (toPush.isNotEmpty) {
       await _pushArticles(uid, toPush);

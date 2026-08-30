@@ -87,9 +87,12 @@ class StorageService {
 
   /// Upsert several article rows in one transaction — bulk flag flips
   /// (mark-all-read / undo) persist only the rows that changed.
-  Future<void> upsertArticles(List<Article> articles) async {
+  ///
+  /// [clocks] lets the cloud-sync pull path adopt the remote per-row clock
+  /// (see [FeedDatabase.upsertArticles] for why this matters).
+  Future<void> upsertArticles(List<Article> articles, {Map<String, int>? clocks}) async {
     try {
-      await _database.upsertArticles(articles);
+      await _database.upsertArticles(articles, clocks: clocks);
     } catch (e) {
       unawaited(ErrorHandler.logError('Failed to save article rows', error: e));
     }

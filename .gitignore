@@ -57,6 +57,9 @@ app.*.map.json
 .planning/
 .openspec/
 
+# Local secret handoff for CircleCI env vars (never commit)
+env.txt
+
 # Worktrees for isolated feature development
 .worktrees/
 

@@ -371,7 +371,7 @@ function kvStub(initial = {}) {
 }
 
 function workerEnv(extra = {}) {
-  return { ARTICLES_KV: kvStub(), API_SECRET: 'test-secret', ...extra };
+  return { ARTICLES_KV: kvStub(), API_SECRET: 'test-secret', ADMIN_SECRET: 'test-admin-secret', ...extra };
 }
 
 function workerRequest(path, { method = 'GET', body, secret } = {}) {
@@ -421,18 +421,33 @@ test('PUT /sources rejects wrong/missing secret and invalid bodies', async () =>
   assert.equal(noAuth.status, 401);
   const badSecret = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: SOURCES }, secret: 'wrong' }), env, noopCtx);
   assert.equal(badSecret.status, 401);
-  const empty = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: [] }, secret: 'test-secret' }), env, noopCtx);
+  const empty = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: [] }, secret: 'test-admin-secret' }), env, noopCtx);
   assert.equal(empty.status, 400);
-  const badEntry = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: [{ id: 'x' }] }, secret: 'test-secret' }), env, noopCtx);
+  const badEntry = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: [{ id: 'x' }] }, secret: 'test-admin-secret' }), env, noopCtx);
   assert.equal(badEntry.status, 400);
   // Nothing was persisted by any rejected call.
   assert.equal(await env.ARTICLES_KV.get(SOURCES_OVERRIDE_KEY), null);
 });
 
-test('PUT /sources with the secret overrides GET /sources and the aggregation list', async () => {
+test('PUT /sources is admin-only: the shared app secret must not grant it', async () => {
+  // The APK embeds API_SECRET, so it must never unlock admin authority.
+  const env = workerEnv();
+  const appSecret = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: SOURCES }, secret: 'test-secret' }), env, noopCtx);
+  assert.equal(appSecret.status, 401);
+  assert.equal(await env.ARTICLES_KV.get(SOURCES_OVERRIDE_KEY), null);
+});
+
+test('PUT /sources fails closed when ADMIN_SECRET is not configured', async () => {
+  const env = workerEnv({ ADMIN_SECRET: undefined });
+  const res = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: SOURCES }, secret: 'test-admin-secret' }), env, noopCtx);
+  assert.equal(res.status, 401);
+  assert.equal(await env.ARTICLES_KV.get(SOURCES_OVERRIDE_KEY), null);
+});
+
+test('PUT /sources with the admin secret overrides GET /sources and the aggregation list', async () => {
   const override = [{ id: 'custom', name: 'Custom', url: 'https://example.com/feed', category: 'Tech' }];
   const env = workerEnv();
-  const put = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: override }, secret: 'test-secret' }), env, noopCtx);
+  const put = await worker.fetch(workerRequest('/sources', { method: 'PUT', body: { sources: override }, secret: 'test-admin-secret' }), env, noopCtx);
   assert.equal(put.status, 200);
 
   const res = await worker.fetch(workerRequest('/sources'), env, noopCtx);

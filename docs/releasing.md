@@ -36,6 +36,25 @@ Firebase), so updates install straight over existing installs.
    (The old GitHub Actions secrets can be deleted from the repo settings —
    the Actions workflows no longer exist.)
 
+## 1b. Worker secrets (one-time, via wrangler)
+
+The worker's authority model (audit-hardened):
+
+| Secret | Scope | Notes |
+| --- | --- | --- |
+| `API_SECRET` | app-shared | embedded in the APK (authenticates `/subscribe`, `/articles/refresh`) — treat as public, not a boundary |
+| `ADMIN_SECRET` | admin-only | **required** for `PUT /sources` (overrides the canonical list for every user). Never embed in the app. Admin requests fail closed when unset. |
+
+```powershell
+cd workers
+npx wrangler secret put ADMIN_SECRET   # long random value, keep in a vault
+npx wrangler secret put API_SECRET     # must match --dart-define=WORKER_API_SECRET used in builds
+```
+
+`PUT /sources` is then only callable with `x-api-secret: $ADMIN_SECRET`
+(comparison is timing-safe). Verification is covered by the worker tests
+("PUT /sources is admin-only…" et al.).
+
 ## 2. Every release
 
 ```powershell

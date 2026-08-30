@@ -135,7 +135,8 @@ class NotificationService {
     // "No FCM token available" with no path to recover (data-layer H2).
     try {
       _fcmToken ??= await _firebaseMessaging.getToken();
-      if (_fcmToken != null) {
+      if (_fcmToken != null && kDebugMode) {
+        // Never in release logs — logcat is world-readable over adb.
         debugPrint(
           '[Notification] FCM Token: ${_fcmToken!.substring(0, 20)}...',
         );

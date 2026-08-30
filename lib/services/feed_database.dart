@@ -110,6 +110,13 @@ class FeedDatabase {
 
   /// Replace the whole cached-feed set. The newest-[AppConfig.maxCachedArticles]
   /// articles by pubDate win, mirroring the old blob behaviour.
+  ///
+  /// Content refreshes must NOT bump row clocks: the cloud-sync merge uses
+  /// `updated_at` as the triage-state LWW clock, so a refresh that stamped
+  /// `now` on every row would re-push the whole identical cache to Firestore
+  /// on the next sync. Existing rows keep their clock; brand-new rows read
+  /// 0 (remote wins / pushed only once touched) — same semantics as the
+  /// v1→v2 migration for legacy rows.
   Future<void> saveArticles(List<Article> articles) async {
     final db = await _open();
     // Cap in Dart before writing: keeps SQL trivially portable.
@@ -121,16 +128,26 @@ class FeedDatabase {
       });
     final kept = sorted.take(AppConfig.maxCachedArticles).toList();
 
+    // Capture the clocks we must preserve before the delete below.
+    final existing = <String, int>{};
+    try {
+      final rows = await db.query(_articlesTable, columns: ['id', 'updated_at']);
+      for (final r in rows) {
+        existing[r['id'] as String] = (r['updated_at'] as int?) ?? 0;
+      }
+    } catch (e) {
+      debugPrint('[FeedDatabase] clock capture failed (treating as empty): $e');
+    }
+
     await db.transaction((txn) async {
       await txn.delete(_articlesTable);
       final batch = txn.batch();
-      final now = _nowMs();
       for (final a in kept) {
         batch.insert(_articlesTable, {
           'id': a.id,
           'pub_date': a.pubDate.millisecondsSinceEpoch,
           'payload': encodeArticle(a),
-          'updated_at': now,
+          'updated_at': existing[a.id] ?? 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
@@ -155,7 +172,15 @@ class FeedDatabase {
 
   /// Upsert several article rows in one transaction — bulk flag flips
   /// (mark-all-read / undo) persist only the rows that changed.
-  Future<void> upsertArticles(List<Article> articles) async {
+  ///
+  /// [clocks] lets the cloud-sync pull path adopt the REMOTE per-row clock:
+  /// stamping the local wall clock here would make every pulled row look
+  /// locally newer than the cloud doc, and the next sync would push the
+  /// identical payload straight back (write amplification, forever).
+  Future<void> upsertArticles(
+    List<Article> articles, {
+    Map<String, int>? clocks,
+  }) async {
     final db = await _open();
     await db.transaction((txn) async {
       final batch = txn.batch();
@@ -165,7 +190,7 @@ class FeedDatabase {
           'id': a.id,
           'pub_date': a.pubDate.millisecondsSinceEpoch,
           'payload': encodeArticle(a),
-          'updated_at': now,
+          'updated_at': clocks?[a.id] ?? now,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);

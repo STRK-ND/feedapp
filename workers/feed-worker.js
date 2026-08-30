@@ -18,6 +18,14 @@
 //                          from Firebase console. Without it, push multicast
 //                          is silently skipped.
 //   FCM_PROJECT_ID       — Firebase project id ("curatedfeeds").
+//   API_SECRET           — shared app secret. The distributed APK embeds it
+//                          (it authenticates app-side reads with side
+//                          effects: /subscribe, /articles/refresh), so treat
+//                          it as public knowledge, not a security boundary.
+//   ADMIN_SECRET         — REQUIRED for PUT /sources (canonical list
+//                          override = global content injection). Must never
+//                          be embedded in the app; CLI/wrangler only. Admin
+//                          requests fail closed when unset.
 
 // ---------------------------------------------------------------------------
 // Canonical source list — served by GET /sources and THE source of truth.
@@ -74,14 +82,16 @@ export default {
         return json({ sources: await getSourceList(env) });
       }
       if (url.pathname === '/sources' && request.method === 'PUT') {
-        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!(await isAuthorized(request, env, 'admin'))) {
+          return json({ error: 'unauthorized' }, 401);
+        }
         return await handlePutSources(request, env);
       }
       if (url.pathname === '/articles' && request.method === 'GET') {
         return await handleArticles(request, url, env);
       }
       if (url.pathname === '/articles/refresh' && request.method === 'GET') {
-        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
         const refreshIp = request.headers.get('CF-Connecting-IP') ?? 'local';
         if (!(await consumeRate(env, 'refresh:' + refreshIp, 5, 60))) {
           return json({ error: 'rate_limited' }, 429);
@@ -89,11 +99,11 @@ export default {
         return await handleForceRefresh(ctx, env);
       }
       if (url.pathname === '/subscribe' && request.method === 'POST') {
-        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
         return await handleSubscribe(request, env);
       }
       if (url.pathname === '/subscribe' && request.method === 'DELETE') {
-        if (!isAuthorized(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
         return await handleUnsubscribe(request, env);
       }
       return json({ error: 'not_found' }, 404);
@@ -118,11 +128,24 @@ export default {
 // Route handlers
 // ---------------------------------------------------------------------------
 
-function isAuthorized(request, env) {
+async function isAuthorized(request, env, level = 'app') {
+  const provided = request.headers.get('x-api-secret') ?? '';
+
+  // Admin authority (PUT /sources overrides the canonical list for every
+  // user — global content injection if leaked). Only ADMIN_SECRET grants
+  // it, and it must never ship inside the app: fail closed when unset.
+  if (level === 'admin') {
+    if (!env.ADMIN_SECRET) {
+      console.error('admin_secret_not_configured');
+      return false;
+    }
+    return await secretsMatch(provided, env.ADMIN_SECRET);
+  }
+
+  // App authority. Opt-in hard gate: ops can set REQUIRE_API_SECRET='1' so
+  // a missing secret fails closed instead of serving an open API. Default
+  // remains open-for-back-compat with a loud warning.
   if (!env.API_SECRET) {
-    // Opt-in hard gate: ops can set REQUIRE_API_SECRET='1' so a missing
-    // secret fails closed instead of serving an open API. Default remains
-    // open-for-back-compat with a loud warning.
     if (env.REQUIRE_API_SECRET === '1') {
       console.error('api_secret_required_but_missing');
       return false;
@@ -130,7 +153,29 @@ function isAuthorized(request, env) {
     console.warn('api_secret_not_configured');
     return true;
   }
-  return request.headers.get('x-api-secret') === env.API_SECRET;
+  return await secretsMatch(provided, env.API_SECRET);
+}
+
+// Constant-time secret comparison. Both sides are hashed to fixed-length
+// digests first, so neither length nor content can leak through timing;
+// the XOR loop over the 32-byte digests takes identical time either way.
+async function secretsMatch(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string' || !expected) {
+    return false;
+  }
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+  ]);
+  return timingSafeEqual(new Uint8Array(a), new Uint8Array(b));
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 async function consumeRate(env, key, limit, windowSec) {
@@ -830,4 +875,4 @@ function cors(response) {
   return r;
 }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories };
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, isAuthorized, secretsMatch, timingSafeEqual };
