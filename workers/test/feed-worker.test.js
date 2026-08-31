@@ -101,6 +101,53 @@ test('buildArticle with garbage <pubDate> yields pubDate === 0', () => {
   assert.equal(article.pubDate, 0);
 });
 
+// --- image extraction regressions (audit of live sources) ---
+
+test('buildArticle extracts BBC-style media:thumbnail', () => {
+  const source = SOURCES[0];
+  const body =
+    '<title>T</title><link>https://example.com/bbc</link>' +
+    '<media:thumbnail width="240" height="134" url="https://ichef.bbci.co.uk/x.jpg"/>';
+  const article = buildArticle(body, source, itemOpts);
+  assert.equal(article.imageUrl, 'https://ichef.bbci.co.uk/x.jpg');
+});
+
+test('buildArticle extracts Sky-style enclosure with query string', () => {
+  const source = SOURCES[4];
+  const body =
+    '<title>T</title><link>https://example.com/sky</link>' +
+    '<enclosure type="image/jpg" url="https://e1.365dm.com/26/08/sky.jpg?20260820165121" length="123456" />';
+  const article = buildArticle(body, source, itemOpts);
+  assert.equal(article.imageUrl, 'https://e1.365dm.com/26/08/sky.jpg?20260820165121');
+});
+
+test('buildArticle extracts embedded <img> and decodes XML-escaped ampersands', () => {
+  const source = SOURCES[11];
+  const body =
+    '<title>T</title><link>https://example.com/nasa</link>' +
+    '<description><![CDATA[x <img src="https://assets.nasa.gov/p.jpg?w=2200&#038;h=1467&#038;fit=clip">]]></description>';
+  const article = buildArticle(body, source, itemOpts);
+  assert.equal(article.imageUrl, 'https://assets.nasa.gov/p.jpg?w=2200&h=1467&fit=clip');
+});
+
+test('buildArticle prefers media:content over enclosure over img', () => {
+  const source = SOURCES[0];
+  const body =
+    '<title>T</title><link>https://example.com/all</link>' +
+    '<img src="https://example.com/img.jpg"/>' +
+    '<enclosure url="https://example.com/enc.jpg"/>' +
+    '<media:content url="https://example.com/media.jpg"/>';
+  const article = buildArticle(body, source, itemOpts);
+  assert.equal(article.imageUrl, 'https://example.com/media.jpg');
+});
+
+test('buildArticle leaves imageUrl null when the item has no image', () => {
+  const source = SOURCES[0];
+  const body = '<title>T</title><link>https://example.com/noimg</link>';
+  const article = buildArticle(body, source, itemOpts);
+  assert.equal(article.imageUrl, null);
+});
+
 test('parseDate: null for empty/garbage, number for RFC-2822 and BST', () => {
   assert.equal(parseDate(''), null);
   assert.equal(parseDate('garbage'), null);

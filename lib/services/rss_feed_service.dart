@@ -39,7 +39,7 @@ const List<RssSource> _kOfflineSeedSources = [
   RssSource(
     id: 'newscientist',
     name: 'New Scientist',
-    url: 'https://www.newscientist.com/feed/home/',
+    url: 'https://www.newscientist.com/feed/home?format=rss',
     category: 'Science',
     color: AppColors.scienceSecondary,
     icon: Icons.biotech,

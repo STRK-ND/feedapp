@@ -37,7 +37,7 @@ const SOURCES = [
   { id: 'verge',        name: 'The Verge',     url: 'https://www.theverge.com/rss/index.xml',        category: 'Tech',          color: '#60A5FA', icon: 'devices' },
   { id: 'wired',        name: 'Wired',         url: 'https://www.wired.com/feed/rss',                category: 'Tech',          color: '#60A5FA', icon: 'memory' },
   { id: 'bbc',          name: 'BBC World',     url: 'https://feeds.bbci.co.uk/news/rss.xml',          category: 'News',          color: '#DC2626', icon: 'public' },
-  { id: 'newscientist', name: 'New Scientist', url: 'https://www.newscientist.com/feed/home/',        category: 'Science',       color: '#22D3EE', icon: 'biotech' },
+  { id: 'newscientist', name: 'New Scientist', url: 'https://www.newscientist.com/feed/home?format=rss', category: 'Science',       color: '#22D3EE', icon: 'biotech' },
   { id: 'skysports',    name: 'Sky Sports',    url: 'https://www.skysports.com/rss/12040',            category: 'Sports',        color: '#34D399', icon: 'sports_soccer' },
   { id: 'variety',      name: 'Variety',       url: 'https://variety.com/feed/',                      category: 'Entertainment', color: '#7C3AED', icon: 'theaters' },
   { id: 'arstechnica',  name: 'Ars Technica',  url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'Tech',          color: '#60A5FA', icon: 'computer' },
@@ -563,13 +563,7 @@ function buildArticle(body, source, opts) {
   const pubDate = parseDate(pubDateRaw) ?? 0;
   const author = strip(extractTag(body, opts.authorTag)) || null;
 
-  const mediaMatch = body.match(/<media:content\b[^>]*url="([^"]+)"/i);
-  const enclosureMatch = body.match(/<enclosure\b[^>]*url="([^"]+\.(?:jpg|jpeg|png|webp|gif))"/i);
-  const imgMatch = body.match(/<img\b[^>]*src="([^"]+)"/i);
-  const imageUrl = (mediaMatch && mediaMatch[1])
-    || (enclosureMatch && enclosureMatch[1])
-    || (imgMatch && imgMatch[1])
-    || null;
+  const imageUrl = extractImage(body);
 
   return {
     id: stableId(source.id, link),
@@ -589,6 +583,41 @@ function buildArticle(body, source, opts) {
     isSaved: false,
     fetchedFullContent: null,
   };
+}
+
+// Image extraction order (empirically matched to our sources):
+//   1. media:content / media:thumbnail (BBC → media:thumbnail, many
+//      WordPress feeds → media:content)
+//   2. <enclosure url=…> — any URL containing an image extension, not just
+//      ending with one (Sky Sports appends cache-buster query strings)
+//   3. first <img src=…> in the item body (NASA embeds images in
+//      content:encoded; ampersands arrive XML-escaped — decode them)
+function extractImage(body) {
+  const mediaMatch =
+    body.match(/<media:content\b[^>]*url="([^"]+)"/i) ||
+    body.match(/<media:thumbnail\b[^>]*url="([^"]+)"/i);
+  if (mediaMatch && mediaMatch[1]) return xmlDecodeUrl(mediaMatch[1]);
+
+  const enclosureMatch = body.match(
+    /<enclosure\b[^>]*url="([^"]+\.(?:jpg|jpeg|png|webp|gif)[^"]*)"/i,
+  );
+  if (enclosureMatch && enclosureMatch[1]) return xmlDecodeUrl(enclosureMatch[1]);
+
+  const imgMatch = body.match(/<img\b[^>]*src="([^"]+)"/i);
+  if (imgMatch && imgMatch[1]) return xmlDecodeUrl(imgMatch[1]);
+
+  return null;
+}
+
+// URLs scraped out of XML bodies arrive entity-escaped (&amp; in query
+// strings, &#038; inside CDATA HTML). Decode just enough to produce a
+// fetchable URL.
+function xmlDecodeUrl(url) {
+  return url
+    .replace(/&#0?38;|&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 // ---------------------------------------------------------------------------
@@ -803,13 +832,24 @@ function base64UrlEncodeBytes(bytes) {
 async function readTextCapped(response, maxBytes) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let text = '', total = 0;
+  let text = '', total = 0, truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > maxBytes) { await reader.cancel(); return null; }
+    if (total > maxBytes) {
+      // Oversized feeds (NASA ships full HTML in content:encoded) are
+      // parsed anyway: the item regexes simply stop at the truncation
+      // point, so we keep the complete leading items instead of dropping
+      // the entire source.
+      await reader.cancel();
+      truncated = true;
+      break;
+    }
     text += decoder.decode(value, { stream: true });
+  }
+  if (truncated) {
+    console.warn('source_truncated', { maxBytes });
   }
   return text + decoder.decode();
 }
