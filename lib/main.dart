@@ -11,7 +11,8 @@ import 'package:workmanager/workmanager.dart';
 
 import 'services/background_sync_service.dart';
 import 'services/posthog_service.dart';
-import 'screens/splash_screen.dart';
+import 'di/service_locator.dart';
+import 'screens/curated_feeds_app.dart';
 import 'utils/error_handler.dart';
 
 Future<void> main() async {
@@ -81,7 +82,17 @@ Future<void> main() async {
     debugPrint('[Main] Workmanager init skipped: $e');
   }
 
-  runApp(const SplashScreen());
+  // CuratedFeedsApp owns the MaterialApp (Directionality, Navigator,
+  // theme, l10n) and shows SplashScreen as home. Firebase + DI must be
+  // ready before the first frame: the root widget's providers read the
+  // locator synchronously during build.
+  try {
+    if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+    await setupServiceLocator();
+  } catch (e) {
+    debugPrint('[Main] Startup init failed: $e');
+  }
+  runApp(const CuratedFeedsApp());
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

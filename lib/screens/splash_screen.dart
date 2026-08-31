@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
@@ -93,8 +92,8 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     try {
-      await Firebase.initializeApp();
-      await setupServiceLocator();
+      // Firebase + service locator are initialized in main() before
+      // runApp — re-initializing here would throw duplicate-app.
       await NotificationService().initialize();
 
       final articleRepository = getIt<ArticleRepository>();
@@ -153,7 +152,7 @@ class _SplashScreenState extends State<SplashScreen>
     await Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            const CuratedFeedsApp(),
+            const MainNavigation(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

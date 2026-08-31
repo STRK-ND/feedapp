@@ -17,6 +17,7 @@ import '../widgets/in_app_notification_banner.dart';
 import '../widgets/curved_bottom_nav/curved_bottom_nav_bar.dart';
 import 'feed_screen.dart';
 import 'settings_screen.dart';
+import 'splash_screen.dart';
 
 /// Root navigator key, owned at the MaterialApp level so cold-start
 /// notification taps — which fire before the nav shell exists — can still
@@ -67,7 +68,7 @@ class CuratedFeedsApp extends StatelessWidget {
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: const MainNavigation(),
+            home: const SplashScreen(),
             builder: (context, child) {
               // Cap system text scaling at 1.4× so large OS fonts can't
               // break the editorial layouts (spec §10). MediaQuery here is

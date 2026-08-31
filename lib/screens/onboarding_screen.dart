@@ -78,7 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const CuratedFeedsApp(),
+              const MainNavigation(),
           transitionsBuilder: (context, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: AppMotion.base,
@@ -92,7 +92,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     unawaited(
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const CuratedFeedsApp()),
+        MaterialPageRoute(builder: (_) => const MainNavigation()),
       ),
     );
   }
