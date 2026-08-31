@@ -219,8 +219,11 @@ class _SplashScreenState extends State<SplashScreen>
               AnimatedBuilder(
                 animation: _revealProgress,
                 builder: (context, _) {
+                  // easeOutBack overshoots past 1.0 — without the second
+                  // clamp the derived opacity asserts in debug builds.
                   final subtitleProgress =
-                      (_revealProgress.value - 0.4).clamp(0.0, 1.0) / 0.6;
+                      ((_revealProgress.value - 0.4).clamp(0.0, 1.0) / 0.6)
+                          .clamp(0.0, 1.0);
                   return Opacity(
                     opacity: subtitleProgress,
                     child: Column(

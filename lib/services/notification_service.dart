@@ -19,7 +19,10 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  // Lazy: FirebaseMessaging.instance throws [core/no-app] when Firebase
+  // hasn't been initialized yet — constructing the service (splash, tests)
+  // must not. Access happens inside initialize(), post-initialization.
+  late final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
