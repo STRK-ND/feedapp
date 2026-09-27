@@ -146,13 +146,13 @@ jobs:
           command: flutter build appbundle --release --flavor play --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET" --dart-define="PLAY_STORE_BUILD=true"
       - save_gradle_cache
       - store_artifacts:
-          path: build/app/outputs/flutter-apk/release/app-release.apk
-          destination: app-release.apk
+          path: build/app/outputs/apk/direct/release/app-direct.apk
+          destination: app-direct.apk
       - store_artifacts:
-          path: build/app/outputs/bundle/release/app-release.aab
-          destination: app-release.aab
+          path: build/app/outputs/bundle/directRelease/app-direct-release.aab
+          destination: app-direct-release.aab
       - store_artifacts:
-          path: build/app/outputs/bundle/playRelease/app-release.aab
+          path: build/app/outputs/bundle/playRelease/app-play-release.aab
           destination: app-play-release.aab
 
   # Provenance gate for the release workflow: the v* tag must point at a
@@ -240,21 +240,24 @@ jobs:
           command: flutter build appbundle --release --flavor play --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET" --dart-define="PLAY_STORE_BUILD=true"
       - save_gradle_cache
       - run:
-          name: Write SHA256SUMS
+          name: Rename artifacts and write SHA256SUMS
           command: |
             cd build/app/outputs
-            ( cd flutter-apk/release && sha256sum app-release.apk ) >> SHA256SUMS
-            ( cd bundle/release && sha256sum app-release.aab ) >> SHA256SUMS
-            ( cd bundle/playRelease && sha256sum app-release.aab ) >> SHA256SUMS
+            # Rename to the published asset names BEFORE hashing: the in-app
+            # updater looks entries up in SHA256SUMS by the exact filename it
+            # downloads (curated-feeds-<tag>.apk), so the file must be hashed
+            # under its published name, not gradle's in-build output name.
+            mv apk/direct/release/app-direct.apk "curated-feeds-$CIRCLE_TAG.apk"
+            mv bundle/directRelease/app-direct-release.aab "curated-feeds-$CIRCLE_TAG.aab"
+            mv bundle/playRelease/app-play-release.aab "curated-feeds-$CIRCLE_TAG-play.aab"
+            sha256sum "curated-feeds-$CIRCLE_TAG.apk" "curated-feeds-$CIRCLE_TAG.aab" > SHA256SUMS
             cat SHA256SUMS
       - run:
           name: Publish GitHub Release
           command: |
             TAG="$CIRCLE_TAG"
-            mv build/app/outputs/flutter-apk/release/app-release.apk "curated-feeds-$TAG.apk"
-            mv build/app/outputs/bundle/release/app-release.aab "curated-feeds-$TAG.aab"
-            mv build/app/outputs/bundle/playRelease/app-release.aab "curated-feeds-$TAG-play.aab"
-            cp build/app/outputs/SHA256SUMS "SHA256SUMS-$TAG.txt"
+            cd build/app/outputs
+            cp SHA256SUMS "SHA256SUMS-$TAG.txt"
 
             REPO="STRK-ND/feedapp"
             AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json")

@@ -2,11 +2,6 @@
   <!-- Permission to access the Internet for fetching RSS feeds and updates -->
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-  <!-- Required so the app can hand its own APK to the Android system
-  installer for in-app OTA updates (UpdateService.triggerInstall).
-  On Android 11+ (API 30) the system silently rejects resolver queries
-  for actions we haven't declared, even with this permission present. -->
-  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <!-- Required for Google Play Billing (in_app_purchase plugin, Play Billing v6+) -->
   <uses-permission android:name="com.android.vending.BILLING"/>
   <!-- Required on Android 13+ (API 33): without this declaration the
