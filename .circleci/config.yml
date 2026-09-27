@@ -145,9 +145,18 @@ jobs:
           name: Build Play AAB (play channel)
           command: flutter build appbundle --release --flavor play --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET" --dart-define="PLAY_STORE_BUILD=true"
       - save_gradle_cache
+      - run:
+          name: Normalize artifact names
+          command: |
+            # Gradle names the APK with the synced version
+            # (curated-feeds-direct-v<version>.apk); strip it for the
+            # version-independent artifact path. Branch builds have no tag.
+            cd build/app/outputs/apk/direct/release
+            mv curated-feeds-direct-v*.apk curated-feeds-direct.apk
+            ls -l
       - store_artifacts:
-          path: build/app/outputs/apk/direct/release/app-direct.apk
-          destination: app-direct.apk
+          path: build/app/outputs/apk/direct/release/curated-feeds-direct.apk
+          destination: curated-feeds-direct.apk
       - store_artifacts:
           path: build/app/outputs/bundle/directRelease/app-direct-release.aab
           destination: app-direct-release.aab
@@ -247,7 +256,7 @@ jobs:
             # updater looks entries up in SHA256SUMS by the exact filename it
             # downloads (curated-feeds-<tag>.apk), so the file must be hashed
             # under its published name, not gradle's in-build output name.
-            mv apk/direct/release/app-direct.apk "curated-feeds-$CIRCLE_TAG.apk"
+            mv apk/direct/release/curated-feeds-direct-v*.apk "curated-feeds-$CIRCLE_TAG.apk"
             mv bundle/directRelease/app-direct-release.aab "curated-feeds-$CIRCLE_TAG.aab"
             mv bundle/playRelease/app-play-release.aab "curated-feeds-$CIRCLE_TAG-play.aab"
             sha256sum "curated-feeds-$CIRCLE_TAG.apk" "curated-feeds-$CIRCLE_TAG.aab" > SHA256SUMS

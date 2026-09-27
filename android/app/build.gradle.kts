@@ -92,13 +92,17 @@ android {
     }
   }
 
-  // Gradle emits one APK per ABI per flavor by default; the CI/Play paths
-  // produce AABs (per-device delivery), so keep only universal-ish
-  // artifacts in outputs to avoid name-collision build failures.
+  // Name release APKs with the app name, flavor, and version, e.g.
+  // curated-feeds-direct-v1.0.0.apk. versionName comes from pubspec via the
+  // Flutter extension, so the filename always tracks the release version.
+  // The CI/Play paths produce AABs (per-device delivery), so only the
+  // universal APK lands here — no per-ABI name collisions.
   applicationVariants.all {
+    val variantFlavor = flavorName.ifEmpty { "base" }
+    val variantVersion = flutter.versionName
     outputs.all {
       (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
-        .outputFileName = outputFileName.replace("-release", "")
+        .outputFileName = "curated-feeds-$variantFlavor-v$variantVersion.apk"
     }
   }
 }
