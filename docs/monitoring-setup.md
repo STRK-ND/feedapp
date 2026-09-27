@@ -33,10 +33,10 @@ FirebaseCrashlytics.instance.crash(); // temporary, then remove
 3. Build with it:
 
 ```powershell
-flutter build apk --release `
+flutter build apk --release --flavor direct `
   --dart-define=SENTRY_DSN=<your-dsn> `
   --dart-define=FLUTTER_ENV=production `
-  --dart-define=RELEASE_VERSION=1.0.0+23
+  --dart-define=RELEASE_VERSION=1.0.0+26
 ```
 
 Everything else (error capture, severity mapping, breadcrumbs) is already
@@ -51,7 +51,7 @@ wired in `lib/main.dart` + `lib/utils/error_handler.dart`.
 3. Build with it:
 
 ```powershell
-flutter build apk --release `
+flutter build apk --release --flavor direct `
   --dart-define=POSTHOG_API_KEY=<phc_...> `
   --dart-define=POSTHOG_HOST=https://us.i.posthog.com
 ```
@@ -67,12 +67,12 @@ user id via `PostHogService.identify`.
 All three can be passed in one build command; order doesn't matter:
 
 ```powershell
-flutter build apk --release `
+flutter build apk --release --flavor direct `
   --dart-define=SENTRY_DSN=<dsn> `
   --dart-define=POSTHOG_API_KEY=<key> `
   --dart-define=POSTHOG_HOST=https://us.i.posthog.com `
   --dart-define=FLUTTER_ENV=production `
-  --dart-define=RELEASE_VERSION=1.0.0+23
+  --dart-define=RELEASE_VERSION=1.0.0+26
 ```
 
 Without the flags the builds behave exactly as before — Crashlytics

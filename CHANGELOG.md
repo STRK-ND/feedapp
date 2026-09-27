@@ -5,6 +5,8 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [1.0.0] - 2026-09-27
 
 Play Store first release (versionCode 26, supersedes the sideload 1.0.2+25 line).
@@ -20,12 +22,7 @@ Play Store first release (versionCode 26, supersedes the sideload 1.0.2+25 line)
 - Pro entitlement on Play builds additionally requires a locally verified Play purchase; a cloud Pro flag alone no longer flips Pro there
 - Version scheme: Play builds start at 1.0.0+26 so every future Play versionCode outranks the sideload line
 
-### Security (from the run-3 release recheck)
-- Swipe-to-save now enforces the same free cap as the save button (5-minute grace window), closing a self-entitlement bypass
-- Play builds ignore an attacker-writable cloud `isPro` flag when unlocking entitlements
-## [Unreleased]
-
-### Security (from the run-2 audit)
+### Security (run-2 audit + run-3 release recheck)
 - Worker: app-level authorization now fails closed when `API_SECRET` is unset — `/subscribe` and `/articles/refresh` are no longer open by default (reads stay public)
 - Worker: subscription tokens are capped at 4096 chars on POST/DELETE `/subscribe`
 - Worker: future-dated feed items (>24h ahead) are dropped at ingestion so they cannot pin clients' delta watermarks
@@ -35,9 +32,12 @@ Play Store first release (versionCode 26, supersedes the sideload 1.0.2+25 line)
 - CI: release workflow gains a provenance check (tag must be on master) and a manual approval hold before signing/publishing
 - CI: signed builds require a pinned `FLUTTER_COMMIT` env var and verify the cloned SDK SHA before use
 - CI: releases publish a `SHA256SUMS-<tag>.txt` asset; `--dart-define` expansions are now quoted
+- CI: release versionCode is floored above the sideload line so early build numbers can never under-rank sideloaded installs
 - Client: delta-fetch watermark is clamped against the clock — a future-dated cached article falls back to a full fetch
 - Client: Open-in-browser launches only http(s) links (no `intent://` or other app-handoff schemes)
 - Client: source registry rejects non-http(s) feed URLs, mirroring the server's `handlePutSources` rule
+- Swipe-to-save now enforces the same free cap as the save button (5-minute grace window), closing a self-entitlement bypass
+- Play builds ignore an attacker-writable cloud `isPro` flag when unlocking entitlements
 
 ## [1.0.1] - 2026-03-23
 
@@ -70,7 +70,7 @@ Play Store first release (versionCode 26, supersedes the sideload 1.0.2+25 line)
 ### Changed
 - Improved update checking with hourly rate limiting
 
-## [1.0.0] - 2026-03-03
+## [1.0.0] - 2026-03-03 (initial sideloaded build)
 
 ### Added
 - Initial release of Curated Feeds app

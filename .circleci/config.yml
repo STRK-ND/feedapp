@@ -208,8 +208,21 @@ jobs:
           name: Sync pubspec version with tag
           command: |
             VERSION="${CIRCLE_TAG#v}"
-            # versionCode must exceed any prior upload (local baseline is 22).
+            # versionCode must exceed any prior upload: the sideload line ended
+            # at 1.0.2+25 and 1.0.0+26 is the Play baseline, so early CI build
+            # numbers are floored at 26 and can never under-rank sideloads.
+            MIN_CODE=26
             CODE=$((22 + CIRCLE_BUILD_NUM))
+            if [ "$CODE" -lt "$MIN_CODE" ]; then
+              CODE=$MIN_CODE
+            fi
+            # The tag must not drift from the reviewed pubspec version: a tag
+            # without a matching pubspec bump fails the release here.
+            PUBSPEC_VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\)+.*/\1/p' pubspec.yaml)
+            if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
+              echo "Tag v$VERSION does not match pubspec version $PUBSPEC_VERSION - bump pubspec and tag the release commit." >&2
+              exit 1
+            fi
             sed -i "s/^version: .*/version: $VERSION+$CODE/" pubspec.yaml
             echo "Synced pubspec version to $VERSION+$CODE"
       - run: flutter pub get

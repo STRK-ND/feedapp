@@ -47,24 +47,25 @@ Get-Content android\app\google-services.json -Raw
 ## What runs when
 
 ### PR to any branch
-- GHA `ci.yml` runs `flutter analyze` + `flutter test`
+- CircleCI `checks` runs `flutter analyze` + `flutter test`
 - CircleCI runs the same
 - PR can't be merged until both pass (require status checks in repo settings)
 
 ### Push to `master`
 - Same checks
-- GHA `build.yml` runs `flutter build apk --release` + `flutter build appbundle --release`
-- Outputs uploaded as GitHub Actions artifact (30-day retention)
-- CircleCI does the same and stores as CircleCI artifacts
+- CircleCI `build_signed` builds the direct APK, direct AAB, and Play AAB with the release signing config
+- Outputs stored as CircleCI artifacts
 
 ### Tag push `v1.0.1` (or any `v*`)
-- GHA `release.yml` runs full check + build
-- Creates GitHub Release titled `v1.0.1` with two assets:
+- CircleCI `release` workflow runs: provenance check → manual approval → checks → build → publish
+- Creates GitHub Release titled `v1.0.1` with four assets:
   - `curated-feeds-v1.0.1.apk`
   - `curated-feeds-v1.0.1.aab`
+  - `curated-feeds-v1.0.1-play.aab`
+  - `SHA256SUMS-v1.0.1.txt`
 - Auto-generated release notes from commit history
-- UpdateService (in-app OTA) is triggered when the user's app next runs
-- pubspec.yaml is auto-synced to match the tag (`version: 1.0.1+1`)
+- UpdateService (in-app OTA) is triggered when the user's app next runs (direct flavor only)
+- The tag version must match pubspec.yaml, and the synced versionCode is floored at 26 (Play baseline; the sideload line ended at 1.0.2+25) — see docs/releasing.md
 
 ---
 
@@ -72,11 +73,12 @@ Get-Content android\app\google-services.json -Raw
 
 ```powershell
 cd D:\CRM\myapp
+# Bump pubspec.yaml first (versionCode must exceed the last published build), commit, then:
 git tag v1.0.1
-git push origin v1.0.1
+git push origin master v1.0.1
 ```
 
-Then watch https://github.com/STRK-ND/feedapp/actions. ~10 minutes later the Release is live at https://github.com/STRK-ND/feedapp/releases.
+Then watch the CircleCI pipeline (https://app.circleci.com/pipelines/github/STRK-ND/feedapp). After the approval hold, the Release is live at https://github.com/STRK-ND/feedapp/releases.
 
 ---
 

@@ -58,7 +58,8 @@ npx wrangler secret put API_SECRET     # must match --dart-define=WORKER_API_SEC
 ## 2. Every release
 
 ```powershell
-# 1. Bump the version in pubspec.yaml (e.g. 1.0.0+23 -> 1.0.1+24), commit
+# 1. Bump the version in pubspec.yaml (must be >= 1.0.1+27; versionCode 1.0.0+26 is
+#    already published to Play, and CI enforces its own floor above it), commit
 git add pubspec.yaml
 git commit -m "chore: bump version to 1.0.1"
 
