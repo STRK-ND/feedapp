@@ -50,28 +50,34 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('upsertArticles clock contract', () {
-    test('pulled rows adopt the remote clock, not the local wall clock', () async {
-      final db = await makeDb();
-      final remote = {'a1': 1000, 'a2': 2000};
-      await db.upsertArticles(
-        [makeArticle(id: 'a1'), makeArticle(id: 'a2')],
-        clocks: remote,
-      );
+    test(
+      'pulled rows adopt the remote clock, not the local wall clock',
+      () async {
+        final db = await makeDb();
+        final remote = {'a1': 1000, 'a2': 2000};
+        await db.upsertArticles([
+          makeArticle(id: 'a1'),
+          makeArticle(id: 'a2'),
+        ], clocks: remote);
 
-      final clocks = await db.loadArticleTimestamps();
-      // If these ever come back as "now", every sync pushes the identical
-      // payload back to the cloud — the echo bug.
-      expect(clocks['a1'], 1000);
-      expect(clocks['a2'], 2000);
-    });
+        final clocks = await db.loadArticleTimestamps();
+        // If these ever come back as "now", every sync pushes the identical
+        // payload back to the cloud — the echo bug.
+        expect(clocks['a1'], 1000);
+        expect(clocks['a2'], 2000);
+      },
+    );
 
-    test('rows without an explicit clock fall back to the local clock', () async {
-      final db = await makeDb();
-      final before = DateTime.now().millisecondsSinceEpoch;
-      await db.upsertArticles([makeArticle(id: 'a1', isRead: true)]);
-      final clocks = await db.loadArticleTimestamps();
-      expect(clocks['a1']! >= before, isTrue);
-    });
+    test(
+      'rows without an explicit clock fall back to the local clock',
+      () async {
+        final db = await makeDb();
+        final before = DateTime.now().millisecondsSinceEpoch;
+        await db.upsertArticles([makeArticle(id: 'a1', isRead: true)]);
+        final clocks = await db.loadArticleTimestamps();
+        expect(clocks['a1']! >= before, isTrue);
+      },
+    );
   });
 
   group('saveArticles clock contract', () {
@@ -88,11 +94,14 @@ void main() {
       expect(clocks['a1'], 5555);
     });
 
-    test('brand-new rows from a refresh read clock 0 (remote wins, untouched rows never push)', () async {
-      final db = await makeDb();
-      await db.saveArticles([makeArticle(id: 'fresh')]);
-      final clocks = await db.loadArticleTimestamps();
-      expect(clocks['fresh'], 0);
-    });
+    test(
+      'brand-new rows from a refresh read clock 0 (remote wins, untouched rows never push)',
+      () async {
+        final db = await makeDb();
+        await db.saveArticles([makeArticle(id: 'fresh')]);
+        final clocks = await db.loadArticleTimestamps();
+        expect(clocks['fresh'], 0);
+      },
+    );
   });
 }

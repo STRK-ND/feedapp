@@ -90,7 +90,10 @@ class StorageService {
   ///
   /// [clocks] lets the cloud-sync pull path adopt the remote per-row clock
   /// (see [FeedDatabase.upsertArticles] for why this matters).
-  Future<void> upsertArticles(List<Article> articles, {Map<String, int>? clocks}) async {
+  Future<void> upsertArticles(
+    List<Article> articles, {
+    Map<String, int>? clocks,
+  }) async {
     try {
       await _database.upsertArticles(articles, clocks: clocks);
     } catch (e) {

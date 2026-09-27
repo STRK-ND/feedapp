@@ -131,7 +131,10 @@ class FeedDatabase {
     // Capture the clocks we must preserve before the delete below.
     final existing = <String, int>{};
     try {
-      final rows = await db.query(_articlesTable, columns: ['id', 'updated_at']);
+      final rows = await db.query(
+        _articlesTable,
+        columns: ['id', 'updated_at'],
+      );
       for (final r in rows) {
         existing[r['id'] as String] = (r['updated_at'] as int?) ?? 0;
       }

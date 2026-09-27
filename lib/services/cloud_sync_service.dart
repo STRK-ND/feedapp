@@ -249,7 +249,8 @@ class CloudSyncService implements SyncHooks {
     final all = await _storage.loadArticles();
     final toPush = [
       for (final a in all)
-        if ((a.isRead || a.isSaved) && (localTs[a.id] ?? 0) > (cloudTs[a.id] ?? 0))
+        if ((a.isRead || a.isSaved) &&
+            (localTs[a.id] ?? 0) > (cloudTs[a.id] ?? 0))
           a,
     ];
     if (toPush.isNotEmpty) {

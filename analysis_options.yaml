@@ -61,6 +61,8 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/l10n*.dart"
+    - build/**
+    - android/**
 
   strong-mode:
     implicit-casts: false
