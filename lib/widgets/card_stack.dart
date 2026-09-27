@@ -62,12 +62,23 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   }
 
   void _prefetchNextCardImage() {
-    // Prefetch image for the card at index 1 (next card after current front card)
+    // Prefetch image for the card at index 1 (next card after current
+    // front card). Resize to the same width the card renders at —
+    // precaching the full-size image decodes it once for nothing and the
+    // resized cache key would never match on swipe.
     if (widget.articles.length > 1) {
       final nextArticle = widget.articles[1];
       if (nextArticle.imageUrl != null) {
+        final imageMaxWidth = context.read<SettingsNotifier>().imageMaxWidth;
+        // allowUpscaling: false matches ResizeImage.resizeIfNeeded, which
+        // is what CachedNetworkImage.memCacheWidth uses internally — the
+        // cache key (including the policy) must be identical to hit.
         precacheImage(
-          CachedNetworkImageProvider(nextArticle.imageUrl!),
+          ResizeImage(
+            CachedNetworkImageProvider(nextArticle.imageUrl!),
+            width: imageMaxWidth,
+            allowUpscaling: false,
+          ),
           context,
         );
       }

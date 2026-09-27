@@ -28,6 +28,33 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
     _animation = Tween<double>(begin: -2, end: 2).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
     );
+    // The ticker must never run while the shimmer is not rendered:
+    // repeat() fires every frame regardless of build output, burning
+    // battery and frame budget behind the scenes (e.g. every
+    // SkeletonBox that has already been handed its real content).
+    if (!_shouldAnimate()) _controller.stop();
+  }
+
+  bool _shouldAnimate() {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final isDesktop =
+        Theme.of(context).platform == TargetPlatform.windows ||
+        Theme.of(context).platform == TargetPlatform.macOS ||
+        Theme.of(context).platform == TargetPlatform.linux;
+    final prefersReducedMotion = isDesktop
+        ? false
+        : mediaQuery?.disableAnimations ?? false;
+    return widget.isLoading && !prefersReducedMotion;
+  }
+
+  @override
+  void didUpdateWidget(ShimmerLoading oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_shouldAnimate()) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller.stop();
+    }
   }
 
   @override
@@ -38,16 +65,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.maybeOf(context);
-    final isDesktop =
-        Theme.of(context).platform == TargetPlatform.windows ||
-        Theme.of(context).platform == TargetPlatform.macOS ||
-        Theme.of(context).platform == TargetPlatform.linux;
-    final prefersReducedMotion = isDesktop
-        ? false
-        : mediaQuery?.disableAnimations ?? false;
-
-    if (prefersReducedMotion || !widget.isLoading) {
+    if (!_shouldAnimate()) {
       return widget.child;
     }
 
