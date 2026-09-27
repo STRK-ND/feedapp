@@ -75,7 +75,11 @@ Future<void> main() async {
               ? const String.fromEnvironment('RELEASE_VERSION')
               : '${pi.packageName}@${pi.version}'
           ..maxBreadcrumbs = 100
-          ..sampleRate = 0.25;
+          ..sampleRate = 0.25
+          // Performance tracing is expensive (spans for every screen load
+          // and refresh are built, serialized, and shipped). 10% gives
+          // usable APM trends without the battery/radio cost of 100%.
+          ..tracesSampleRate = 0.1;
       }).timeout(const Duration(seconds: 10));
     } catch (e) {
       debugPrint('Sentry init failed: $e');

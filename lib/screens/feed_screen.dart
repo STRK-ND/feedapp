@@ -255,11 +255,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       results,
     ) {
       if (!mounted) return;
-      setState(() {
-        _isOnline = results.contains(ConnectivityResult.none) == false;
-      });
+      final wasOnline = _isOnline;
+      final isOnline = results.contains(ConnectivityResult.none) == false;
+      // Same-state events (Wi-Fi <-> cellular handoffs, signal-strength
+      // churn) are common on commutes and must not wake the radio: only
+      // an offline -> online transition refreshes.
+      if (isOnline == wasOnline) return;
+      setState(() => _isOnline = isOnline);
 
-      if (_isOnline && _articles.isNotEmpty) {
+      if (isOnline && !wasOnline && _articles.isNotEmpty) {
         _refreshFeeds();
       }
     });

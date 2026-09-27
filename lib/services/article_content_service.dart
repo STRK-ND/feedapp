@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
@@ -12,6 +13,14 @@ class ArticleContent {
   final List<String> images;
 
   ArticleContent({required this.text, required this.images});
+}
+
+/// Internal result of the isolate extraction pipeline.
+class _ExtractedContent {
+  final String text;
+  final List<String> images;
+
+  const _ExtractedContent({required this.text, required this.images});
 }
 
 /// Service to fetch and extract full article content from URLs
@@ -50,49 +59,19 @@ class ArticleContentService {
       }
 
       final htmlContent = response.body;
-      final document = parser.parse(htmlContent);
+      // Parse + extract on a background isolate: html/parser.dart building a
+      // DOM for a full article page is CPU-heavy (hundreds of ms on mid-range
+      // phones) and would block the UI while the sheet opens.
+      final content = await Isolate.run(
+        () => _extractContentSync(htmlContent, url),
+      );
 
-      // Extract images first
-      final images = _extractImages(document, url);
-      debugPrint('[ArticleContent] Found ${images.length} images');
+      final images = content.images;
 
-      // Try generic selectors
-      final genericSelectors = [
-        'article',
-        '[role="article"]',
-        'article p',
-        '.article-content',
-        '.post-content',
-        '.entry-content',
-        '.content p',
-        'main p',
-        'article .post-body',
-        '.post-body',
-      ];
-
-      for (final selector in genericSelectors) {
-        final content = _extractContentBySelector(document, selector);
-        if (content.isNotEmpty) {
-          debugPrint(
-            '[ArticleContent] Found content using generic selector: $selector',
-          );
-          return ArticleContent(text: content, images: images);
-        }
+      if (content.text.isNotEmpty) {
+        debugPrint('[ArticleContent] Found content on background isolate');
+        return ArticleContent(text: content.text, images: images);
       }
-
-      // Last resort: Extract all paragraphs
-      final paragraphs = document.querySelectorAll('p');
-      final content = paragraphs
-          .map((p) => p.text.trim())
-          .where((text) => text.isNotEmpty && text.length > 20)
-          .take(30)
-          .join('\n\n');
-
-      if (content.isNotEmpty) {
-        debugPrint('[ArticleContent] Found content using paragraph extraction');
-        return ArticleContent(text: content, images: images);
-      }
-
       debugPrint('[ArticleContent] No content found');
       return ArticleContent(
         text:
@@ -118,8 +97,53 @@ class ArticleContentService {
     return result.text;
   }
 
+  /// Pure (no I/O) extraction pipeline: parse HTML → images + text.
+  /// Static + sync so [Isolate.run] can execute it in a background
+  /// isolate; `debugPrint`-side effects stay out of the hot path.
+  static _ExtractedContent _extractContentSync(String html, String url) {
+    final document = parser.parse(html);
+    final images = _extractImagesStatic(document, url);
+    final text = _extractTextSync(document);
+    return _ExtractedContent(text: text, images: images);
+  }
+
+  /// Selectors tried in order, then a paragraph fallback.
+  static const List<String> _genericSelectors = [
+    'article',
+    '[role="article"]',
+    'article p',
+    '.article-content',
+    '.post-content',
+    '.entry-content',
+    '.content p',
+    'main p',
+    'article .post-body',
+    '.post-body',
+  ];
+
+  /// Walk the generic selectors and paragraph fallback off the UI thread.
+  static String _extractTextSync(dom.Document document) {
+    for (final selector in _genericSelectors) {
+      final content = _extractContentBySelector(document, selector);
+      if (content.isNotEmpty) {
+        return content;
+      }
+    }
+    // Last resort: extract all paragraphs.
+    final paragraphs = document.querySelectorAll('p');
+    final content = paragraphs
+        .map((p) => p.text.trim())
+        .where((text) => text.isNotEmpty && text.length > 20)
+        .take(30)
+        .join('\n\n');
+    return content;
+  }
+
   /// Extract images from the document
-  List<String> _extractImages(dom.Document document, String baseUrl) {
+  static List<String> _extractImagesStatic(
+    dom.Document document,
+    String baseUrl,
+  ) {
     final images = <String>[];
     final uri = Uri.parse(baseUrl);
 
@@ -184,7 +208,10 @@ class ArticleContentService {
   }
 
   /// Extract content using a CSS selector
-  String _extractContentBySelector(dom.Document document, String selector) {
+  static String _extractContentBySelector(
+    dom.Document document,
+    String selector,
+  ) {
     final elements = document.querySelectorAll(selector);
 
     if (elements.isEmpty) return '';
@@ -214,7 +241,7 @@ class ArticleContentService {
   }
 
   /// Extract clean text from an element, removing unwanted content
-  String _extractTextFromElement(dom.Element element) {
+  static String _extractTextFromElement(dom.Element element) {
     final textBuilder = StringBuffer();
     bool hasContent = false;
 
@@ -269,7 +296,7 @@ class ArticleContentService {
   }
 
   /// Clean extracted text - enhanced to strip HTML, URLs, and RSS artifacts
-  String cleanText(String text) {
+  static String cleanText(String text) {
     if (text.isEmpty) return text;
 
     // Decode HTML entities first (before stripping tags/URLs)
@@ -312,7 +339,7 @@ class ArticleContentService {
   }
 
   /// Decode HTML entities (both named entities and numeric character references)
-  String _decodeHtmlEntities(String text) {
+  static String _decodeHtmlEntities(String text) {
     // First decode numeric entities (&#8221;, &#8217;, etc.)
     text = text.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
       final code = int.tryParse(match.group(1) ?? '');

@@ -126,6 +126,10 @@ class ListArticleCard extends StatelessWidget {
                           imageUrl: article.imageUrl!,
                           fit: BoxFit.cover,
                           cacheManager: AppCacheManager(),
+                          // Decode cap: a 200dp row must not decode a
+                          // 4000px source into a full bitmap (tens of MB
+                          // per image, GC churn while scrolling).
+                          memCacheWidth: 800,
                           width: double.infinity,
                           height: 200,
                           fadeInDuration: AppMotion.base,

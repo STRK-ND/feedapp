@@ -239,6 +239,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         width: double.infinity,
         fit: BoxFit.cover,
         cacheManager: AppCacheManager(),
+        // Decode cap mirrors card_stack.dart — full-resolution heroes
+        // cost tens of MB of bitmap memory each.
+        memCacheWidth: 800,
         fadeInDuration: AppCardStyles.fadeInDuration,
         fadeOutDuration: AppCardStyles.fadeInDuration,
         placeholder: (context, url) =>

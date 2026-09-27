@@ -45,7 +45,7 @@ void main() {
     ''';
 
     test('parses items, strips HTML, skips entries without title/link', () {
-      final articles = serviceWith(rss).parseFeed(rss, source);
+      final articles = ClientFeedService.parseFeedSync(rss, source);
 
       expect(articles.length, 2);
       expect(articles[0].title, 'First post');
@@ -56,8 +56,8 @@ void main() {
     });
 
     test('ids are stable across parses and unique per link', () {
-      final a = serviceWith(rss).parseFeed(rss, source);
-      final b = serviceWith(rss).parseFeed(rss, source);
+      final a = ClientFeedService.parseFeedSync(rss, source);
+      final b = ClientFeedService.parseFeedSync(rss, source);
 
       expect(a[0].id, b[0].id);
       expect(a[1].id, b[1].id);
@@ -66,7 +66,7 @@ void main() {
     });
 
     test('parses RFC-2822 and offset date forms', () {
-      final articles = serviceWith(rss).parseFeed(rss, source);
+      final articles = ClientFeedService.parseFeedSync(rss, source);
       // Tue, 28 Jul 2026 18:11:00 GMT
       expect(articles[0].pubDate.toUtc().hour, 18);
       // 09:30 +0530 == 04:00 UTC
@@ -80,7 +80,7 @@ void main() {
         '<item>',
         '<item><media:content url="https://img.example.com/media.png"/>',
       );
-      final articles = serviceWith(withMedia).parseFeed(withMedia, source);
+      final articles = ClientFeedService.parseFeedSync(withMedia, source);
       expect(articles.first.imageUrl, 'https://img.example.com/media.png');
     });
   });
@@ -101,7 +101,7 @@ void main() {
     ''';
 
     test('parses alternate link, author, ISO date', () {
-      final articles = serviceWith(atom).parseFeed(atom, source);
+      final articles = ClientFeedService.parseFeedSync(atom, source);
 
       expect(articles.length, 1);
       expect(articles[0].title, 'Atom entry');
@@ -111,6 +111,14 @@ void main() {
       expect(articles[0].description, 'Notes & thoughts on things');
       expect(articles[0].pubDate.year, 2026);
       expect(articles[0].pubDate.month, 7);
+    });
+
+    test('async parseFeed matches the sync contract (isolate path)', () async {
+      final articles = await serviceWith(atom).parseFeed(atom, source);
+      final syncArticles = ClientFeedService.parseFeedSync(atom, source);
+      expect(articles.length, syncArticles.length);
+      expect(articles.first.title, syncArticles.first.title);
+      expect(articles.first.id, syncArticles.first.id);
     });
   });
 

@@ -7,6 +7,7 @@
 library;
 
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -51,9 +52,10 @@ class ClientFeedService {
     return parseFeed(response.body, source);
   }
 
-  /// Parse an RSS 2.0 or Atom document. Pure (no I/O) so tests can pin
-  /// the format contract directly.
-  List<Article> parseFeed(String xmlText, RssSource source) {
+  /// Parse an RSS 2.0 or Atom document. Sync and pure (no I/O) so tests
+  /// can pin the format contract directly; production callers go through
+  /// [parseFeed], which runs this on a background isolate.
+  static List<Article> parseFeedSync(String xmlText, RssSource source) {
     final XmlDocument doc;
     try {
       doc = XmlDocument.parse(xmlText);
@@ -85,7 +87,14 @@ class ClientFeedService {
     return articles;
   }
 
-  Article? _fromRss(XmlElement item, RssSource source) {
+  /// Parse on a background isolate: XmlDocument.parse + per-entry
+  /// extraction is CPU-heavy and scales with feed size — off the main
+  /// isolate so a large feed cannot jank the UI while the user scrolls.
+  Future<List<Article>> parseFeed(String xmlText, RssSource source) {
+    return Isolate.run(() => parseFeedSync(xmlText, source));
+  }
+
+  static Article? _fromRss(XmlElement item, RssSource source) {
     final title = _textOf(item, 'title');
     var link = _textOf(item, 'link');
     link ??= _attrOfNested(item, 'guid'); // rare fallback
@@ -115,7 +124,7 @@ class ClientFeedService {
     );
   }
 
-  Article? _fromAtom(XmlElement entry, RssSource source) {
+  static Article? _fromAtom(XmlElement entry, RssSource source) {
     final title = _textOf(entry, 'title');
     var link = _atomAlternateLink(entry);
     link ??= _textOf(entry, 'id');
@@ -145,7 +154,7 @@ class ClientFeedService {
     );
   }
 
-  Article _build({
+  static Article _build({
     required RssSource source,
     required String title,
     required String link,
@@ -172,7 +181,7 @@ class ClientFeedService {
   }
 
   /// First direct child element matching [name] (qualified name allowed).
-  String? _textOf(XmlElement parent, String name) {
+  static String? _textOf(XmlElement parent, String name) {
     for (final el in parent.children.whereType<XmlElement>()) {
       if (el.name.qualified == name) {
         return el.innerText.trim();
@@ -181,7 +190,7 @@ class ClientFeedService {
     return null;
   }
 
-  String? _nestedText(XmlElement parent, List<String> path) {
+  static String? _nestedText(XmlElement parent, List<String> path) {
     XmlElement? current = parent;
     for (final name in path) {
       final found = current?.children
@@ -194,7 +203,7 @@ class ClientFeedService {
     return current?.innerText.trim();
   }
 
-  String? _attrOfNested(XmlElement parent, String name) {
+  static String? _attrOfNested(XmlElement parent, String name) {
     for (final el in parent.children.whereType<XmlElement>()) {
       if (el.name.qualified == name) {
         final text = el.innerText.trim();
@@ -205,7 +214,7 @@ class ClientFeedService {
   }
 
   /// Atom <link>: prefer rel="alternate" or no rel, else first href.
-  String? _atomAlternateLink(XmlElement entry) {
+  static String? _atomAlternateLink(XmlElement entry) {
     final links = entry.children
         .whereType<XmlElement>()
         .where((el) => el.name.qualified == 'link')
@@ -224,7 +233,7 @@ class ClientFeedService {
   }
 
   /// Image hunt mirrors the worker: media:content → enclosure → <img>.
-  String? _imageUrlFrom(XmlElement item) {
+  static String? _imageUrlFrom(XmlElement item) {
     for (final el in item.descendantElements) {
       if (el.name.qualified == 'media:content' ||
           el.name.qualified == 'media:thumbnail') {
@@ -255,7 +264,7 @@ class ClientFeedService {
   }
 
   /// RFC-2822 ("Tue, 28 Jul 2026 18:11:00 GMT"), ISO-8601, or null.
-  DateTime? _parseDate(String? raw) {
+  static DateTime? _parseDate(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     final iso = DateTime.tryParse(raw);
     if (iso != null) return iso;
@@ -328,7 +337,7 @@ class ClientFeedService {
     return utc;
   }
 
-  String stripHtml(String input) {
+  static String stripHtml(String input) {
     var s = input
         .replaceAll(RegExp(r'<!\[CDATA\[([\s\S]*?)\]\]>'), r'$1')
         .replaceAll(RegExp(r'<[^>]+>'), ' ')
