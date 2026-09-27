@@ -125,8 +125,10 @@ class ArticleRepository {
         if (candidate.isBefore(DateTime.now())) {
           watermark = candidate;
         } else {
-          debugPrint('[Repository] Watermark pinned in the future by cached '
-              'article date; falling back to full fetch.');
+          debugPrint(
+            '[Repository] Watermark pinned in the future by cached '
+            'article date; falling back to full fetch.',
+          );
         }
       }
 

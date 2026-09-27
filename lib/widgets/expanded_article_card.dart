@@ -448,7 +448,8 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   // feed content, so only real web URLs may
                                   // leave the app (blocks intent:// and
                                   // other app-handoff schemes).
-                                  if (uri.scheme != 'http' && uri.scheme != 'https') {
+                                  if (uri.scheme != 'http' &&
+                                      uri.scheme != 'https') {
                                     return;
                                   }
                                   if (await canLaunchUrl(uri)) {

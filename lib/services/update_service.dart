@@ -314,12 +314,10 @@ class UpdateService {
         verified = actual == expectedDigest;
         if (!verified) {
           debugPrint(
-            '[UpdateService] Checksum mismatch: expected $expectedDigest, got $actual',
+            '[UpdateService] Checksum mismatch: '
+            'expected $expectedDigest, got $actual',
           );
-          throw HttpException(
-            'APK checksum mismatch',
-            uri: Uri.parse(url),
-          );
+          throw HttpException('APK checksum mismatch', uri: Uri.parse(url));
         }
       }
 
@@ -350,7 +348,9 @@ class UpdateService {
   /// ([UpdateDownloadHandle.installable] is false). Older call sites that
   /// hand over a bare file bypass this check — the handle-based API is the
   /// only sanctioned install route.
-  static Future<bool> triggerInstall({required UpdateDownloadHandle handle}) async {
+  static Future<bool> triggerInstall({
+    required UpdateDownloadHandle handle,
+  }) async {
     if (!handle.installable) {
       debugPrint(
         '[UpdateService] Install refused: APK was not checksum-verified.',
