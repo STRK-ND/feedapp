@@ -302,6 +302,7 @@ class NotificationService {
       'type': 'ota_update',
       'version': info.version,
       'downloadUrl': info.downloadUrl,
+      if (info.checksumUrl != null) 'checksumUrl': info.checksumUrl,
       'releaseNotes': info.releaseNotes,
       'htmlUrl': info.htmlUrl,
       'releaseDate': info.releaseDate,
@@ -394,6 +395,7 @@ class NotificationService {
       return UpdateInfo(
         version: data['version'] as String? ?? '',
         downloadUrl: data['downloadUrl'] as String? ?? '',
+        checksumUrl: data['checksumUrl'] as String?,
         releaseNotes: data['releaseNotes'] as String? ?? '',
         htmlUrl: data['htmlUrl'] as String? ?? '',
         releaseDate: data['releaseDate'] as String? ?? '',

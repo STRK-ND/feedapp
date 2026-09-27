@@ -159,9 +159,10 @@ class _MainNavigationState extends State<MainNavigation> {
       final handle = await UpdateService.downloadApk(
         url: info.downloadUrl,
         version: info.version,
+        checksumUrl: info.checksumUrl,
       );
       if (!ctx.mounted) return;
-      final launched = await UpdateService.triggerInstall(apkFile: handle.file);
+      final launched = await UpdateService.triggerInstall(handle: handle);
       if (launched) {
         messenger?.showSnackBar(
           SnackBar(content: Text('Installing ${info.version}…')),

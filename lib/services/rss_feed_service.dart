@@ -213,6 +213,10 @@ class RssFeedService {
     final name = json['name'] as String?;
     final url = json['url'] as String?;
     if (id == null || id.isEmpty || name == null || url == null) return null;
+    // Mirror the server's handlePutSources rule: only http(s) feed URLs are
+    // accepted (dart:http fails closed on other schemes, but rejecting them
+    // here keeps the registry clean and the intent explicit).
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return null;
     final category = json['category'] as String? ?? 'Custom';
     return RssSource(
       id: id,

@@ -509,3 +509,86 @@ test('getSourceList falls back to the bundled list when the override is empty or
   await env.ARTICLES_KV.put(SOURCES_OVERRIDE_KEY, JSON.stringify([]));
   assert.deepEqual(await getSourceList(env), SOURCES);
 });
+
+// ---------------------------------------------------------------------------
+// Fail-closed app gate: /subscribe and /articles/refresh mutate shared
+// state, so a missing API_SECRET must mean "locked", not "open".
+// ---------------------------------------------------------------------------
+
+test('app-level routes fail closed when API_SECRET is not configured', async () => {
+  const env = workerEnv({ API_SECRET: undefined });
+
+  const sub = await worker.fetch(workerRequest('/subscribe', { method: 'POST', body: { token: 'tok-1234567890' } }), env, noopCtx);
+  assert.equal(sub.status, 401);
+
+  const unsub = await worker.fetch(workerRequest('/subscribe', { method: 'DELETE', body: { token: 'tok-1234567890' } }), env, noopCtx);
+  assert.equal(unsub.status, 401);
+
+  const refresh = await worker.fetch(workerRequest('/articles/refresh'), env, noopCtx);
+  assert.equal(refresh.status, 401);
+
+  // Nothing was persisted by any rejected call.
+  assert.equal(await env.ARTICLES_KV.get('sub:tok-1234567890'), null);
+  assert.equal(await env.ARTICLES_KV.get('refresh:lock'), null);
+});
+
+test('public reads stay open when API_SECRET is not configured', async () => {
+  const env = workerEnv({ API_SECRET: undefined });
+  const res = await worker.fetch(workerRequest('/articles'), env, noopCtx);
+  assert.ok(res.status === 200 || res.status === 503);
+});
+
+test('subscribe enforces the token shape (min and max length)', async () => {
+  // Authorized request (auth is checked before body validation) — the
+  // shape checks below are what is under test.
+  const env = workerEnv();
+  const short = await worker.fetch(workerRequest('/subscribe', { method: 'POST', body: { token: 'short' }, secret: 'test-secret' }), env, noopCtx);
+  assert.equal(short.status, 400);
+
+  const long = await worker.fetch(
+    workerRequest('/subscribe', { method: 'POST', body: { token: 'x'.repeat(4097) }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(long.status, 400);
+
+  const maxOk = await worker.fetch(
+    workerRequest('/subscribe', { method: 'POST', body: { token: 'x'.repeat(4096) }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(maxOk.status, 200);
+});
+
+test('worker errors return a static 500 body (no exception text echoed)', async () => {
+  const env = workerEnv({
+    ARTICLES_KV: {
+      // Any handler touching KV throws -> the top-level catch responds.
+      get: async () => { throw new Error('Internal exploded detail xyzzy'); },
+      put: async () => {},
+      delete: async () => {},
+      list: async () => ({ keys: [] }),
+    },
+  });
+  const res = await worker.fetch(workerRequest('/sources'), env, noopCtx);
+  assert.equal(res.status, 500);
+  const data = await res.json();
+  assert.equal(data.error, 'internal');
+  assert.equal(data.message, undefined);
+  const text = JSON.stringify(data);
+  assert.ok(!text.includes('xyzzy'));
+});
+
+test('buildArticle drops future-dated items that would pin delta watermarks', () => {
+  const source = SOURCES[0];
+  const farFuture = new Date(Date.now() + 30 * 24 * 3600 * 1000).toUTCString();
+  const body = `<title>Future</title><link>https://example.com/f</link><pubDate>${farFuture}</pubDate>`;
+  assert.equal(buildArticle(body, source, itemOpts), null);
+
+  // Small skew (under the 24h allowance) is kept.
+  const nearFuture = new Date(Date.now() + 3600 * 1000).toUTCString();
+  const okBody = `<title>Soon</title><link>https://example.com/s</link><pubDate>${nearFuture}</pubDate>`;
+  const kept = buildArticle(okBody, source, itemOpts);
+  assert.ok(kept);
+  assert.equal(kept.title, 'Soon');
+});

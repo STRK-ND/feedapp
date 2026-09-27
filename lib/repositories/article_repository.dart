@@ -117,7 +117,17 @@ class ArticleRepository {
           if (a.pubDate.isAfter(maxDate)) maxDate = a.pubDate;
         }
         // Overlap window absorbs minor clock skew between worker and client.
-        watermark = maxDate.subtract(const Duration(hours: 1));
+        final candidate = maxDate.subtract(const Duration(hours: 1));
+        // Clamp against the clock: a single future-dated article must not
+        // pin the watermark in the future (that would exclude every real
+        // new article until the future date passes). If the candidate is
+        // not in the past, fall back to a full fetch (watermark = null).
+        if (candidate.isBefore(DateTime.now())) {
+          watermark = candidate;
+        } else {
+          debugPrint('[Repository] Watermark pinned in the future by cached '
+              'article date; falling back to full fetch.');
+        }
       }
 
       // Fetch pages until exhausted (bounded at 5 pages / 250 articles).

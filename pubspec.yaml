@@ -40,6 +40,7 @@ dependencies:
 
   # Networking & Data
   http: ^1.2.0
+  crypto: ^3.0.7
   cached_network_image: ^3.3.0
   xml: ^7.0.1
   html: ^0.15.4
@@ -98,5 +99,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - shorebird.yaml
 
 

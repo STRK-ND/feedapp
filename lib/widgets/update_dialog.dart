@@ -271,11 +271,12 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
       final handle = await UpdateService.downloadApk(
         url: widget.updateInfo.downloadUrl,
         version: widget.updateInfo.version,
+        checksumUrl: widget.updateInfo.checksumUrl,
       );
       if (!mounted) return;
 
       setState(() => _stage = _Stage.installing);
-      final launched = await UpdateService.triggerInstall(apkFile: handle.file);
+      final launched = await UpdateService.triggerInstall(handle: handle);
       if (!mounted) return;
 
       if (launched) {

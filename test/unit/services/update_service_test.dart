@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:crypto/crypto.dart' show sha256;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -25,6 +28,10 @@ MockClient _newerReleaseClient() {
             'name': 'curated-feeds-v1.2.2.apk',
             'browser_download_url':
                 'https://example.com/curated-feeds-v1.2.2.apk',
+          },
+          {
+            'name': 'SHA256SUMS-v1.2.2.txt',
+            'browser_download_url': 'https://example.com/SHA256SUMS-v1.2.2.txt',
           },
         ],
       }),
@@ -136,4 +143,125 @@ void main() {
   // MissingPluginException under `flutter test`. That is expected and handled:
   // checkForUpdates wraps the call in try/catch (see update_service.dart), so
   // the returned UpdateInfo is unaffected.
+
+  group('UpdateService.checksums', () {
+    setUp(() {
+      // downloadApk writes to the temp dir via path_provider; mock the
+      // platform channel so tests run without device storage.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/path_provider'),
+        (call) async => Directory.systemTemp.createTemp('apk_dl_test').path,
+      );
+    });
+
+    test('checkForUpdates carries the SHA256SUMS asset when published', () async {
+      final info = await UpdateService.checkForUpdates(
+        forceCheck: true,
+        client: _newerReleaseClient(),
+      );
+      expect(info, isNotNull);
+      expect(info!.checksumUrl,
+          'https://example.com/SHA256SUMS-v1.2.2.txt');
+    });
+
+    test('fetchExpectedChecksum parses sha256sum output', () async {
+      final digest = 'a' * 64;
+      final client = MockClient((request) async {
+        return http.Response(
+          '0000...  other-file.apk\n$digest  curated-feeds-v1.2.2.apk\n',
+          200,
+        );
+      });
+      final got = await UpdateService.fetchExpectedChecksum(
+        checksumUrl: 'https://example.com/SHA256SUMS-v1.2.2.txt',
+        apkFileName: 'curated-feeds-v1.2.2.apk',
+        client: client,
+      );
+      expect(got, digest);
+    });
+
+    test('downloadApk accepts a matching checksum and marks installable',
+        () async {
+      // Build the exact bytes, then the matching sha256sums entry.
+      final bytes = List<int>.generate(2048, (i) => i % 251);
+      final digest = sha256.convert(bytes).toString();
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('SHA256SUMS-v9.9.9.txt')) {
+          return http.Response(
+            '$digest  curated-feeds-v9.9.9.apk\n',
+            200,
+          );
+        }
+        return http.Response.bytes(bytes, 200);
+      });
+
+      final handle = await UpdateService.downloadApk(
+        url: 'https://example.com/curated-feeds-v9.9.9.apk',
+        version: '9.9.9',
+        checksumUrl: 'https://example.com/SHA256SUMS-v9.9.9.txt',
+        client: client,
+      );
+      expect(handle.installable, isTrue);
+      expect(await handle.file.exists(), isTrue);
+      await handle.file.delete();
+    });
+
+    test('downloadApk throws on a checksum mismatch and leaves no file',
+        () async {
+      final bytes = List<int>.generate(1024, (i) => i % 251);
+      final wrongDigest = 'b' * 64;
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('SHA256SUMS-v9.9.9.txt')) {
+          return http.Response(
+            '$wrongDigest  curated-feeds-v9.9.9.apk\n',
+            200,
+          );
+        }
+        return http.Response.bytes(bytes, 200);
+      });
+
+      await expectLater(
+        UpdateService.downloadApk(
+          url: 'https://example.com/curated-feeds-v9.9.9.apk',
+          version: '9.9.9',
+          checksumUrl: 'https://example.com/SHA256SUMS-v9.9.9.txt',
+          client: client,
+        ),
+        throwsA(isA<HttpException>()),
+      );
+    });
+
+    test('downloadApk fails closed when the checksum asset is missing',
+        () async {
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('SHA256SUMS-v9.9.9.txt')) {
+          return http.Response('not found', 404);
+        }
+        return http.Response.bytes(List<int>.filled(16, 1), 200);
+      });
+
+      await expectLater(
+        UpdateService.downloadApk(
+          url: 'https://example.com/curated-feeds-v9.9.9.apk',
+          version: '9.9.9',
+          checksumUrl: 'https://example.com/SHA256SUMS-v9.9.9.txt',
+          client: client,
+        ),
+        throwsA(isA<HttpException>()),
+      );
+    });
+
+    test('triggerInstall refuses an unverified handle', () async {
+      final handle = UpdateDownloadHandle(
+        file: File('/tmp/nonexistent.apk'),
+        version: '9.9.9',
+        sizeBytes: 0,
+        installable: false,
+      );
+      // Refusal happens before any platform call, so no MissingPlugin
+      // exception can occur: it returns false deterministically.
+      expect(await UpdateService.triggerInstall(handle: handle), isFalse);
+    });
+  });
 }

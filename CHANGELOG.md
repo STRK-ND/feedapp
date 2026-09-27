@@ -5,6 +5,22 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security (from the run-2 audit)
+- Worker: app-level authorization now fails closed when `API_SECRET` is unset — `/subscribe` and `/articles/refresh` are no longer open by default (reads stay public)
+- Worker: subscription tokens are capped at 4096 chars on POST/DELETE `/subscribe`
+- Worker: future-dated feed items (>24h ahead) are dropped at ingestion so they cannot pin clients' delta watermarks
+- Worker: 500 responses no longer echo exception text to callers
+- OTA: in-app updater verifies the APK against the release's `SHA256SUMS` asset (published by CI) before install; mismatch or missing checksums fail closed to the browser fallback
+- OTA: `triggerInstall` now refuses any download handle that was not checksum-verified
+- CI: release workflow gains a provenance check (tag must be on master) and a manual approval hold before signing/publishing
+- CI: signed builds require a pinned `FLUTTER_COMMIT` env var and verify the cloned SDK SHA before use
+- CI: releases publish a `SHA256SUMS-<tag>.txt` asset; `--dart-define` expansions are now quoted
+- Client: delta-fetch watermark is clamped against the clock — a future-dated cached article falls back to a full fetch
+- Client: Open-in-browser launches only http(s) links (no `intent://` or other app-handoff schemes)
+- Client: source registry rejects non-http(s) feed URLs, mirroring the server's `handlePutSources` rule
+
 ## [1.0.1] - 2026-03-23
 
 ### Fixed

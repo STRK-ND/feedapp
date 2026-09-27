@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -84,6 +86,7 @@ class UpdateService {
               version: cleanVersion,
               releaseDate: data['published_at'] as String,
               downloadUrl: _getApkDownloadUrl(data),
+              checksumUrl: _getChecksumUrl(data, latestVersion),
               releaseNotes: data['body'] as String? ?? '',
               htmlUrl: data['html_url'] as String,
             );
@@ -127,6 +130,53 @@ class UpdateService {
     return releaseData['html_url'] as String? ?? '';
   }
 
+  /// Extract the SHA256SUMS asset URL for [tag] (e.g. `SHA256SUMS-v1.2.2.txt`,
+  /// published by the release pipeline). Returns null when the release does
+  /// not carry checksums — downloadApk then refuses the silent-install path
+  /// and falls back to the browser download, fail-closed.
+  static String? _getChecksumUrl(Map<String, dynamic> releaseData, String tag) {
+    final assets = releaseData['assets'] as List<dynamic>?;
+    if (assets == null) return null;
+    for (final asset in assets) {
+      final name = asset['name'] as String?;
+      if (name != null && name == 'SHA256SUMS-$tag.txt') {
+        return asset['browser_download_url'] as String?;
+      }
+    }
+    return null;
+  }
+
+  /// Fetch the published SHA256SUMS file and return the expected digest for
+  /// [apkFileName], or null when the file/entry is missing or malformed.
+  static Future<String?> fetchExpectedChecksum({
+    required String checksumUrl,
+    required String apkFileName,
+    http.Client? client,
+  }) async {
+    http.Client? ownedClient;
+    try {
+      final response = await (client ?? (ownedClient = http.Client()))
+          .get(Uri.parse(checksumUrl))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      // Format: one "<sha256>  <filename>" pair per line (sha256sum output).
+      for (final line in response.body.split('\n')) {
+        final parts = line.trim().split(RegExp(r'\s+'));
+        if (parts.length == 2 && parts[1] == apkFileName) {
+          final digest = parts[0].toLowerCase();
+          if (RegExp(r'^[0-9a-f]{64}$').hasMatch(digest)) return digest;
+          return null;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[UpdateService] Failed to fetch checksums: $e');
+      return null;
+    } finally {
+      ownedClient?.close();
+    }
+  }
+
   /// Mark a version as ignored.
   static Future<void> ignoreVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
@@ -150,6 +200,14 @@ class UpdateService {
   /// dialog) on network/IO failure so the caller can fall back to
   /// `openDownloadUrl`.
   ///
+  /// Verification: when [checksumUrl] is provided, the streamed bytes are
+  /// hashed while downloading and compared against the digest published in
+  /// the release's SHA256SUMS asset; a mismatch (or an unusable checksum
+  /// file) throws before the file is ever renamed to its installable name.
+  /// Without [checksumUrl] the download is kept but the caller must treat
+  /// the handle as unverified — `installable` is false and `triggerInstall`
+  /// refuses it, so no unverified APK can reach the system installer.
+  ///
   /// Streams via `http.Client().send` straight to disk — the whole APK is
   /// never held in memory — and aborts as soon as [AppConfig.maxApkDownloadSizeMB]
   /// is exceeded (the cap was previously declared but never checked, and a
@@ -160,12 +218,33 @@ class UpdateService {
   static Future<UpdateDownloadHandle> downloadApk({
     required String url,
     required String version,
+    String? checksumUrl,
     http.Client? client,
     void Function(double? progress)? onProgress,
   }) async {
     final owned = client ?? http.Client();
     File? file;
     try {
+      // Resolve the expected digest BEFORE spending the download: a release
+      // without a usable SHA256SUMS entry must not be silently installed.
+      final apkFileName = Uri.parse(url).pathSegments.isEmpty
+          ? 'curatedfeeds-$version.apk'
+          : Uri.parse(url).pathSegments.last;
+      String? expectedDigest;
+      if (checksumUrl != null && checksumUrl.isNotEmpty) {
+        expectedDigest = await fetchExpectedChecksum(
+          checksumUrl: checksumUrl,
+          apkFileName: apkFileName,
+          client: client,
+        );
+        if (expectedDigest == null) {
+          throw HttpException(
+            'Release checksum file unusable for $apkFileName',
+            uri: Uri.parse(url),
+          );
+        }
+      }
+
       final request = http.Request('GET', Uri.parse(url));
       final response = await owned
           .send(request)
@@ -195,6 +274,12 @@ class UpdateService {
 
       final sink = file.openWrite();
       var received = 0;
+      // Hash while streaming: package:crypto delivers the Digest to the
+      // collector sink when the conversion is closed.
+      final digestCollector = _DigestCollector();
+      final digestSink = expectedDigest != null
+          ? crypto.sha256.startChunkedConversion(digestCollector)
+          : null;
       try {
         await for (final chunk in response.stream) {
           received += chunk.length;
@@ -205,6 +290,7 @@ class UpdateService {
             );
           }
           sink.add(chunk);
+          digestSink?.add(chunk);
           if (onProgress != null) {
             onProgress(
               expectedBytes != null && expectedBytes > 0
@@ -218,12 +304,32 @@ class UpdateService {
         await sink.close();
       }
 
+      // Verify the streamed bytes against the published digest before the
+      // file becomes an installable APK (no .part suffix). On mismatch the
+      // file is deleted by the finally block below.
+      var verified = false;
+      if (digestSink != null) {
+        digestSink.close();
+        final actual = digestCollector.digest!.toString();
+        verified = actual == expectedDigest;
+        if (!verified) {
+          debugPrint(
+            '[UpdateService] Checksum mismatch: expected $expectedDigest, got $actual',
+          );
+          throw HttpException(
+            'APK checksum mismatch',
+            uri: Uri.parse(url),
+          );
+        }
+      }
+
       final complete = File(file.path.replaceAll(RegExp(r'\.part$'), ''));
       await file.rename(complete.path);
       return UpdateDownloadHandle(
         file: complete,
         version: version,
         sizeBytes: received,
+        installable: expectedDigest != null ? verified : false,
       );
     } finally {
       // Never leave a partial file behind on failure.
@@ -239,7 +345,19 @@ class UpdateService {
   /// Hand the cached APK to the Android system installer. Returns
   /// `true` if `open_filex` resolved an installer intent, `false`
   /// otherwise (caller falls back to browser handoff).
-  static Future<bool> triggerInstall({required File apkFile}) async {
+  ///
+  /// Fail-closed: refuses files whose download was not checksum-verified
+  /// ([UpdateDownloadHandle.installable] is false). Older call sites that
+  /// hand over a bare file bypass this check — the handle-based API is the
+  /// only sanctioned install route.
+  static Future<bool> triggerInstall({required UpdateDownloadHandle handle}) async {
+    if (!handle.installable) {
+      debugPrint(
+        '[UpdateService] Install refused: APK was not checksum-verified.',
+      );
+      return false;
+    }
+    final apkFile = handle.file;
     if (defaultTargetPlatform != TargetPlatform.android) {
       return false;
     }
@@ -266,6 +384,10 @@ class UpdateInfo {
   final String version;
   final String releaseDate;
   final String downloadUrl;
+
+  /// Release SHA256SUMS asset URL (null when the release predates checksum
+  /// publishing). Drives the fail-closed verification in [downloadApk].
+  final String? checksumUrl;
   final String releaseNotes;
   final String htmlUrl;
 
@@ -273,6 +395,7 @@ class UpdateInfo {
     required this.version,
     required this.releaseDate,
     required this.downloadUrl,
+    this.checksumUrl,
     required this.releaseNotes,
     required this.htmlUrl,
   });
@@ -280,14 +403,32 @@ class UpdateInfo {
 
 /// A handle to a downloaded APK on disk. Returned by `downloadApk`
 /// for the dialog to pass into `triggerInstall`.
+///
+/// [installable] is true only when the streamed bytes matched the digest
+/// published in the release's SHA256SUMS asset. `triggerInstall` refuses
+/// handles that are not installable, so an unverified APK can never reach
+/// the system installer.
 class UpdateDownloadHandle {
   final File file;
   final String version;
   final int sizeBytes;
+  final bool installable;
 
   const UpdateDownloadHandle({
     required this.file,
     required this.version,
     required this.sizeBytes,
+    this.installable = false,
   });
+}
+
+/// Receives the final Digest from the streaming sha256 conversion.
+class _DigestCollector implements Sink<crypto.Digest> {
+  crypto.Digest? digest;
+
+  @override
+  void add(crypto.Digest d) => digest = d;
+
+  @override
+  void close() {}
 }

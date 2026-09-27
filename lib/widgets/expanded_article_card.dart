@@ -444,6 +444,13 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 icon: Icons.open_in_new_rounded,
                                 onPressed: () async {
                                   final uri = Uri.parse(widget.article.link);
+                                  // Scheme allowlist: the link comes from
+                                  // feed content, so only real web URLs may
+                                  // leave the app (blocks intent:// and
+                                  // other app-handoff schemes).
+                                  if (uri.scheme != 'http' && uri.scheme != 'https') {
+                                    return;
+                                  }
                                   if (await canLaunchUrl(uri)) {
                                     await launchUrl(
                                       uri,

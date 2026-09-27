@@ -32,6 +32,18 @@ class _ReplayedWorker extends WorkerFeedService {
   }
 }
 
+/// Worker stub that records every issued FilterParams so tests can pin the
+/// delta-fetch contract (what `since` watermark the repository derived).
+class _RecordingWorker extends WorkerFeedService {
+  final List<FilterParams?> calls = [];
+
+  @override
+  Future<PaginatedResponse> fetchArticles({FilterParams? params}) async {
+    calls.add(params);
+    return PaginatedResponse(items: [], total: 0, page: 1, pageSize: 50, hasMore: false);
+  }
+}
+
 void main() {
   group('ArticleRepository', () {
     late ArticleRepository repository;
@@ -134,6 +146,62 @@ void main() {
         final result = await repo.fetchNewArticles();
         expect(result.isSuccess, true);
         expect(result.data!.first.isSaved, true);
+      });
+    });
+
+    group('fetchNewArticles watermark safety', () {
+      test('a future-dated cached article cannot pin the delta watermark',
+          () async {
+        final worker = _RecordingWorker();
+        final repo = ArticleRepository(workerFeedService: worker);
+
+        // Cache holds one article dated 30 days in the future (bad upstream
+        // CMS clock or hostile feed). The derived watermark would land in
+        // the future too and silently exclude every real new article.
+        final future = DateTime.now().add(const Duration(days: 30));
+        repo.syncFrom([
+          Article(
+            id: 'verge-future',
+            title: 'F',
+            description: 'D',
+            fullContent: '',
+            link: 'https://e.com/f',
+            sourceId: 'verge',
+            sourceName: 'The Verge',
+            pubDate: future,
+          ),
+        ], <Article>[]);
+
+        final result = await repo.fetchNewArticles();
+        expect(result.isSuccess, true);
+
+        // The clamp must fall back to a full fetch: since stays null.
+        expect(worker.calls, isNotEmpty);
+        expect(worker.calls.first!.since, isNull);
+      });
+
+      test('a normal cache still produces a past watermark', () async {
+        final worker = _RecordingWorker();
+        final repo = ArticleRepository(workerFeedService: worker);
+
+        repo.syncFrom([
+          Article(
+            id: 'verge-old',
+            title: 'O',
+            description: 'D',
+            fullContent: '',
+            link: 'https://e.com/o',
+            sourceId: 'verge',
+            sourceName: 'The Verge',
+            pubDate: DateTime.now().subtract(const Duration(hours: 5)),
+          ),
+        ], <Article>[]);
+
+        await repo.fetchNewArticles();
+        expect(worker.calls, isNotEmpty);
+        final since = worker.calls.first!.since;
+        expect(since, isNotNull);
+        expect(since!.isBefore(DateTime.now()), isTrue);
       });
     });
   });

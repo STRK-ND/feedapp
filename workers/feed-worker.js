@@ -108,8 +108,10 @@ export default {
       }
       return json({ error: 'not_found' }, 404);
     } catch (e) {
+      // Log details to structured logs only — never echo exception text to
+      // unauthenticated callers.
       console.error('worker_error', { path: url.pathname, error: String(e) });
-      return json({ error: 'internal', message: String(e) }, 500);
+      return json({ error: 'internal' }, 500);
     }
   },
 
@@ -142,16 +144,13 @@ async function isAuthorized(request, env, level = 'app') {
     return await secretsMatch(provided, env.ADMIN_SECRET);
   }
 
-  // App authority. Opt-in hard gate: ops can set REQUIRE_API_SECRET='1' so
-  // a missing secret fails closed instead of serving an open API. Default
-  // remains open-for-back-compat with a loud warning.
+  // App authority. Fail closed when API_SECRET is not configured: the
+  // app-level routes guarded here (/subscribe, /articles/refresh) mutate
+  // shared state, so an unconfigured secret must mean "locked", not
+  // "open". Reads (GET /articles, GET /sources) stay public by design.
   if (!env.API_SECRET) {
-    if (env.REQUIRE_API_SECRET === '1') {
-      console.error('api_secret_required_but_missing');
-      return false;
-    }
-    console.warn('api_secret_not_configured');
-    return true;
+    console.error('api_secret_not_configured');
+    return false;
   }
   return await secretsMatch(provided, env.API_SECRET);
 }
@@ -298,7 +297,7 @@ async function handleSubscribe(request, env) {
     return json({ error: 'invalid_json' }, 400);
   }
   const token = body?.token;
-  if (typeof token !== 'string' || token.length < 10) {
+  if (typeof token !== 'string' || token.length < 10 || token.length > 4096) {
     return json({ error: 'missing_token' }, 400);
   }
   const prefs = body?.preferences && typeof body.preferences === 'object' ? body.preferences : {};
@@ -329,7 +328,7 @@ async function handleUnsubscribe(request, env) {
     return json({ error: 'invalid_json' }, 400);
   }
   const token = body?.token;
-  if (typeof token !== 'string' || token.length < 10) {
+  if (typeof token !== 'string' || token.length < 10 || token.length > 4096) {
     return json({ error: 'missing_token' }, 400);
   }
 
@@ -560,7 +559,16 @@ function buildArticle(body, source, opts) {
     extractTag(body, opts.descTag) || extractTag(body, opts.fullContentTag)
   );
   const pubDateRaw = strip(extractTag(body, opts.pubDateTag));
-  const pubDate = parseDate(pubDateRaw) ?? 0;
+  let pubDate = parseDate(pubDateRaw) ?? 0;
+  // Drop future-dated items: they pin every client's delta-fetch watermark
+  // (the client requests only items newer than its newest cached article),
+  // silently freezing those feeds until the future date passes. Clock skew
+  // of a few minutes is fine to keep; anything further out is a broken feed.
+  const MAX_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+  if (pubDate > Date.now() + MAX_FUTURE_SKEW_MS) {
+    console.warn('future_dated_item_dropped', { source: source.id, pubDate });
+    return null;
+  }
   const author = strip(extractTag(body, opts.authorTag)) || null;
 
   const imageUrl = extractImage(body);

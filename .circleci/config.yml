@@ -6,7 +6,14 @@ version: 2.1
 
 commands:
   install_flutter:
-    description: Install pinned Flutter SDK (cached across builds)
+    description: Install pinned Flutter SDK (cached across builds, SHA-verified)
+    parameters:
+      # Full commit SHA of the FLUTTER_VERSION tag. Supplied by release/verify
+      # jobs for signed builds so the SDK that produces the artifact is bound
+      # to an exact revision, not a movable tag.
+      verify_commit:
+        type: string
+        default: ""
     steps:
       - restore_cache:
           keys:
@@ -16,6 +23,13 @@ commands:
           command: |
             if [ ! -x "$HOME/flutter-sdk/bin/flutter" ]; then
               git clone --depth 1 -b "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$HOME/flutter-sdk"
+            fi
+            if [ -n "<< parameters.verify_commit >>" ]; then
+              ACTUAL=$(git -C "$HOME/flutter-sdk" rev-parse HEAD)
+              if [ "$ACTUAL" != "<< parameters.verify_commit >>" ]; then
+                echo "Flutter SDK SHA mismatch: expected << parameters.verify_commit >>, got $ACTUAL" >&2
+                exit 1
+              fi
             fi
             "$HOME/flutter-sdk/bin/flutter" --version
             echo "export PATH=\"$HOME/flutter-sdk/bin:$PATH\"" >> "$BASH_ENV"
@@ -95,14 +109,25 @@ jobs:
           command: flutter test
 
   # Mirrors .github build.yml — signed APK + AAB on every master push.
+  # FLUTTER_COMMIT (full SHA of the FLUTTER_VERSION tag) must be provided via
+  # project env vars: signed builds fail closed without it so the SDK that
+  # produces the artifact is always pinned.
   build_signed:
     docker:
       - image: cimg/android:2026.08.1
     environment:
       FLUTTER_VERSION: "3.47.2"
     steps:
+      - run:
+          name: Require pinned SDK commit
+          command: |
+            if [ -z "${FLUTTER_COMMIT:-}" ]; then
+              echo "FLUTTER_COMMIT is not set: add the full commit SHA of Flutter $FLUTTER_VERSION to project env vars before running signed builds." >&2
+              exit 1
+            fi
       - checkout
-      - install_flutter
+      - install_flutter:
+          verify_commit: "${FLUTTER_COMMIT}"
       - decode_signing
       - restore_pub_cache
       - restore_gradle_cache
@@ -112,10 +137,10 @@ jobs:
       - save_pub_cache
       - run:
           name: Build signed APK
-          command: flutter build apk --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+          command: flutter build apk --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - run:
           name: Build signed AAB
-          command: flutter build appbundle --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+          command: flutter build appbundle --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - save_gradle_cache
       - store_artifacts:
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -124,17 +149,52 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           destination: app-release.aab
 
-  # Mirrors .github release.yml — on a v* tag: version sync, checks, signed
-  # APK + AAB, publish a GitHub Release. The in-app updater reads that
-  # release, so hosting stays on GitHub regardless of who builds.
+  # Provenance gate for the release workflow: the v* tag must point at a
+  # commit on master (the reviewed code), not an arbitrary commit. Runs
+  # before the approval hold and before any signing material is decoded.
+  release_provenance_check:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - run:
+          name: Verify tag points at master
+          command: |
+            git fetch origin master --quiet
+            TAG_COMMIT=$(git rev-parse "${CIRCLE_TAG}^{commit}")
+            # The command is an if-condition so set -e cannot abort before
+            # the explanatory error is printed.
+            if git merge-base --is-ancestor "$TAG_COMMIT" origin/master; then
+              MASTER_HEAD=$(git rev-parse origin/master)
+              if [ "$TAG_COMMIT" != "$MASTER_HEAD" ]; then
+                echo "WARNING: tag $CIRCLE_TAG is on master history but not at master HEAD ($MASTER_HEAD)."
+              fi
+              echo "Provenance OK: tag $CIRCLE_TAG is an ancestor of origin/master."
+            else
+              echo "Tag $CIRCLE_TAG ($TAG_COMMIT) is NOT on master - refusing to release off-master code." >&2
+              exit 1
+            fi
+
+  # Mirrors .github release.yml — on a v* tag: provenance check, approval,
+  # version sync, checks, signed APK + AAB + SHA256SUMS, publish a GitHub
+  # Release. The in-app updater reads that release, so hosting stays on
+  # GitHub regardless of who builds.
   release:
     docker:
       - image: cimg/android:2026.08.1
     environment:
       FLUTTER_VERSION: "3.47.2"
     steps:
+      - run:
+          name: Require pinned SDK commit
+          command: |
+            if [ -z "${FLUTTER_COMMIT:-}" ]; then
+              echo "FLUTTER_COMMIT is not set: add the full commit SHA of Flutter $FLUTTER_VERSION to project env vars before releasing." >&2
+              exit 1
+            fi
       - checkout
-      - install_flutter
+      - install_flutter:
+          verify_commit: "${FLUTTER_COMMIT}"
       - decode_signing
       - restore_pub_cache
       - restore_gradle_cache
@@ -152,17 +212,25 @@ jobs:
       - run: flutter test
       - run:
           name: Build signed APK
-          command: flutter build apk --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+          command: flutter build apk --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - run:
           name: Build signed AAB
-          command: flutter build appbundle --release --dart-define=WORKER_API_SECRET=$WORKER_API_SECRET
+          command: flutter build appbundle --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - save_gradle_cache
+      - run:
+          name: Write SHA256SUMS
+          command: |
+            cd build/app/outputs
+            ( cd flutter-apk && sha256sum app-release.apk ) >> SHA256SUMS
+            ( cd bundle/release && sha256sum app-release.aab ) >> SHA256SUMS
+            cat SHA256SUMS
       - run:
           name: Publish GitHub Release
           command: |
             TAG="$CIRCLE_TAG"
             mv build/app/outputs/flutter-apk/app-release.apk "curated-feeds-$TAG.apk"
             mv build/app/outputs/bundle/release/app-release.aab "curated-feeds-$TAG.aab"
+            cp build/app/outputs/SHA256SUMS "SHA256SUMS-$TAG.txt"
 
             REPO="STRK-ND/feedapp"
             AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json")
@@ -192,19 +260,42 @@ jobs:
             }
             upload_asset "curated-feeds-$TAG.apk" "application/vnd.android.package-archive"
             upload_asset "curated-feeds-$TAG.aab" "application/octet-stream"
-            echo "Published release $TAG with APK + AAB"
+            upload_asset "SHA256SUMS-$TAG.txt" "text/plain"
+            echo "Published release $TAG with APK + AAB + SHA256SUMS"
 
 workflows:
   ci:
     jobs:
       - verify
       - build_signed:
+          requires:
+            - verify
           filters:
             branches:
               only: master
   release:
     jobs:
+      # Provenance gate: the tag must point at the reviewed master HEAD
+      # before any signing material is decoded. Blocks the job (and the
+      # hold that follows) when the tag is off-master.
+      - release_provenance_check:
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+      - hold:
+          type: approval
+          requires:
+            - release_provenance_check
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
       - release:
+          requires:
+            - hold
           filters:
             tags:
               only: /^v.*/
