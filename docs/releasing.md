@@ -70,7 +70,7 @@ git push origin master v1.0.1
 
 The `release` job then: syncs pubspec version to the tag (versionCode
 floored at 22 + build number) → format/analyze/tests → signed APK + AAB →
-creates the GitHub Release `v1.0.1` with `curated-feeds-v1.0.1.apk` / `.aab`
+creates the GitHub Release `v1.0.1` with `Curated Feeds v1.0.1.apk` / `.aab`
 and auto-generated notes. Watch progress under the project's **Pipelines**
 tab on CircleCI. Re-running a failed release job is safe: if the release
 already exists, assets are uploaded to it instead of failing.

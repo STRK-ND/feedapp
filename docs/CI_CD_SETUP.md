@@ -59,9 +59,9 @@ Get-Content android\app\google-services.json -Raw
 ### Tag push `v1.0.1` (or any `v*`)
 - CircleCI `release` workflow runs: provenance check → manual approval → checks → build → publish
 - Creates GitHub Release titled `v1.0.1` with four assets:
-  - `curated-feeds-v1.0.1.apk`
-  - `curated-feeds-v1.0.1.aab`
-  - `curated-feeds-v1.0.1-play.aab`
+  - `Curated Feeds v1.0.1.apk`
+  - `Curated Feeds v1.0.1.aab`
+  - `Curated Feeds v1.0.1-play.aab`
   - `SHA256SUMS-v1.0.1.txt`
 - Auto-generated release notes from commit history
 - UpdateService (in-app OTA) is triggered when the user's app next runs (direct flavor only)

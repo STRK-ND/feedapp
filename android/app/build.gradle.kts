@@ -92,17 +92,17 @@ android {
     }
   }
 
-  // Name release APKs with the app name, flavor, and version, e.g.
-  // curated-feeds-direct-v1.0.0.apk. versionName comes from pubspec via the
-  // Flutter extension, so the filename always tracks the release version.
+  // Name release APKs "Curated Feeds v<version>.apk". versionName comes from
+  // pubspec via the Flutter extension, so the filename always tracks the
+  // release version. The flavor is not part of the name: the direct channel
+  // only ever ships one APK per release, so the version alone is unambiguous.
   // The CI/Play paths produce AABs (per-device delivery), so only the
   // universal APK lands here — no per-ABI name collisions.
   applicationVariants.all {
-    val variantFlavor = flavorName.ifEmpty { "base" }
     val variantVersion = flutter.versionName
     outputs.all {
       (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
-        .outputFileName = "curated-feeds-$variantFlavor-v$variantVersion.apk"
+        .outputFileName = "Curated Feeds v$variantVersion.apk"
     }
   }
 }

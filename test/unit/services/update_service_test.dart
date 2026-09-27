@@ -25,9 +25,9 @@ MockClient _newerReleaseClient() {
         'html_url': 'https://github.com/STRK-ND/feedapp/releases/tag/v1.2.2',
         'assets': [
           {
-            'name': 'curated-feeds-v1.2.2.apk',
+            'name': 'Curated Feeds v1.2.2.apk',
             'browser_download_url':
-                'https://example.com/curated-feeds-v1.2.2.apk',
+                'https://example.com/Curated%20Feeds%20v1.2.2.apk',
           },
           {
             'name': 'SHA256SUMS-v1.2.2.txt',
@@ -74,7 +74,10 @@ void main() {
 
       expect(info, isNotNull);
       expect(info!.version, '1.2.2');
-      expect(info.downloadUrl, 'https://example.com/curated-feeds-v1.2.2.apk');
+      expect(
+        info.downloadUrl,
+        'https://example.com/Curated%20Feeds%20v1.2.2.apk',
+      );
       expect(info.releaseDate, '2026-01-15T10:00:00Z');
       expect(info.releaseNotes, contains('Fixes things'));
       expect(info.htmlUrl, contains('releases/tag/v1.2.2'));
@@ -185,16 +188,48 @@ void main() {
       final digest = 'a' * 64;
       final client = MockClient((request) async {
         return http.Response(
-          '0000...  other-file.apk\n$digest  curated-feeds-v1.2.2.apk\n',
+          '0000...  other-file.apk\n$digest  Curated Feeds v1.2.2.apk\n',
           200,
         );
       });
       final got = await UpdateService.fetchExpectedChecksum(
         checksumUrl: 'https://example.com/SHA256SUMS-v1.2.2.txt',
-        apkFileName: 'curated-feeds-v1.2.2.apk',
+        apkFileName: 'Curated Feeds v1.2.2.apk',
         client: client,
       );
       expect(got, digest);
+    });
+
+    group('extractApkFileName', () {
+      test('decodes percent-encoded asset names from GitHub URLs', () {
+        expect(
+          UpdateService.extractApkFileName(
+            'https://example.com/Curated%20Feeds%20v1.0.0.apk',
+            fallback: 'fallback.apk',
+          ),
+          'Curated Feeds v1.0.0.apk',
+        );
+      });
+
+      test('leaves plain names untouched', () {
+        expect(
+          UpdateService.extractApkFileName(
+            'https://example.com/curated-feeds-v1.0.0.apk',
+            fallback: 'fallback.apk',
+          ),
+          'curated-feeds-v1.0.0.apk',
+        );
+      });
+
+      test('falls back when the URL has no final segment', () {
+        expect(
+          UpdateService.extractApkFileName(
+            'https://example.com/',
+            fallback: 'fallback.apk',
+          ),
+          'fallback.apk',
+        );
+      });
     });
 
     test(
@@ -205,13 +240,13 @@ void main() {
         final digest = sha256.convert(bytes).toString();
         final client = MockClient((request) async {
           if (request.url.path.endsWith('SHA256SUMS-v9.9.9.txt')) {
-            return http.Response('$digest  curated-feeds-v9.9.9.apk\n', 200);
+            return http.Response('$digest  Curated Feeds v9.9.9.apk\n', 200);
           }
           return http.Response.bytes(bytes, 200);
         });
 
         final handle = await UpdateService.downloadApk(
-          url: 'https://example.com/curated-feeds-v9.9.9.apk',
+          url: 'https://example.com/Curated%20Feeds%20v9.9.9.apk',
           version: '9.9.9',
           checksumUrl: 'https://example.com/SHA256SUMS-v9.9.9.txt',
           client: client,
@@ -230,7 +265,7 @@ void main() {
         final client = MockClient((request) async {
           if (request.url.path.endsWith('SHA256SUMS-v9.9.9.txt')) {
             return http.Response(
-              '$wrongDigest  curated-feeds-v9.9.9.apk\n',
+              '$wrongDigest  Curated Feeds v9.9.9.apk\n',
               200,
             );
           }
@@ -239,7 +274,7 @@ void main() {
 
         await expectLater(
           UpdateService.downloadApk(
-            url: 'https://example.com/curated-feeds-v9.9.9.apk',
+            url: 'https://example.com/Curated%20Feeds%20v9.9.9.apk',
             version: '9.9.9',
             checksumUrl: 'https://example.com/SHA256SUMS-v9.9.9.txt',
             client: client,

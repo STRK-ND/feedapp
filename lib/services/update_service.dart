@@ -146,6 +146,19 @@ class UpdateService {
     return null;
   }
 
+  /// Filename of the downloadable asset at [url], with percent-encoding
+  /// resolved. GitHub encodes spaces in asset names as `%20` inside download
+  /// URLs while SHA256SUMS entries carry the literal name, so lookup keys
+  /// must be decoded to match (e.g. `Curated%20Feeds%20v1.0.0.apk` →
+  /// `Curated Feeds v1.0.0.apk`). Falls back to [fallback] for segment-less
+  /// or empty final segments.
+  static String extractApkFileName(String url, {required String fallback}) {
+    final segments = Uri.parse(url).pathSegments;
+    if (segments.isEmpty) return fallback;
+    final decoded = Uri.decodeComponent(segments.last);
+    return decoded.isEmpty ? fallback : decoded;
+  }
+
   /// Fetch the published SHA256SUMS file and return the expected digest for
   /// [apkFileName], or null when the file/entry is missing or malformed.
   static Future<String?> fetchExpectedChecksum({
@@ -160,12 +173,16 @@ class UpdateService {
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return null;
       // Format: one "<sha256>  <filename>" pair per line (sha256sum output).
+      // Filenames may contain spaces (e.g. "Curated Feeds v1.0.0.apk"), so
+      // the first token is the digest and everything after the first
+      // whitespace run is the filename — do not require exactly two columns.
       for (final line in response.body.split('\n')) {
-        final parts = line.trim().split(RegExp(r'\s+'));
-        if (parts.length == 2 && parts[1] == apkFileName) {
-          final digest = parts[0].toLowerCase();
-          if (RegExp(r'^[0-9a-f]{64}$').hasMatch(digest)) return digest;
-          return null;
+        final match = RegExp(
+          r'^([0-9A-Fa-f]{64})\s+(.+)$',
+        ).firstMatch(line.trim());
+        if (match == null) continue;
+        if (match.group(2) == apkFileName) {
+          return match.group(1)!.toLowerCase();
         }
       }
       return null;
@@ -227,9 +244,10 @@ class UpdateService {
     try {
       // Resolve the expected digest BEFORE spending the download: a release
       // without a usable SHA256SUMS entry must not be silently installed.
-      final apkFileName = Uri.parse(url).pathSegments.isEmpty
-          ? 'curatedfeeds-$version.apk'
-          : Uri.parse(url).pathSegments.last;
+      final apkFileName = extractApkFileName(
+        url,
+        fallback: 'curatedfeeds-$version.apk',
+      );
       String? expectedDigest;
       if (checksumUrl != null && checksumUrl.isNotEmpty) {
         expectedDigest = await fetchExpectedChecksum(

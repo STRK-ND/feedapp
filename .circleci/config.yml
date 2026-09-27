@@ -149,10 +149,10 @@ jobs:
           name: Normalize artifact names
           command: |
             # Gradle names the APK with the synced version
-            # (curated-feeds-direct-v<version>.apk); strip it for the
+            # ("Curated Feeds v<version>.apk"); strip it for the
             # version-independent artifact path. Branch builds have no tag.
             cd build/app/outputs/apk/direct/release
-            mv curated-feeds-direct-v*.apk curated-feeds-direct.apk
+            mv "Curated Feeds v"*.apk curated-feeds-direct.apk
             ls -l
       - store_artifacts:
           path: build/app/outputs/apk/direct/release/curated-feeds-direct.apk
@@ -254,12 +254,12 @@ jobs:
             cd build/app/outputs
             # Rename to the published asset names BEFORE hashing: the in-app
             # updater looks entries up in SHA256SUMS by the exact filename it
-            # downloads (curated-feeds-<tag>.apk), so the file must be hashed
-            # under its published name, not gradle's in-build output name.
-            mv apk/direct/release/curated-feeds-direct-v*.apk "curated-feeds-$CIRCLE_TAG.apk"
-            mv bundle/directRelease/app-direct-release.aab "curated-feeds-$CIRCLE_TAG.aab"
-            mv bundle/playRelease/app-play-release.aab "curated-feeds-$CIRCLE_TAG-play.aab"
-            sha256sum "curated-feeds-$CIRCLE_TAG.apk" "curated-feeds-$CIRCLE_TAG.aab" > SHA256SUMS
+            # downloads ("Curated Feeds <tag>.apk"), so the file must be
+            # hashed under its published name, not the in-build output name.
+            mv apk/direct/release/"Curated Feeds v"*.apk "Curated Feeds $CIRCLE_TAG.apk"
+            mv bundle/directRelease/app-direct-release.aab "Curated Feeds $CIRCLE_TAG.aab"
+            mv bundle/playRelease/app-play-release.aab "Curated Feeds $CIRCLE_TAG-play.aab"
+            sha256sum "Curated Feeds $CIRCLE_TAG.apk" "Curated Feeds $CIRCLE_TAG.aab" > SHA256SUMS
             cat SHA256SUMS
       - run:
           name: Publish GitHub Release
@@ -289,13 +289,13 @@ jobs:
                 -H "Authorization: Bearer $GITHUB_TOKEN" \
                 -H "Content-Type: $mime" \
                 --data-binary @"$file" \
-                "$UPLOAD_URL?name=$file")
+                "$UPLOAD_URL?name=${file// /%20}")
               if [ "$HTTP_CODE" != "201" ]; then
                 echo "Asset upload failed ($HTTP_CODE): $(head -c 300 /tmp/asset.json)"; exit 1
               fi
             }
-            upload_asset "curated-feeds-$TAG.apk" "application/vnd.android.package-archive"
-            upload_asset "curated-feeds-$TAG.aab" "application/octet-stream"
+            upload_asset "Curated Feeds $TAG.apk" "application/vnd.android.package-archive"
+            upload_asset "Curated Feeds $TAG.aab" "application/octet-stream"
             upload_asset "SHA256SUMS-$TAG.txt" "text/plain"
             echo "Published release $TAG with APK + AAB + SHA256SUMS (play AAB kept as artifact for manual store upload)"
 
