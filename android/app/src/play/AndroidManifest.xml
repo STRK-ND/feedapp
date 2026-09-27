@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play Store distribution manifest: merged over the main manifest for
+     the `play` flavor ONLY. Anything declared here overrides the main
+     manifest at merge time.
+
+     REQUEST_INSTALL_PACKAGES is deliberately absent: Play policy forbids
+     self-updating package installs, and the entire GitHub-Releases OTA
+     path is compiled out of Play builds (PLAY_STORE_BUILD=true gates
+     checkForUpdates / announceUpdate / the dialog menu entry). The main
+     manifest also no longer declares it; this file exists so the direct
+     flavor's declaration is opt-in per distribution channel. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data
+            android:name="io.flutter.embedding.engine.NormalFlavor"
+            android:value="play" />
+    </application>
+</manifest>

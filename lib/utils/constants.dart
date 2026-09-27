@@ -90,9 +90,22 @@ class AppConfig {
   static const int rssTimeoutSeconds = 8;
   static const int maxArticlesPerSource = 20;
 
-  // Pro monetization caps. ponytail: single cap for now — add a
-  // ProLimits class only if a second cap lands.
-  static const int freeSavedArticlesCap = 25;
+  /// Pro monetization caps. The Play Store build ships a smaller free cap
+  /// (store listing discloses it); the sideload/GitHub build keeps the
+  /// original generous cap.
+  static int get freeSavedArticlesCap => isPlayStoreBuild ? 5 : 25;
+
+  /// True when compiled with --dart-define=PLAY_STORE_BUILD=true.
+  ///
+  /// The Play Store forbids self-updating package installs, so Play builds
+  /// disable the entire GitHub-Releases OTA path (checkForUpdates and
+  /// everything downstream: dialog, notification, download, installer) and
+  /// ship the REQUEST_INSTALL_PACKAGES permission removal via the `play`
+  /// flavor manifest. Updates on Play come exclusively from the store.
+  static const bool isPlayStoreBuild = bool.fromEnvironment(
+    'PLAY_STORE_BUILD',
+    defaultValue: false,
+  );
 
   // Cache settings
   static const int maxCachedArticles = 1000;

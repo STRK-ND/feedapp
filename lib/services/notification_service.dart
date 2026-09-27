@@ -255,6 +255,10 @@ class NotificationService {
   /// version on subsequent cold starts, so the user is notified once
   /// per published release.
   Future<void> announceUpdate(UpdateInfo info) async {
+    // Play Store builds must never announce or drive a package install —
+    // the store is the only update channel there. (checkForUpdates is also
+    // gated, so this is belt-and-braces for any direct callers.)
+    if (AppConfig.isPlayStoreBuild) return;
     final settingsService = getIt<SettingsService>();
     if (!await settingsService.getNotificationsEnabled()) {
       debugPrint(

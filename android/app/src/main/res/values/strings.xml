@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <!-- Base label. The `direct` flavor overrides this via its own resValue
+       ("Curated Feeds Direct"); the `play` flavor re-declares the same
+       value so both flavors always resolve @string/app_name. -->
   <string name="app_name">Curated Feeds</string>
 </resources>

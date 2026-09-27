@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/rss_source.dart';
 import '../models/article.dart';
+import '../utils/constants.dart';
 import '../utils/error_handler.dart';
 import 'posthog_service.dart';
 import 'settings_service.dart';
@@ -276,7 +277,21 @@ class CloudSyncService implements SyncHooks {
 
   Future<void> _restoreProFlag(String uid) async {
     final data = (await _userDoc(uid).get()).data();
-    if (data?['isPro'] == true && !(await _settings.getIsPro())) {
+    // Play builds honor the cloud Pro flag as one input, but the store's
+    // own entitlement is authoritative: without a verified Play purchase
+    // the local flag does not unlock Pro features on this device.
+    // ponytail: replace with a real server-side check when revenue
+    // justifies the infra.
+    final cloudPro = data?['isPro'] == true;
+    if (!cloudPro) return;
+    if (AppConfig.isPlayStoreBuild && !(await _settings.getIsPro())) {
+      debugPrint(
+        '[CloudSync] Cloud Pro flag ignored on Play build without a '
+        'verified local purchase.',
+      );
+      return;
+    }
+    if (!(await _settings.getIsPro())) {
       await _settings.setIsPro(true);
     }
   }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Direct (GitHub Releases / sideload) distribution manifest: merged over
+     the main manifest for the `direct` flavor ONLY.
+
+     Declares REQUEST_INSTALL_PACKAGES explicitly so the in-app OTA
+     installer (UpdateService.triggerInstall via open_filex) works. The
+     permission is gated by policy_review on the Play Store; direct builds
+     are not distributed through Play and keep self-update capability. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <application>
+        <meta-data
+            android:name="io.flutter.embedding.engine.NormalFlavor"
+            android:value="direct" />
+    </application>
+</manifest>

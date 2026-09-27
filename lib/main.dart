@@ -13,10 +13,17 @@ import 'services/background_sync_service.dart';
 import 'services/posthog_service.dart';
 import 'di/service_locator.dart';
 import 'screens/curated_feeds_app.dart';
+import 'utils/constants.dart';
 import 'utils/error_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (AppConfig.isPlayStoreBuild) {
+    // Never let a debug banner reach a store build, even if someone
+    // compiles the play flavor in profile/debug by accident.
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);

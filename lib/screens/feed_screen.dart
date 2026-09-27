@@ -75,6 +75,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   // Time of last successful refresh; suppresses repeat calls within
   // this window even when no current in-flight call exists.
   DateTime? _lastRefreshAt;
+  // Last time the free-tier save-cap snackbar was shown on the swipe
+  // path; caps hint frequency to once per 5 minutes.
+  DateTime? _lastCapHintAt;
 
   final List<String> _categories = AppConfig.categories;
   final Connectivity _connectivity = Connectivity();
@@ -299,6 +302,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Future<void> _checkForUpdates() async {
+    // Play Store builds never self-update — the store is the only
+    // distribution channel there.
+    if (AppConfig.isPlayStoreBuild) return;
     await Future<void>.delayed(Duration.zero); // yield to frame, then check
     if (!mounted) return;
 
@@ -418,11 +424,30 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
     if (articleIndex == -1) return;
 
+    // Same free-tier cap as _onToggleSave (the swipe path previously
+    // bypassed it). A 5-minute grace window lets a user who just hit the
+    // cap still swipe-save a few items before the UI enforces it strictly.
+    final isAlreadySaved = _savedArticles.any((a) => a.id == article.id);
+    final isPro = context.read<SettingsNotifier>().isPro;
+    if (!isPro &&
+        !isAlreadySaved &&
+        _savedArticles.length >= AppConfig.freeSavedArticlesCap) {
+      final now = DateTime.now();
+      if (_lastCapHintAt == null ||
+          now.difference(_lastCapHintAt!) > const Duration(minutes: 5)) {
+        _lastCapHintAt = now;
+        _showSnackBar(
+          _l10n.freeSavedLimitReached(AppConfig.freeSavedArticlesCap),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _savedArticles = List.from(_savedArticles);
       _articles[articleIndex].isSaved = true;
 
-      if (!_savedArticles.any((a) => a.id == article.id)) {
+      if (!isAlreadySaved) {
         _savedArticles.insert(0, article);
       }
 
@@ -1137,6 +1162,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     ),
                     onSelected: (value) async {
                       if (value == 'check_updates') {
+                        // Hidden on Play builds: the store handles updates.
+                        if (AppConfig.isPlayStoreBuild) return;
                         final updateInfo = await UpdateService.checkForUpdates(
                           forceCheck: true,
                         );
@@ -1164,16 +1191,17 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       }
                     },
                     itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'check_updates',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.system_update),
-                            const SizedBox(width: 12),
-                            Text(_l10n.checkForUpdates),
-                          ],
+                      if (!AppConfig.isPlayStoreBuild)
+                        PopupMenuItem(
+                          value: 'check_updates',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.system_update),
+                              const SizedBox(width: 12),
+                              Text(_l10n.checkForUpdates),
+                            ],
+                          ),
                         ),
-                      ),
                       PopupMenuItem(
                         value: 'settings',
                         child: Row(

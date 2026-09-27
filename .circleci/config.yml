@@ -136,18 +136,24 @@ jobs:
           command: flutter pub get
       - save_pub_cache
       - run:
-          name: Build signed APK
-          command: flutter build apk --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+          name: Build signed APK (direct channel)
+          command: flutter build apk --release --flavor direct --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - run:
-          name: Build signed AAB
-          command: flutter build appbundle --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+          name: Build signed AAB (direct channel)
+          command: flutter build appbundle --release --flavor direct --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+      - run:
+          name: Build Play AAB (play channel)
+          command: flutter build appbundle --release --flavor play --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET" --dart-define="PLAY_STORE_BUILD=true"
       - save_gradle_cache
       - store_artifacts:
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/release/app-release.apk
           destination: app-release.apk
       - store_artifacts:
           path: build/app/outputs/bundle/release/app-release.aab
           destination: app-release.aab
+      - store_artifacts:
+          path: build/app/outputs/bundle/playRelease/app-release.aab
+          destination: app-play-release.aab
 
   # Provenance gate for the release workflow: the v* tag must point at a
   # commit on master (the reviewed code), not an arbitrary commit. Runs
@@ -211,25 +217,30 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run:
-          name: Build signed APK
-          command: flutter build apk --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+          name: Build signed APK (direct channel)
+          command: flutter build apk --release --flavor direct --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
       - run:
-          name: Build signed AAB
-          command: flutter build appbundle --release --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+          name: Build signed AAB (direct channel)
+          command: flutter build appbundle --release --flavor direct --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET"
+      - run:
+          name: Build Play AAB (play channel)
+          command: flutter build appbundle --release --flavor play --dart-define="WORKER_API_SECRET=$WORKER_API_SECRET" --dart-define="PLAY_STORE_BUILD=true"
       - save_gradle_cache
       - run:
           name: Write SHA256SUMS
           command: |
             cd build/app/outputs
-            ( cd flutter-apk && sha256sum app-release.apk ) >> SHA256SUMS
+            ( cd flutter-apk/release && sha256sum app-release.apk ) >> SHA256SUMS
             ( cd bundle/release && sha256sum app-release.aab ) >> SHA256SUMS
+            ( cd bundle/playRelease && sha256sum app-release.aab ) >> SHA256SUMS
             cat SHA256SUMS
       - run:
           name: Publish GitHub Release
           command: |
             TAG="$CIRCLE_TAG"
-            mv build/app/outputs/flutter-apk/app-release.apk "curated-feeds-$TAG.apk"
+            mv build/app/outputs/flutter-apk/release/app-release.apk "curated-feeds-$TAG.apk"
             mv build/app/outputs/bundle/release/app-release.aab "curated-feeds-$TAG.aab"
+            mv build/app/outputs/bundle/playRelease/app-release.aab "curated-feeds-$TAG-play.aab"
             cp build/app/outputs/SHA256SUMS "SHA256SUMS-$TAG.txt"
 
             REPO="STRK-ND/feedapp"
@@ -261,7 +272,7 @@ jobs:
             upload_asset "curated-feeds-$TAG.apk" "application/vnd.android.package-archive"
             upload_asset "curated-feeds-$TAG.aab" "application/octet-stream"
             upload_asset "SHA256SUMS-$TAG.txt" "text/plain"
-            echo "Published release $TAG with APK + AAB + SHA256SUMS"
+            echo "Published release $TAG with APK + AAB + SHA256SUMS (play AAB kept as artifact for manual store upload)"
 
 workflows:
   ci:

@@ -42,6 +42,34 @@ android {
     multiDexEnabled = true
   }
 
+  // Distribution channels. The Play Store build (play) is the only one
+  // published to Google Play: it compiles with PLAY_STORE_BUILD=true (all
+  // self-update code paths compile out) and merges the play manifest
+  // (no REQUEST_INSTALL_PACKAGES). The direct build keeps GitHub-Releases
+  // self-update for sideloaded installs.
+  flavorDimensions += "distribution"
+  productFlavors {
+    create("play") {
+      dimension = "distribution"
+      resValue("string", "app_name", "Curated Feeds")
+    }
+    create("direct") {
+      dimension = "distribution"
+      resValue("string", "app_name", "Curated Feeds Direct")
+    }
+  }
+
+  buildTypes {
+    getByName("release") {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(
+        getDefaultProguardFile("proguard-android-optimize.txt"),
+        "proguard-rules.pro",
+      )
+    }
+  }
+
   signingConfigs {
     if (keystoreConfigured) {
       create("release") {
@@ -61,6 +89,16 @@ android {
         signingConfigs.getByName("release")
       else
         signingConfigs.getByName("debug")
+    }
+  }
+
+  // Gradle emits one APK per ABI per flavor by default; the CI/Play paths
+  // produce AABs (per-device delivery), so keep only universal-ish
+  // artifacts in outputs to avoid name-collision build failures.
+  applicationVariants.all {
+    outputs.all {
+      (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+        .outputFileName = outputFileName.replace("-release", "")
     }
   }
 }
