@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Round launcher icon.
+
+  Hand-maintained, and NOT copied by `dart run flutter_launcher_icons`:
+  the tool writes only mipmap-anydpi-v26/ic_launcher.xml
+  (android.dart hardcodes androidDefaultIconName), so this file would
+  silently rot against the generated one. Keep it byte-identical to
+  mipmap-anydpi-v26/ic_launcher.xml.
+
+  At API 26+ there is no round/square distinction — the system applies the
+  same mask to both — so the content is identical. The round variant is only
+  ever used on API 25 and below, via the mipmap-*/ic_launcher_round.png
+  rasters that tool/generate_brand_assets.py produces. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background"/>
-    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+  <background android:drawable="@color/ic_launcher_background"/>
+  <foreground>
+      <inset
+          android:drawable="@drawable/ic_launcher_foreground"
+          android:inset="0%" />
+  </foreground>
+
+  <monochrome>
+      <inset
+          android:drawable="@drawable/ic_launcher_monochrome"
+          android:inset="0%" />
+  </monochrome>
 </adaptive-icon>

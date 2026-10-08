@@ -5,6 +5,7 @@ google-services.json
 *.aab
 *.log
 *.pyc
+__pycache__/
 *.swp
 .DS_Store
 .atom/

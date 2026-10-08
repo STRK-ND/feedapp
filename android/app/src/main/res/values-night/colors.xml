@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Native launch-window ground, dark. Must equal AppColors.ground in
+         lib/utils/design_tokens.dart.
+         `ic_launcher_background` is deliberately absent here: a themed
+         launcher icon is a bug, so it stays theme-independent. -->
+    <color name="launch_background">#0E0814</color>
+</resources>

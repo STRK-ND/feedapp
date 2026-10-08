@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AGP resource-shrinker keep list.
+
+  Release builds set `isShrinkResources = true`, and a resource referenced
+  only by NAME from Dart — e.g. AndroidInitializationSettings(
+  'ic_notification') — is invisible to the shrinker's static reachability
+  analysis, which walks the manifest and the DEX for real references. The
+  plugin resolves the name at runtime with Resources.getIdentifier(), so the
+  drawable would be stripped from the release APK while working perfectly in
+  debug. Add every Dart-only-referenced resource here.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification" />

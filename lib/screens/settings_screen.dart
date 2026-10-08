@@ -19,6 +19,7 @@ import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
 import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
+import '../widgets/app_logo.dart';
 import 'sources_screen.dart' show SourcesScreen;
 import 'paywall_screen.dart';
 import 'login_screen.dart';
@@ -469,21 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     horizontal: 16,
                     vertical: 4,
                   ),
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(
-                        AppCardStyles.badgeRadius,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.info_outline_rounded,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  leading: const AppLogo(size: 40),
                   title: Text(
                     _l10n.appVersionTitle,
                     style: GoogleFonts.dmSans(

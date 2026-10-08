@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../di/service_locator.dart';
+import '../utils/error_handler.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart' show AppColors;
+import '../widgets/app_logo.dart';
 import '../widgets/folio_rule.dart';
 import 'curated_feeds_app.dart';
 import 'onboarding_screen.dart';
@@ -94,7 +96,26 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Firebase + service locator are initialized in main() before
       // runApp — re-initializing here would throw duplicate-app.
-      await NotificationService().initialize();
+      //
+      // Notifications are isolated from the rest of the bootstrap: they
+      // depend on the platform plugin layer and were the one unguarded
+      // await here, so a failure in them used to skip feed init, the
+      // edition counter and background sync below. Failing to register a
+      // push token must never cost the user their feed.
+      try {
+        await NotificationService().initialize();
+      } catch (e, stackTrace) {
+        debugPrint('[Splash] Notification init failed, continuing: $e');
+        // debugPrint is invisible in release: mirror to Sentry so a
+        // systematic init failure still leaves telemetry.
+        unawaited(
+          ErrorHandler.logWarning(
+            'Notification init failed during splash bootstrap',
+            error: e,
+            stackTrace: stackTrace,
+          ),
+        );
+      }
 
       final articleRepository = getIt<ArticleRepository>();
       final settingsService = getIt<SettingsService>();
@@ -176,24 +197,14 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Pen-stroke folio glyph animation.
-              SizedBox(
-                width: 96,
-                height: 96,
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([_drawProgress, _revealProgress]),
-                  builder: (context, _) {
-                    return CustomPaint(
-                      painter: _FolioGlyphPainter(
-                        drawProgress: _drawProgress.value,
-                        revealProgress: _revealProgress.value,
-                        strokeColor: AppColors.primary,
-                        fillColor: AppColors.primary.withValues(alpha: 0.16),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              // Logo arrival. The raster replaces the pen-stroke folio
+              // glyph, but the beat below is unchanged: `_drawProgress`
+              // drives the logo's fade and scale across its full 0..1,
+              // `_revealProgress` still starts only once it completes,
+              // and the 1400ms minimum dwell in _initializeApp still
+              // covers the animation. The default 96 matches the native
+              // splash's launch_image size, so nothing jumps at hand-off.
+              AppLogo(animation: _drawProgress),
               const SizedBox(height: 28),
               // Wordmark
               FadeTransition(
@@ -220,7 +231,10 @@ class _SplashScreenState extends State<SplashScreen>
                 animation: _revealProgress,
                 builder: (context, _) {
                   // easeOutBack overshoots past 1.0 — without the second
-                  // clamp the derived opacity asserts in debug builds.
+                  // clamp the derived opacity asserts in debug builds
+                  // (this was the L-5 flaky test's root cause: under
+                  // parallel-suite CPU contention a pump landed on an
+                  // overshoot frame). Matches the paywall-screen guard.
                   final subtitleProgress =
                       ((_revealProgress.value - 0.4).clamp(0.0, 1.0) / 0.6)
                           .clamp(0.0, 1.0);
@@ -260,121 +274,5 @@ class _SplashScreenState extends State<SplashScreen>
         ),
       ),
     );
-  }
-}
-
-/// Pen-stroke CustomPainter for the folio glyph. 96×96 dp rounded square
-/// with two column divides and small headline/text lines inside.
-///
-/// The animation draws strokes over time using [PathMetric.extractPath]
-/// so it reads as a pen drawing itself.
-class _FolioGlyphPainter extends CustomPainter {
-  _FolioGlyphPainter({
-    required this.drawProgress,
-    required this.revealProgress,
-    required this.strokeColor,
-    required this.fillColor,
-  });
-
-  final double drawProgress; // 0..1 across the stroke phase
-  final double revealProgress; // 0..1 across the fill/scale phase
-  final Color strokeColor;
-  final Color fillColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-
-    // Outer rrect
-    final outerRRect = RRect.fromRectAndRadius(
-      rect.deflate(4),
-      const Radius.circular(22),
-    );
-
-    // Fill — only after the stroke completes.
-    if (revealProgress > 0) {
-      final scale = 0.92 + 0.08 * revealProgress;
-      canvas.save();
-      canvas.translate(size.width / 2, size.height / 2);
-      canvas.scale(scale, scale);
-      canvas.translate(-size.width / 2, -size.height / 2);
-      canvas.drawRRect(
-        outerRRect,
-        Paint()
-          ..color = fillColor
-          ..style = PaintingStyle.fill,
-      );
-      canvas.restore();
-    }
-
-    // Stroke — drawn via path metric extraction for the pen-stroke reveal.
-    final strokePaint = Paint()
-      ..color = strokeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final fullPath = _buildGlyphPath(size);
-    if (drawProgress < 1.0) {
-      for (final metric in fullPath.computeMetrics()) {
-        final extract = metric.extractPath(0, metric.length * drawProgress);
-        canvas.drawPath(extract, strokePaint);
-      }
-    } else {
-      canvas.drawPath(fullPath, strokePaint);
-    }
-  }
-
-  Path _buildGlyphPath(Size size) {
-    final path = Path();
-    final w = size.width;
-    final h = size.height;
-
-    // Outer rounded square
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(4, 4, w - 8, h - 8),
-        const Radius.circular(22),
-      ),
-    );
-
-    // Two column dividers — vertical lines
-    final col1X = w / 3;
-    final col2X = 2 * w / 3;
-    path.moveTo(col1X, 12);
-    path.lineTo(col1X, h - 12);
-    path.moveTo(col2X, 12);
-    path.lineTo(col2X, h - 12);
-
-    // Headline block — left column top (short headline lines)
-    path.moveTo(12, 16);
-    path.lineTo(col1X - 4, 16);
-    path.moveTo(12, 20);
-    path.lineTo(col1X - 6, 20);
-
-    // Three short text lines per column
-    const lineYs = [30.0, 40.0, 50.0];
-    for (final y in lineYs) {
-      // Left
-      path.moveTo(12, y);
-      path.lineTo(col1X - 4, y);
-      // Center
-      path.moveTo(col1X + 4, y);
-      path.lineTo(col2X - 4, y);
-      // Right
-      path.moveTo(col2X + 4, y);
-      path.lineTo(w - 12, y);
-    }
-
-    return path;
-  }
-
-  @override
-  bool shouldRepaint(_FolioGlyphPainter oldDelegate) {
-    return oldDelegate.drawProgress != drawProgress ||
-        oldDelegate.revealProgress != revealProgress ||
-        oldDelegate.strokeColor != strokeColor ||
-        oldDelegate.fillColor != fillColor;
   }
 }

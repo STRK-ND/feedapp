@@ -46,6 +46,19 @@
     <meta-data
       android:name="com.posthog.posthog.AUTO_INIT"
       android:value="false" />
+    <!-- FCM: when the app is in the background or killed, notification-
+    payload messages are rendered by the SYSTEM, not by
+    flutter_local_notifications — so the `icon:` on
+    AndroidNotificationDetails never applies to that path. Without these
+    the system falls back to the full-colour launcher tile, which masks
+    into a blob. The icon is already shrinker-kept via res/raw/keep.xml,
+    so this reference is release-safe. -->
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_icon"
+      android:resource="@drawable/ic_notification" />
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_color"
+      android:resource="@color/ic_launcher_background" />
   </application>
   <!-- Required to query activities that can process text, see:
   https://developer.android.com/training/package-visibility and

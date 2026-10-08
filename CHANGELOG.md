@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Brand rollout (1.0.1) — new app logo on all surfaces
+- Launcher icon rebuilt from `logo.png`: navy `#0E0814` adaptive background + extracted swirl/glyph foreground (66dp safe zone) + themed-icon layer; legacy + round rasters regenerated
+- In-app splash and paywall now render the logo via the shared `AppLogo` widget (replaces the duplicated hand-painted glyph); Settings → About, onboarding, and login show the mark
+- Native launch screen carries the logo on the matching theme ground; status-bar notifications use a white-silhouette icon
+- **Fixed:** the notification icon name (`@mipmap/ic_launcher`) never resolved, which silently aborted push-token registration — now `ic_notification`, and splash bootstrap isolates notification init so it can't take down feed init
+- Regenerate with `python3 tool/generate_brand_assets.py && dart run flutter_launcher_icons` (then sync `ic_launcher_round.xml`)
+
 ## [1.0.0] - 2026-09-27
 
 Play Store first release (versionCode 26, supersedes the sideload 1.0.2+25 line).

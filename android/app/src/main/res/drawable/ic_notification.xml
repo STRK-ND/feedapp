@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon.
+
+  Android tints small icons with the system colour and crops them to a
+  circle, so this is a flat white silhouette on a 24dp grid. VectorDrawable
+  keeps it crisp at every density and needs no per-bucket PNGs.
+
+  The RSS glyph alone, NOT the swirl: the swirl ribbon's thinnest feature is
+  2px in a 415px source, which at a 24dp status bar (a 0.058x downscale)
+  becomes 0.12px. Measured, the full silhouette's blob count climbs 4 -> 41
+  across 24..192px as it fragments into debris; the glyph holds 3 clean
+  shapes (dot + two arcs) at 24/32/48/96px.
+
+  Referenced from Dart by name only ("ic_notification"), so res/raw/keep.xml
+  is what stops `isShrinkResources = true` stripping it from release builds.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Brand ring: r=10 about the centre, 2dp stroke. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,12m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2" />
+
+    <!-- RSS dot: r=1.8 at (7.5,16.5). The subpath starts at the LEFT point
+         of the circle so the two semicircles close on the intended centre:
+         starting at the top point with a horizontal diameter would force a
+         semicircle centred on the chord midpoint instead. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5.7,16.5a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0" />
+
+    <!-- RSS arcs: r=4 and r=8 about (7.5,16.5). Both are quarter arcs facing
+         the canvas centre, so their drawn extent is ~(5.7 + half the 2.1dp
+         stroke) ~= 6.75dp from the arc centre — inside the ring's inner
+         edge (r=9) with room to spare. Do not extend these past a quarter
+         without re-checking against the ring. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M7.5,12.5a4,4 0,0 1,4 4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M7.5,8.5a8,8 0,0 1,8 8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+</vector>

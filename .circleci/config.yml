@@ -99,6 +99,15 @@ jobs:
       - checkout
       - install_flutter
       - run:
+          name: Get dependencies
+          # Required before everything below: without package_config.json,
+          # `dart format` falls back to the SDK-default language version and
+          # flags files that are correctly formatted (37 of them), and
+          # analyze/test cannot resolve packages at all. A pubspec.lock
+          # change busts the restored cache, so this must be an explicit
+          # step, never cache-assumed.
+          command: flutter pub get
+      - run:
           name: Check formatting
           command: dart format --output=none --set-exit-if-changed lib test
       - run:
@@ -107,6 +116,23 @@ jobs:
       - run:
           name: Unit tests
           command: flutter test
+      - run:
+          name: Brand assets in sync
+          # The launcher icon, splash bitmaps and Play graphics are generated
+          # by tool/generate_brand_assets.py and committed (flutter build
+          # must never depend on Python). Re-run it here and fail if the
+          # committed outputs drift from what the script produces — e.g.
+          # after a logo.png revision or a palette retune. A missing Pillow
+          # is an environment gap, not drift, so that warns instead of
+          # failing; actual output drift always fails.
+          command: |
+            if ! python3 -c "import PIL" 2>/dev/null; then
+              pip install --quiet pillow 2>/dev/null \
+                || pip3 install --quiet pillow 2>/dev/null \
+                || { echo "Pillow unavailable; skipping brand-asset drift check"; exit 0; }
+            fi
+            python3 tool/generate_brand_assets.py
+            git diff --exit-code -- assets/brand android/app/src/main/res marketing/
 
   # Mirrors .github build.yml — signed APK + AAB on every master push.
   # FLUTTER_COMMIT (full SHA of the FLUTTER_VERSION tag) must be provided via

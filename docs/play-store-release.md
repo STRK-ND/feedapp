@@ -36,6 +36,16 @@ CI (`release` workflow) builds both; the Play AAB lands as a CircleCI
 artifact (`app-play-release.aab`) for manual store upload. The GitHub
 Release itself carries only the direct APK/AAB + SHA256SUMS.
 
+## Store graphics (Play Console → Grow → Store presence → Main store listing)
+
+Generated from `logo.png` by `python3 tool/generate_brand_assets.py` (idempotent, ~2s). After any logo revision re-run the script, then `dart run flutter_launcher_icons`, and re-upload both images.
+
+- [ ] App icon: `marketing/icon-512.png` — 512×512 PNG, 24-bit (no alpha), **fully opaque**. Play rejects transparency and applies its own ~30% corner radius, so the file is a full square with the squircle's transparent corners filled with the brand ground. Do not round the edges yourself — Play warns that it masks dynamically.
+- [ ] Feature graphic: `marketing/feature-graphic-1024x500.png` — 1024×500, 24-bit PNG (no alpha). Carries **no text by design**: `google_fonts` fetches Playfair at runtime and the generator script has no font access, so typesetting here would mean either bundling a font file or keeping a second source of truth. Play also overlays the app title on several surfaces. If marketing wants type in this asset, it should be designed by hand rather than scripted.
+- [ ] Phone screenshots: **not** generated — capture 2–4 from a device. 16:9 or 9:16, 320–3840 px per side.
+
+The launcher icon that ships in the APK and the Play listing are two different renders of the same mark: the listing icon comes from the **legacy raster** `mipmap-*/ic_launcher.png` (full tile), while the on-device icon comes from the **adaptive icon** (navy `#0E0814` background + the extracted swirl/glyph foreground). Regenerating both requires the Python script *and* `flutter_launcher_icons` — neither alone is sufficient — and after `flutter_launcher_icons` you must copy `mipmap-anydpi-v26/ic_launcher.xml` over `ic_launcher_round.xml`, because the tool only ever writes the former.
+
 ## Play Console requirements (owner checklist)
 
 - [ ] Play Console → App signing: accept **Play App Signing** (Google holds the release key; upload key = the existing upload keystore via CI)

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive launcher-icon background. Mirrors AppColors.ground in
+         lib/utils/design_tokens.dart. `dart run flutter_launcher_icons`
+         rewrites only this one color entry in place; everything else in
+         this file is hand-maintained and safe to edit around it. -->
+    <color name="ic_launcher_background">#0E0814</color>
+
+    <!-- Native launch-window ground, light. Must equal AppColors.paper in
+         lib/utils/design_tokens.dart. Exists so the hand-off from the
+         native splash to the Flutter splash is a same-colour swap instead
+         of a white flash.
+         NOTE: this app defaults to ThemeMode.dark regardless of the OS
+         setting, so a light-mode OS user briefly sees this before the dark
+         in-app splash. Both values are the matching in-app background, so
+         the seam reads as a crossfade rather than a flash. -->
+    <color name="launch_background">#F4F1F8</color>
+</resources>

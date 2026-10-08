@@ -17,6 +17,7 @@ import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
 import '../utils/design_tokens.dart';
 import 'curated_feeds_app.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/folio_rule.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -156,6 +157,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       child: Row(
         children: [
+          const AppLogo(size: 32),
+          const SizedBox(width: AppSpacing.s3),
           _StepDots(step: _step, total: 3),
           const Spacer(),
           TextButton(

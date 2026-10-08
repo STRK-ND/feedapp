@@ -5,6 +5,7 @@ import '../di/service_locator.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../utils/design_tokens.dart';
+import '../widgets/app_logo.dart';
 
 /// Sign-in screen — Google one-tap + email/password.
 ///
@@ -168,6 +169,8 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Center(child: AppLogo(size: 48)),
+                const SizedBox(height: AppSpacing.s4),
                 Text(
                   l10n.loginSubtitle,
                   style: AppType.bodyLarge(color: onSurfaceVariant),

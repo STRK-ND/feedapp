@@ -12,7 +12,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Android, build-name is used as versionName while build-number
 # is used as versionCode. Read more about Android versioning at
 # https://developer.android.com/studio/publish/versioning
-version: 1.0.0+26
+version: 1.0.1+27
 
 environment:
   sdk: ^3.10.8
@@ -82,9 +82,16 @@ dependencies:
   firebase_crashlytics: ^5.3.0
   posthog_flutter: ^5.38.1
 
+  # In-app review prompt (R-4) — first-party Google package.
+  in_app_review: ^2.0.10
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Regenerates the Android adaptive launcher icon from assets/brand/.
+  # Run `python3 tool/generate_brand_assets.py` first, then this.
+  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -101,5 +108,39 @@ flutter:
   generate: true
   assets:
     - shorebird.yaml
+    # Only logo.png is bundled: mark.png and mark_mono.png are inputs to
+    # `dart run flutter_launcher_icons` (read from disk, never via
+    # Image.asset), so listing them here would ship ~123 KB of dead weight
+    # in every APK/AAB.
+    - assets/brand/logo.png
+
+# Regenerate with: python3 tool/generate_brand_assets.py, then
+# `dart run flutter_launcher_icons`, then copy
+# android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml over
+# ic_launcher_round.xml (the tool only ever writes the former — the round
+# variant would otherwise silently keep the old icon).
+#
+# The foreground and monochrome layers are ALREADY padded to the 66dp safe
+# zone of the 108dp canvas by the Python script, which is why the inset is 0.
+# The tool's default of 16 emits <inset android:inset="16%"/> and would
+# shrink a correctly-sized 66dp mark to 45dp — visibly small in the launcher.
+flutter_launcher_icons:
+  android: true
+  # Full tile (navy squircle + swirl + glyph) for the legacy rasters, which are
+  # what Google Play renders in the store listing on API 26+.
+  image_path_android: "assets/brand/logo.png"
+  # Flat brand navy — AppColors.ground. Must be a hex string, not a path:
+  # a hex string makes the tool write <color name="ic_launcher_background">
+  # into res/values/colors.xml, which is the background layer we want.
+  adaptive_icon_background: "#0E0814"
+  # Swirl + glyph alone. The navy squircle is the background layer; putting
+  # the whole tile here would render as an icon-inside-an-icon.
+  adaptive_icon_foreground: "assets/brand/mark.png"
+  adaptive_icon_foreground_inset: 0
+  # White RSS-glyph silhouette. The swirl cannot be a themed icon: it is a
+  # tonal gradient, so its alpha matte is ~64% coverage and renders as a
+  # solid disc at 48dp.
+  adaptive_icon_monochrome: "assets/brand/mark_mono.png"
+  min_sdk_android: 24
 
 

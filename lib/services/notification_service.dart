@@ -215,9 +215,13 @@ class NotificationService {
 
   /// Initialize local notifications
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
+    // Must be a bare *drawable* name. The plugin resolves this with
+    // Resources.getIdentifier(name, "drawable", package) — so a mipmap
+    // reference such as '@mipmap/ic_launcher' returns 0, initialize() throws
+    // invalid_drawable_resource, and because this await is unguarded it
+    // aborted the rest of NotificationService.initialize(), including
+    // enablePushNotifications() below. Push registration was silently dead.
+    const androidSettings = AndroidInitializationSettings(_notificationIcon);
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -285,6 +289,11 @@ class NotificationService {
       channelId,
       channelName,
       channelDescription: channelDescription,
+      // Explicit rather than relying on the persisted initialization
+      // default: this is the one notification a user is likely to actually
+      // read, so its small icon is the most visible piece of brand on the
+      // lock screen.
+      icon: _notificationIcon,
       importance: Importance.high,
       priority: Priority.high,
       ticker: '${info.version} is available',
@@ -338,6 +347,15 @@ class NotificationService {
   /// the same id means a newer version supersedes the older one
   /// instead of stacking two banners.
   static const int _kOtaNotificationId = 8001;
+
+  /// Small-icon drawable for every Android notification this service posts.
+  ///
+  /// Single constant (not two string literals) so the name and
+  /// `res/raw/keep.xml` are the only two things a rename has to touch:
+  /// the plugin resolves it at runtime with
+  /// `Resources.getIdentifier(name, "drawable", package)`, which the
+  /// resource shrinker cannot see through.
+  static const String _notificationIcon = 'ic_notification';
 
   /// Consumer tap-handler. Set via [setUpdateNotificationTapHandler]
   /// from a UI entry-point that has access to a `BuildContext`. The
