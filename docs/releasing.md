@@ -32,6 +32,7 @@ Firebase), so updates install straight over existing installs.
    | `GOOGLE_SERVICES_JSON` | Contents of `android/app/google-services.json` |
    | `WORKER_API_SECRET` | The Cloudflare Worker API secret |
    | `GITHUB_TOKEN` | A GitHub PAT (classic) with **repo** scope, or a fine-grained token with **Contents: read & write** on this repo — used to publish the GitHub Release |
+   | `FLUTTER_COMMIT` | Optional. Full SHA of the `FLUTTER_VERSION` tag. When unset, signed builds fall back to the SHA pinned in `.circleci/config.yml` (update it together with `FLUTTER_VERSION`); set it only to rotate the SDK without a commit |
 
    (The old GitHub Actions secrets can be deleted from the repo settings —
    the Actions workflows no longer exist.)

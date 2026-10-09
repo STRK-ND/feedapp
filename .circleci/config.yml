@@ -8,8 +8,9 @@ commands:
   install_flutter:
     description: Install pinned Flutter SDK (cached across builds, SHA-verified)
     parameters:
-      # Full commit SHA of the FLUTTER_VERSION tag. Supplied by release/verify
-      # jobs for signed builds so the SDK that produces the artifact is bound
+      # Full commit SHA of the FLUTTER_VERSION tag. Resolved by the
+      # "Resolve pinned SDK commit" step (env var override, else the SHA
+      # pinned in config) so the SDK that produces the artifact is bound
       # to an exact revision, not a movable tag.
       verify_commit:
         type: string
@@ -135,9 +136,12 @@ jobs:
             git diff --exit-code -- assets/brand android/app/src/main/res marketing/
 
   # Mirrors .github build.yml — signed APK + AAB on every master push.
-  # FLUTTER_COMMIT (full SHA of the FLUTTER_VERSION tag) must be provided via
-  # project env vars: signed builds fail closed without it so the SDK that
-  # produces the artifact is always pinned.
+  # Provenance is fail-closed: the signed artifact must come from the exact
+  # SDK revision, never the movable FLUTTER_VERSION tag. The revision comes
+  # from the FLUTTER_COMMIT project env var when set (rotation without a
+  # commit), else the SHA pinned below — update it together with
+  # FLUTTER_VERSION (it is the upstream tag's SHA, verified with
+  # `git ls-remote https://github.com/flutter/flutter.git refs/tags/<ver>`).
   build_signed:
     docker:
       - image: cimg/android:2026.08.1
@@ -145,15 +149,18 @@ jobs:
       FLUTTER_VERSION: "3.47.2"
     steps:
       - run:
-          name: Require pinned SDK commit
+          name: Resolve pinned SDK commit
           command: |
-            if [ -z "${FLUTTER_COMMIT:-}" ]; then
-              echo "FLUTTER_COMMIT is not set: add the full commit SHA of Flutter $FLUTTER_VERSION to project env vars before running signed builds." >&2
-              exit 1
+            COMMIT="${FLUTTER_COMMIT:-d3b14c876900e553bc736ca19295fc09e3853e8e}"
+            if [ -n "${FLUTTER_COMMIT:-}" ]; then
+              echo "Using FLUTTER_COMMIT from project env vars."
+            else
+              echo "FLUTTER_COMMIT not set; using config-pinned SHA $COMMIT for Flutter $FLUTTER_VERSION."
             fi
+            echo "export PINNED_SDK_COMMIT=\"$COMMIT\"" >> "$BASH_ENV"
       - checkout
       - install_flutter:
-          verify_commit: "${FLUTTER_COMMIT}"
+          verify_commit: "${PINNED_SDK_COMMIT}"
       - decode_signing
       - restore_pub_cache
       - restore_gradle_cache
@@ -227,15 +234,16 @@ jobs:
       FLUTTER_VERSION: "3.47.2"
     steps:
       - run:
-          name: Require pinned SDK commit
+          name: Resolve pinned SDK commit
           command: |
+            COMMIT="${FLUTTER_COMMIT:-d3b14c876900e553bc736ca19295fc09e3853e8e}"
             if [ -z "${FLUTTER_COMMIT:-}" ]; then
-              echo "FLUTTER_COMMIT is not set: add the full commit SHA of Flutter $FLUTTER_VERSION to project env vars before releasing." >&2
-              exit 1
+              echo "FLUTTER_COMMIT not set; using config-pinned SHA $COMMIT for Flutter $FLUTTER_VERSION."
             fi
+            echo "export PINNED_SDK_COMMIT=\"$COMMIT\"" >> "$BASH_ENV"
       - checkout
       - install_flutter:
-          verify_commit: "${FLUTTER_COMMIT}"
+          verify_commit: "${PINNED_SDK_COMMIT}"
       - decode_signing
       - restore_pub_cache
       - restore_gradle_cache
