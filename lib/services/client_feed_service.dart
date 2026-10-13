@@ -167,7 +167,10 @@ class ClientFeedService {
       id: '${source.id}-${_stableHash(link)}',
       title: title,
       description: description,
-      fullContent: description,
+      // P-1: no separate fullContent copy of description — the reader
+      // falls back to `description` when fullContent is empty (the worker
+      // no longer sends the field either, so both paths agree).
+      fullContent: '',
       link: link,
       sourceId: source.id,
       sourceName: source.name,

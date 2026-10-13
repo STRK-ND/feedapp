@@ -88,10 +88,21 @@ class RssSource {
   /// Stable id derived from the feed URL. Dart's String.hashCode is NOT
   /// stable across runs, so a small deterministic hash is used instead —
   /// ids must survive restarts or saved/read flags would orphan.
+  ///
+  /// I-9: the mask is 53 bits, not 30. The old `& 0x3FFFFFFF` left only
+  /// ~1.07e9 values, and because `ClientFeedService._build` derives every
+  /// article id as `${source.id}-${hash(link)}`, two sources colliding on
+  /// id produced colliding article ids — SQLite `id` is PRIMARY KEY, so one
+  /// feed silently overwrote the other's articles. 53 bits needs ~9e15
+  /// distinct URLs before a collision is likelier than not (birthday bound
+  /// √2^53 ≈ 9.5e7 URLs), which is unreachable for a per-device custom-feed
+  /// list, and stays safely inside Dart's 64-bit int for the `<< 5` step.
+  /// The hash alone is not a uniqueness proof, so
+  /// [SettingsService.addCustomSource] also provably disambiguates at insert.
   static String stableIdForUrl(String url) {
     var h = 0;
     for (final cu in url.codeUnits) {
-      h = ((h << 5) - h + cu) & 0x3FFFFFFF;
+      h = ((h << 5) - h + cu) & 0x1FFFFFFFFFFFFF;
     }
     return 'custom-${h.toRadixString(36)}';
   }

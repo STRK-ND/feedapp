@@ -83,9 +83,17 @@ void main() {
     );
 
     // Let _loadStore() complete (fake isAvailable() returns false
-    // immediately) and the unavailable state render.
-    await tester.pump();
-    await tester.pump();
+    // immediately) and the unavailable state render. L-5: two bare pumps
+    // were a fixed guess at how many frames the async transition needs and
+    // failed ~1 in 10 full parallel runs under CPU contention. Bounded
+    // settle instead — the paywall's controllers (600ms/500ms) settle well
+    // inside the hard 5s bound; the explicit timeout prevents a hang if a
+    // future animation ever runs unbounded.
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 5),
+    );
 
     expect(
       find.text('Store unavailable. Check your connection and Play Store.'),

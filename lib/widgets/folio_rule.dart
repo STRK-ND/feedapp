@@ -163,6 +163,10 @@ class FolioRule extends StatelessWidget {
               ],
               Semantics(
                 button: true,
+                // Shortcut, not the primary control: the labeled "Mark
+                // all read" button in the app bar is the discoverable
+                // path. The dot keeps its 40x40 hit area; its semantics
+                // must say what it does rather than describe the count.
                 label: hasUnread
                     ? 'Mark all as read. $unreadCount unread.'
                     : 'No unread.',

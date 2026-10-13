@@ -397,6 +397,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildDivider(),
                   _buildMaxArticlesSelector(notifier),
                 ],
+                _buildDivider(),
+                _buildViewModeSelector(notifier),
               ]),
               const SizedBox(height: 24),
               _buildSectionHeader(_l10n.sectionSources),
@@ -518,7 +520,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : _l10n.supportOneTimeSubtitle,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const PaywallScreen(entry: PaywallEntry.settings),
+                      ),
                     );
                   },
                 ),
@@ -941,14 +946,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
         ),
       ),
+      // F-6: 2000 was offered here but the storage cap
+      // (AppConfig.maxCachedArticles = 1000) made it a silent no-op — the
+      // dropdown advertised a value the cache could never hold. Re-add
+      // 2000 only together with raising that ceiling.
       trailing: DropdownButton<int>(
-        value: [100, 250, 500, 1000, 2000].contains(settings.maxArticles)
+        value: [100, 250, 500, 1000].contains(settings.maxArticles)
             ? settings.maxArticles
             : 500,
         dropdownColor: colorScheme.surface,
         underline: const SizedBox.shrink(),
         icon: Icon(Icons.expand_more, color: colorScheme.onSurfaceVariant),
-        items: [100, 250, 500, 1000, 2000].map((max) {
+        items: [100, 250, 500, 1000].map((max) {
           return DropdownMenuItem(
             value: max,
             child: Text(
@@ -963,6 +972,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (value) async {
           if (value != null) {
             await settings.setMaxArticles(value);
+          }
+        },
+      ),
+    );
+  }
+
+  /// View mode (card stack vs continuous list). Moved here from the feed
+  /// app bar: it is a persisted preference, not a per-session action, and
+  /// as an unexplained `view_agenda` glyph it was one of five icon-only
+  /// controls competing for attention in the app bar.
+  Widget _buildViewModeSelector(SettingsNotifier settings) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+        ),
+        child: Icon(
+          Icons.view_agenda_outlined,
+          size: 20,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
+      title: Text(
+        _l10n.viewModeLabel,
+        style: GoogleFonts.dmSans(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+        ),
+      ),
+      trailing: DropdownButton<String>(
+        value: settings.viewMode == 'continuous' ? 'continuous' : 'stack',
+        dropdownColor: colorScheme.surface,
+        underline: const SizedBox.shrink(),
+        icon: Icon(Icons.expand_more, color: colorScheme.onSurfaceVariant),
+        items: [
+          DropdownMenuItem(
+            value: 'stack',
+            child: Text(
+              _l10n.cardStackModeLabel,
+              style: GoogleFonts.dmSans(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          DropdownMenuItem(
+            value: 'continuous',
+            child: Text(
+              _l10n.continuousModeLabel,
+              style: GoogleFonts.dmSans(
+                color: textTheme.bodyLarge?.color ?? colorScheme.onSurface,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+        onChanged: (value) async {
+          if (value != null) {
+            await settings.setViewMode(value);
           }
         },
       ),
@@ -1275,6 +1350,72 @@ class _AccountCardState extends State<_AccountCard> {
     }
   }
 
+  // R-2: Play requires an in-app account-deletion path for any app that
+  // creates accounts. Delete is deliberately typed (the user must retype
+  // DELETE) and states exactly what is removed.
+  Future<void> _confirmDeleteAccount() async {
+    final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.deleteAccountTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.deleteAccountBody),
+            const SizedBox(height: 16),
+            Text(
+              l10n.deleteAccountTypePrompt,
+              style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(hintText: 'DELETE'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.dialogCancel),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) => FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: value.text.trim() == 'DELETE'
+                  ? () => Navigator.pop(ctx, true)
+                  : null,
+              child: Text(l10n.deleteAccountConfirm),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await getIt<AuthService>().deleteAccount();
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.deleteAccountDoneSnack)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.deleteAccountFailedSnack)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1351,6 +1492,32 @@ class _AccountCardState extends State<_AccountCard> {
             ),
           );
 
+    final deleteTile = ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: colorScheme.error.withAlpha(38),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
+        child: Icon(
+          Icons.delete_forever_outlined,
+          size: 20,
+          color: colorScheme.error,
+        ),
+      ),
+      title: Text(
+        l10n.deleteAccountTitle,
+        style: AppType.titleMedium(color: colorScheme.error),
+      ),
+      subtitle: Text(
+        l10n.deleteAccountSubtitle,
+        style: AppType.bodyMedium(color: colorScheme.onSurfaceVariant),
+      ),
+      onTap: _confirmDeleteAccount,
+    );
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -1358,7 +1525,10 @@ class _AccountCardState extends State<_AccountCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outline),
       ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [tile]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: user == null ? [tile] : [tile, deleteTile],
+      ),
     );
   }
 }

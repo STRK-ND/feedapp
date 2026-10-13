@@ -29,6 +29,7 @@ import '../utils/error_handler.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
 import 'settings_screen.dart';
+import 'paywall_screen.dart';
 
 /// Main RSS Feed Screen - Card view only
 class RssFeedScreen extends StatefulWidget {
@@ -172,12 +173,6 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     setState(() => _viewMode = mode);
   }
 
-  Future<void> _toggleViewMode() async {
-    final next = _viewMode == 'stack' ? 'continuous' : 'stack';
-    setState(() => _viewMode = next);
-    await context.read<SettingsNotifier>().setViewMode(next);
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -312,7 +307,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     await Future<void>.delayed(Duration.zero); // yield to frame, then check
     if (!mounted) return;
 
-    final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+    // P-2: NO forceCheck here. The hourly throttle in checkForUpdates
+    // exists for exactly this path — passing forceCheck:true disabled it,
+    // so every cold start spent one of GitHub's 60 unauthenticated
+    // requests/hour. Those are bucketed per source IP, so CGNAT/NAT users
+    // share one budget. The manual "Check for updates" menu item keeps
+    // forceCheck:true — that is the correct use of it.
+    final updateInfo = await UpdateService.checkForUpdates();
 
     if (mounted && updateInfo != null) {
       await showUpdateDialog(context: context, updateInfo: updateInfo);
@@ -420,6 +421,25 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     }
   }
 
+  // R-1: the cap-hit SnackBar names Pro but routes nowhere — the moment a
+  // user has demonstrated intent to pay was the moment the app did not
+  // offer the purchase. Route to the paywall instead (the 5-minute hint
+  // throttle above is retained, or rapid swiping would push a screen per
+  // gesture).
+  void _promptUpgrade({required String trigger}) {
+    unawaited(
+      AnalyticsService.logPaywallShown(
+        trigger: trigger,
+        savedCount: _savedArticles.length,
+      ),
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PaywallScreen(entry: PaywallEntry.saveCap),
+      ),
+    );
+  }
+
   void _onSwipeRight(int index) {
     if (index >= _displayedArticles.length) return;
 
@@ -440,9 +460,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
       if (_lastCapHintAt == null ||
           now.difference(_lastCapHintAt!) > const Duration(minutes: 5)) {
         _lastCapHintAt = now;
-        _showSnackBar(
-          _l10n.freeSavedLimitReached(AppConfig.freeSavedArticlesCap),
-        );
+        AnalyticsService.logCapHit(savedCount: _savedArticles.length);
+        _promptUpgrade(trigger: 'save_cap_swipe');
       }
       return;
     }
@@ -505,9 +524,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     if (isSaving) {
       final isPro = context.read<SettingsNotifier>().isPro;
       if (!isPro && _savedArticles.length >= AppConfig.freeSavedArticlesCap) {
-        _showSnackBar(
-          _l10n.freeSavedLimitReached(AppConfig.freeSavedArticlesCap),
-        );
+        AnalyticsService.logCapHit(savedCount: _savedArticles.length);
+        _promptUpgrade(trigger: 'save_cap_button');
         return;
       }
     }
@@ -989,60 +1007,48 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               ),
             ),
             actions: [
-              // Mark-all-read with undo.
-              if (_selectedTab == 0)
+              // Mark-all-read with undo. Labelled, not icon-only: "Mark
+              // all read" was one of five unexplained glyphs in the bar,
+              // and its done_all icon reads as a read-state badge, not
+              // an action.
+              if (_selectedTab == 0 && _unreadCount > 0)
                 Semantics(
                   button: true,
-                  label: _unreadCount > 0
-                      ? _l10n.markAllReadSemantic(_unreadCount)
-                      : _l10n.noUnreadToMark,
+                  label: _l10n.markAllReadSemantic(_unreadCount),
                   child: Padding(
                     padding: const EdgeInsets.only(right: 4),
-                    child: IconButton(
-                      onPressed: _unreadCount == 0
-                          ? null
-                          : () {
-                              HapticFeedback.lightImpact();
-                              _onMarkAllRead();
-                            },
-                      tooltip: _unreadCount > 0
-                          ? _l10n.markAllAsReadAction
-                          : _l10n.sourceUnsubscribedSubtitle,
-                      icon: Icon(
-                        _unreadCount == 0
-                            ? Icons.done_all_rounded
-                            : Icons.done_all_outlined,
-                        color: appBarTitleColor,
-                      ),
-                    ),
-                  ),
-                ),
-              // View-mode toggle (Stack / Continuous) — feed tab only.
-              if (_selectedTab == 0)
-                Semantics(
-                  button: true,
-                  label: _viewMode == 'stack'
-                      ? _l10n.switchToContinuousTooltip
-                      : _l10n.switchToStackTooltip,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: IconButton(
+                    child: TextButton.icon(
                       onPressed: () {
-                        HapticFeedback.selectionClick();
-                        _toggleViewMode();
+                        HapticFeedback.lightImpact();
+                        _onMarkAllRead();
                       },
-                      tooltip: _viewMode == 'stack'
-                          ? _l10n.continuousModeLabel
-                          : _l10n.cardStackModeLabel,
                       icon: Icon(
-                        _viewMode == 'stack'
-                            ? Icons.view_agenda_outlined
-                            : Icons.crop_square,
+                        Icons.done_all_outlined,
+                        size: 18,
                         color: appBarTitleColor,
+                      ),
+                      label: Text(
+                        _l10n.markAllAsReadAction,
+                        style: _textTheme.labelLarge?.copyWith(
+                          color: appBarTitleColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(0, 40),
                       ),
                     ),
                   ),
                 ),
+              // View-mode toggle (Stack / Continuous) moved OUT of the
+              // app bar: it is a preference, not a per-session action,
+              // and it duplicated the same control in Settings. Keeping
+              // one glyph in the bar for it added a fifth unexplained
+              // icon. Continuous mode is also always reachable by simply
+              // scrolling the stack's card list downward (the folio dot
+              // below marks all read, which is the genuinely global
+              // action).
               if (_selectedTab == 0 && _articles.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(right: 8),
@@ -1159,7 +1165,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: appBarTitleColor),
+                    // more_horiz reads as "menu" to a first-time user;
+                    // more_vert reads as "dismiss" or a drag handle.
+                    icon: Icon(
+                      Icons.more_horiz_outlined,
+                      color: appBarTitleColor,
+                    ),
                     color: colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

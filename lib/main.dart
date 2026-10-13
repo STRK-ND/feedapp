@@ -13,15 +13,19 @@ import 'services/background_sync_service.dart';
 import 'services/posthog_service.dart';
 import 'di/service_locator.dart';
 import 'screens/curated_feeds_app.dart';
-import 'utils/constants.dart';
 import 'utils/error_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (AppConfig.isPlayStoreBuild) {
-    // Never let a debug banner reach a store build, even if someone
-    // compiles the play flavor in profile/debug by accident.
+  // Never let a debug banner or worker URL reach a release log: logcat is
+  // world-readable over adb on a debug-attached device, and `debugPrint`
+  // was the only sink for the worker URL, auth headers, and error text.
+  // Gate on release mode, NOT on the flavor — `direct` release builds are
+  // just as widely distributed as `play` ones, so the Play-only gate left
+  // every sideload leak logging (I-1). Debug/profile still print so the
+  // banner and diagnostics behave as before.
+  if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
 
@@ -66,7 +70,6 @@ Future<void> main() async {
       await SentryFlutter.init((options) {
         options
           ..dsn = sentryDsn
-          ..tracesSampleRate = 1.0
           ..environment = const String.fromEnvironment(
             'FLUTTER_ENV',
             defaultValue: 'production',

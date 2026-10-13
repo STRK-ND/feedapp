@@ -10,6 +10,7 @@ import 'in_app_notification_manager.dart';
 import '../models/in_app_notification.dart';
 import '../di/service_locator.dart';
 import '../utils/constants.dart';
+import '../utils/error_handler.dart';
 import 'settings_service.dart';
 import 'update_service.dart';
 
@@ -87,6 +88,21 @@ class NotificationService {
           )
           .timeout(const Duration(seconds: AppConfig.workerTimeoutSeconds));
 
+      // M-3: a 401 here means the compiled WORKER_API_SECRET is stale or
+      // unset relative to the deployed worker. That is not a transient
+      // failure — it silently disabled push for entire release builds —
+      // so surface it as its own high-severity error (Sentry in release)
+      // instead of vanishing into the generic catchError below.
+      if (response.statusCode == 401) {
+        unawaited(
+          ErrorHandler.logError(
+            'Worker rejected push registration (401) — WORKER_API_SECRET '
+            'is stale or unset. Push notifications are disabled.',
+            severity: ErrorSeverity.high,
+          ),
+        );
+        throw StateError('Push subscription rejected: worker secret mismatch');
+      }
       if (response.statusCode != 200) {
         throw StateError(
           'Push subscription failed: HTTP ${response.statusCode}',

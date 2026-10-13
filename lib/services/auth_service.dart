@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
+import 'cloud_sync_service.dart';
 
 /// Firebase Authentication wrapper — Google one-tap + email/password.
 ///
@@ -74,5 +77,39 @@ class AuthService {
       }
     }
     await _auth.signOut();
+  }
+
+  /// Permanently deletes the account (R-2 — Play policy: any app that
+  /// creates accounts must offer an in-app deletion path).
+  ///
+  /// ORDERING MATTERS: the Firestore mirror is wiped FIRST. If
+  /// `user.delete()` succeeded first and the wipe then failed, the auth
+  /// record would be gone and we could no longer prove ownership of the
+  /// data — leaving it orphaned with no path back.
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    // 1. Remove the cloud mirror (articles, settings, sources, sync
+    //    state, and the user root document).
+    if (GetIt.instance.isRegistered<CloudSyncService>()) {
+      await GetIt.instance<CloudSyncService>().purgeUserData(user.uid);
+    }
+
+    // 2. Google session cleanup so a re-auth prompt isn't needed.
+    if (_googleInitialized) {
+      try {
+        await _google.signOut();
+      } catch (_) {
+        // Best-effort; deletion below is what matters.
+      }
+    }
+
+    // 3. Then the auth record. Firebase may still throw
+    //    requires-recent-login on long-lived sessions; the caller
+    //    surfaces that as a failure snackbar and the cloud wipe having
+    //    already completed is the safe failure direction (account locked
+    //    out of its data, not data orphaned without an owner).
+    await user.delete();
   }
 }

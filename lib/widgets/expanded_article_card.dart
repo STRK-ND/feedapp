@@ -13,11 +13,13 @@ import '../services/article_content_service.dart';
 import '../services/tts_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
+import '../services/analytics_service.dart';
 import '../utils/constants.dart' hide AppColors;
 import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
 import '../utils/reader_theme.dart';
 import 'reader_controls.dart';
+import '../screens/paywall_screen.dart';
 
 /// Expanded article card bottom sheet/modal widget
 /// Features: Glassmorphism, hero image fade-in transitions,
@@ -42,6 +44,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
   bool _isLoadingContent = false;
   String? _fullContent;
 
+  /// True once the article has been marked read while open (R-4 gate:
+  /// review prompt fires on reader close, and only after a read).
+  bool _wasRead = false;
+  bool _isProUser = false;
+
   // Listen mode. The service is a lazy singleton; this sheet drives its
   // state and stops playback on close.
   TtsService? _tts;
@@ -63,6 +70,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     super.initState();
     _initContent();
     _loadPrefs();
+    // The card opens already-marked-read from _onTapCard; treat any open
+    // session as a completed read for the review-signal gate.
+    _wasRead = widget.article.isRead;
   }
 
   @override
@@ -113,7 +123,12 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       case TtsState.paused:
         await tts.resume();
       case TtsState.stopped:
-        final body = (_fullContent ?? widget.article.fullContent).trim();
+        final body =
+            (_fullContent ??
+                    (widget.article.fullContent.isNotEmpty
+                        ? widget.article.fullContent
+                        : widget.article.description))
+                .trim();
         final text = '${widget.article.title}. $body';
         unawaited(tts.speak(text));
     }
@@ -121,6 +136,13 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
 
   @override
   void dispose() {
+    // R-4: closing the reader after a real read is the app's strongest
+    // satisfaction signal. Gated to 90 days inside the service and never
+    // fired for Pro users — payers get no nags, and Google caps the
+    // prompt's real-world frequency anyway.
+    if (_wasRead && !_isProUser) {
+      unawaited(AnalyticsService.maybeRequestReview());
+    }
     _tts?.removeListener(_onTtsChanged);
     // Leaving the reader always silences playback.
     unawaited(_tts?.stop());
@@ -137,16 +159,29 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       _widenMeasure = notifier.widenMeasure;
       _bodyFont = notifier.bodyFont;
       _monoDatelines = notifier.monoDatelines;
+      _isProUser = notifier.isPro;
     });
   }
 
   Future<void> _persistTheme(ReaderTheme t) async {
     final notifier = context.read<SettingsNotifier>();
     if (isReaderThemeLocked(t, notifier.isPro)) {
+      // R-1: keep the explanatory SnackBar, then route to the paywall —
+      // the second Pro surface (after the save cap) also previously
+      // dead-ended at a transient banner with no path to purchase.
+      unawaited(
+        AnalyticsService.logPaywallShown(trigger: 'theme_lock', savedCount: 0),
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context).proThemeLocked(t.label)),
           duration: const Duration(seconds: 2),
+        ),
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const PaywallScreen(entry: PaywallEntry.themeLock),
         ),
       );
       return;
@@ -186,13 +221,19 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
       return;
     }
 
-    // Try to fetch full content only if RSS content is short
-    if (widget.article.fullContent.length < 200) {
+    // P-1: the worker no longer sends `fullContent` (it was always a
+    // byte-for-byte copy of `description`, costing 26% of every payload),
+    // so ask the surviving field. Article.fromJson defaults fullContent
+    // to '' for old cached rows, so fall back for pre-existing rows too.
+    final summary = widget.article.fullContent.isNotEmpty
+        ? widget.article.fullContent
+        : widget.article.description;
+    if (summary.length < 200) {
       await _fetchFullContent();
     } else {
       if (mounted) {
         setState(() {
-          _fullContent = widget.article.fullContent;
+          _fullContent = summary;
         });
       }
     }
@@ -219,7 +260,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _fullContent = widget.article.fullContent;
+        _fullContent = widget.article.fullContent.isNotEmpty
+            ? widget.article.fullContent
+            : widget.article.description;
         _isLoadingContent = false;
       });
     }
@@ -324,6 +367,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         _widenMeasure = settings.widenMeasure;
         _bodyFont = settings.bodyFont;
         _monoDatelines = settings.monoDatelines;
+        _isProUser = settings.isPro;
 
         final palette = ReaderPalette.forTheme(
           theme: _readerTheme,
@@ -605,14 +649,19 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   onWidenMeasure: _persistWiden,
                                   onBodyFont: _persistBodyFont,
                                   onLockedTheme: (t) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          AppLocalizations.of(
-                                            context,
-                                          ).proThemeLocked(t.label),
+                                    // R-1: route the locked swatch to the
+                                    // paywall as well as explaining it.
+                                    unawaited(
+                                      AnalyticsService.logPaywallShown(
+                                        trigger: 'theme_lock',
+                                        savedCount: 0,
+                                      ),
+                                    );
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => const PaywallScreen(
+                                          entry: PaywallEntry.themeLock,
                                         ),
-                                        duration: const Duration(seconds: 2),
                                       ),
                                     );
                                   },

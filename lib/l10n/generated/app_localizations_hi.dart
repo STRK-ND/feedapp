@@ -263,16 +263,10 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get noUnreadToMark => 'पढ़ा हुआ चिह्नित करने के लिए कुछ अपठित नहीं';
+  String get viewModeLabel => 'दृश्य मोड';
 
   @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
-
-  @override
-  String get switchToContinuousTooltip => 'सतत सूची पर बदलें';
-
-  @override
-  String get switchToStackTooltip => 'कार्ड स्टैक पर बदलें';
 
   @override
   String get continuousModeLabel => 'सतत';
@@ -657,6 +651,30 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get signOutConfirm => 'साइन आउट';
+
+  @override
+  String get deleteAccountTitle => 'खाता हटाएँ';
+
+  @override
+  String get deleteAccountSubtitle =>
+      'अपना खाता और क्लाउड डेटा स्थायी रूप से हटाएँ';
+
+  @override
+  String get deleteAccountBody =>
+      'इससे आपका खाता और उसके साथ संग्रहीत सब कुछ स्थायी रूप से हट जाएगा: सेव किए गए लेख, पढ़ने का इतिहास और सिंक की गई सेटिंग्स। इसे वापस नहीं किया जा सकता।';
+
+  @override
+  String get deleteAccountTypePrompt => 'पुष्टि के लिए DELETE टाइप करें';
+
+  @override
+  String get deleteAccountConfirm => 'हमेशा के लिए हटाएँ';
+
+  @override
+  String get deleteAccountDoneSnack => 'खाता हटा दिया गया';
+
+  @override
+  String get deleteAccountFailedSnack =>
+      'खाता नहीं हटाया जा सका। दोबारा कोशिश करें या सहायता से संपर्क करें।';
 
   @override
   String get loginTitle => 'साइन इन';

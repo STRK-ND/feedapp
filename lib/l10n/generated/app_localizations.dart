@@ -530,29 +530,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{{count} result} other{{count} results}} for \"{query}\"'**
   String searchResultsCount(int count, String query);
 
-  /// No description provided for @noUnreadToMark.
+  /// No description provided for @viewModeLabel.
   ///
   /// In en, this message translates to:
-  /// **'No unread to mark as read'**
-  String get noUnreadToMark;
+  /// **'View Mode'**
+  String get viewModeLabel;
 
   /// No description provided for @markAllAsReadAction.
   ///
   /// In en, this message translates to:
   /// **'Mark all as read'**
   String get markAllAsReadAction;
-
-  /// No description provided for @switchToContinuousTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to continuous list'**
-  String get switchToContinuousTooltip;
-
-  /// No description provided for @switchToStackTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to card stack'**
-  String get switchToStackTooltip;
 
   /// No description provided for @continuousModeLabel.
   ///
@@ -1273,6 +1261,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign out'**
   String get signOutConfirm;
+
+  /// No description provided for @deleteAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccountTitle;
+
+  /// No description provided for @deleteAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete your account and cloud data'**
+  String get deleteAccountSubtitle;
+
+  /// No description provided for @deleteAccountBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes your account and everything stored with it: saved articles, reading history, and synced settings. This cannot be undone.'**
+  String get deleteAccountBody;
+
+  /// No description provided for @deleteAccountTypePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Type DELETE to confirm'**
+  String get deleteAccountTypePrompt;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete forever'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @deleteAccountDoneSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deleted'**
+  String get deleteAccountDoneSnack;
+
+  /// No description provided for @deleteAccountFailedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete the account. Try again, or contact support.'**
+  String get deleteAccountFailedSnack;
 
   /// No description provided for @loginTitle.
   ///

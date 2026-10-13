@@ -40,6 +40,13 @@ android {
     versionCode = flutter.versionCode
     versionName = flutter.versionName
     multiDexEnabled = true
+    ndk {
+      // R-5: x86_64 is emulator-only — Play never installs it on a device,
+      // and shipping it added ~21 MB to every sideload APK (65.6 MB total).
+      // Emulator testing: use a physical device, or run with
+      // --target-platform android-arm64 on Apple-silicon hosts.
+      abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+    }
   }
 
   // Distribution channels. The Play Store build (play) is the only one
@@ -83,12 +90,24 @@ android {
 
   buildTypes {
     release {
-      // Falls back to debug signing when key.properties is missing so
-      // local release builds still work — never ship that APK.
-      signingConfig = if (keystoreConfigured)
+      // L-4: fail closed — a release build without real signing material
+      // must not silently produce a debug-signed artifact (re-signable by
+      // anyone, cannot upgrade an existing install). The old fallback
+      // produced a plausible-looking APK that could be uploaded to a
+      // release channel by mistake. Opt in explicitly for local smoke
+      // tests with -PallowDebugSigning (CI always provides key.properties
+      // via decode_signing, so CI output is unaffected).
+      signingConfig = if (keystoreConfigured) {
         signingConfigs.getByName("release")
-      else
+      } else if (project.hasProperty("allowDebugSigning")) {
         signingConfigs.getByName("debug")
+      } else {
+        throw GradleException(
+          "android/key.properties is missing. Refusing to build a release " +
+            "artifact signed with the debug key. Provide real signing " +
+            "material, or pass -PallowDebugSigning for a local smoke test.",
+        )
+      }
     }
   }
 

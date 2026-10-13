@@ -244,6 +244,15 @@ class SettingsService {
   }
 
   /// Adds a custom source if its URL is new; returns the full updated list.
+  ///
+  /// I-9: dedupe is by URL *and* by id. A hash collision in
+  /// [RssSource.stableIdForUrl] used to slip through here (URL is unique,
+  /// id is not) and produce two sources with identical ids — every article
+  /// id is derived as `${source.id}-${hash(link)}`, so colliding sources
+  /// silently overwrote each other's articles in SQLite. Disambiguate
+  /// deterministically with a suffix so re-running on a warm install
+  /// produces the exact same ids (any counter based on list position alone
+  /// would renumber sources when an unrelated one is removed).
   Future<List<RssSource>> addCustomSource(String name, String url) async {
     final current = await getCustomSources();
     final normalized = url.trim();
@@ -252,8 +261,22 @@ class SettingsService {
     )) {
       return current;
     }
+    // First candidate is the bare 53-bit hash; on collision append a
+    // deterministic salt round to the URL before re-hashing.
+    final takenIds = current.map((s) => s.id).toSet();
+    var stem = normalized;
+    var id = RssSource.stableIdForUrl(normalized);
+    var collision = 0;
+    while (takenIds.contains(id)) {
+      collision++;
+      stem = '$normalized#cf$collision';
+      id = RssSource.stableIdForUrl(stem);
+      // A 53-bit hash makes this loop unreachable in practice; the bound
+      // guarantees termination regardless.
+      if (collision > 64) break;
+    }
     final source = RssSource.custom(
-      id: RssSource.stableIdForUrl(normalized),
+      id: id,
       name: name.trim().isEmpty ? Uri.parse(normalized).host : name.trim(),
       url: normalized,
     );
@@ -290,10 +313,18 @@ class SettingsService {
 
   Future<void> setEditionNumber(int value) =>
       _setString('edition_number', value.toString());
+
+  /// F-5: write the edition counter WITHOUT firing the cloud-sync hook.
+  /// The edition number is deliberately excluded from the sync snapshot
+  /// (device-local state, see snapshotForSync), but setEditionNumber goes
+  /// through the shared _setString setter, which fires the hook
+  //  unconditionally — so every feed refresh pushed two byte-identical
+  //  Firestore documents (~48 pointless writes/day/user). Raw write here.
   Future<int> bumpEditionNumber() async {
     final current = await getEditionNumber();
     final next = current + 1;
-    await setEditionNumber(next);
+    await init();
+    await _prefs.setString('edition_number', next.toString());
     return next;
   }
 
@@ -379,7 +410,13 @@ class SettingsService {
     'auto_refresh',
     'show_images',
     'data_saver_mode',
-    'is_pro',
+    // 'is_pro' — M-1/F-2: deliberately NOT synced. Entitlement must never
+    // travel inside the settings snapshot: the user can write their own
+    // Firestore docs, so a synced is_pro is a self-grant path (M-1), and a
+    // not-yet-synced device pushing its local false would revoke a
+    // purchase made elsewhere (F-2). The flag is applied only via
+    // CloudSyncService._restoreProFlag, which holds the verified-purchase
+    // rule for Play builds, and written by CloudSyncService.setPro.
     'mono_datelines',
     'widen_measure',
   ];
@@ -412,16 +449,20 @@ class SettingsService {
   /// through the push hooks. Values are type-checked per key list.
   Future<void> restoreFromSync(Map<String, Object?> values) async {
     await init();
+    // Defence in depth (M-1): even if a stale or re-added key ever leaks
+    // into the snapshot, entitlement is never accepted from a synced
+    // snapshot — _restoreProFlag is the only sanctioned writer.
+    final safe = Map<String, Object?>.from(values)..remove('is_pro');
     for (final k in _syncedStringKeys) {
-      final v = values[k];
+      final v = safe[k];
       if (v is String) await _prefs.setString(k, v);
     }
     for (final k in _syncedBoolKeys) {
-      final v = values[k];
+      final v = safe[k];
       if (v is bool) await _prefs.setBool(k, v);
     }
     for (final k in _syncedListKeys) {
-      final v = values[k];
+      final v = safe[k];
       if (v is List) await _prefs.setStringList(k, v.cast<String>());
     }
   }

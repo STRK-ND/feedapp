@@ -194,6 +194,17 @@ class CloudSyncService implements SyncHooks {
     }
   }
 
+  /// Reconciles the user's triage state against the cloud.
+  ///
+  /// Reads the FULL `users/{uid}/articles` collection (F-4, Option A):
+  /// every document in it exists because the user touched that article —
+  /// the push filter is `isRead || isSaved` — so the collection only ever
+  /// grows, and the read cost scales with lifetime triage volume, not
+  /// current state. Firestore offers no way to query "changed since" on a
+  /// document field, so bounding this requires a structural schema change
+  /// (collapse to a single sync_state doc — see F-4's Option B). Accepted
+  /// as-is at current user volume; revisit if the bill or cold-start
+  /// latency grows.
   Future<void> _reconcileArticles(String uid) async {
     final cloudSnap = await _articlesCol(uid).get();
     final cloudTs = <String, int>{};
@@ -211,9 +222,23 @@ class CloudSyncService implements SyncHooks {
     }
 
     final stateData = (await _syncStateDoc(uid).get()).data();
-    final deletions = ((stateData?['deletions'] as Map?) ?? const {}).map(
+    final deletionsRaw = ((stateData?['deletions'] as Map?) ?? const {}).map(
       (k, v) => MapEntry(k as String, (v as num).toInt()),
     );
+    // F-3: bound the tombstone map. pruneDeletions implements the 90-day
+    // cap and is unit-tested, but was never wired in — the map grew by one
+    // entry per unsave for the life of the account, and every sync paid
+    // the read cost for all of it.
+    final deletions = pruneDeletions(deletionsRaw, _now());
+    if (deletions.length != deletionsRaw.length) {
+      unawaited(
+        _syncStateDoc(uid)
+            .set({'deletions': deletions}, SetOptions(merge: true))
+            .catchError((Object e) {
+              debugPrint('[CloudSync] deletions prune write failed: $e');
+            }),
+      );
+    }
 
     final localTs = await _storage.loadArticleTimestamps();
     final merge = mergeArticles(
@@ -231,14 +256,27 @@ class CloudSyncService implements SyncHooks {
       await _storage.unsaveArticleLocally(id);
     }
 
-    // Rebuild the saved tab from the merged rows (front-insert order is
-    // unknowable across devices; pubDate order is the stable fallback and
-    // re-normalizes as the user saves more).
+    // Rebuild the saved tab from the merged rows. UNION with the rows
+    // already in saved_articles (F-1 fix): rebuilding from the feed table
+    // ALONE silently deleted any saved article that saveArticles' cap had
+    // evicted from the feed table — the row vanished from the user's Saved
+    // tab with no error. Anything already saved is user data; only an
+    // explicit unsave (applied above via unsaveArticleLocally / merge
+    // tombstones) may remove it, so rows absent from `merged` are kept.
+    // Order: front-insert order is unknowable across devices — union rows
+    // that lose the appeal get the oldest positions, pubDate order re-
+    // normalizes as the user saves more.
     if (merge.toUpsert.isNotEmpty || merge.toUnsave.isNotEmpty) {
       final merged = await _storage.loadArticles();
-      final savedRows = merged.where((a) => a.isSaved).toList()
-        ..sort((a, b) => b.pubDate.compareTo(a.pubDate));
-      await _storage.saveSavedArticles(savedRows);
+      final savedRows = merged.where((a) => a.isSaved).toList();
+      final known = await _storage.loadSavedArticles();
+      final seen = {for (final a in savedRows) a.id};
+      final keptSaved = <Article>[
+        ...savedRows,
+        for (final a in known)
+          if (!seen.contains(a.id)) a,
+      ]..sort((a, b) => b.pubDate.compareTo(a.pubDate));
+      await _storage.saveSavedArticles(keptSaved);
       if (!_articlesRestored.isClosed) _articlesRestored.add(null);
     }
 
@@ -277,11 +315,12 @@ class CloudSyncService implements SyncHooks {
 
   Future<void> _restoreProFlag(String uid) async {
     final data = (await _userDoc(uid).get()).data();
-    // Play builds honor the cloud Pro flag as one input, but the store's
-    // own entitlement is authoritative: without a verified Play purchase
-    // the local flag does not unlock Pro features on this device.
-    // ponytail: replace with a real server-side check when revenue
-    // justifies the infra.
+    // THIS is the single authoritative writer path for the Pro flag.
+    // Entitlement never travels in the synced settings snapshot (M-1/F-2:
+    // `is_pro` was removed from _syncedBoolKeys) — _restoreProFlag is the
+    // only code that turns a cloud flag into a local one, and it holds the
+    // verified-purchase rule for Play builds. If `is_pro` is ever re-added
+    // to the synced keys, this method stops being the trust boundary.
     final cloudPro = data?['isPro'] == true;
     if (!cloudPro) return;
     if (AppConfig.isPlayStoreBuild && !(await _settings.getIsPro())) {
@@ -352,15 +391,15 @@ class CloudSyncService implements SyncHooks {
   }
 
   Future<void> _pushSettings(String uid) async {
+    // F-5/F-2/M-1: does NOT mirror isPro onto the user doc. `setPro` is the
+    // only writer of that field; re-deriving it from the local preference
+    // meant a second, not-yet-synced device could silently revoke a
+    // purchase made elsewhere (its local values['is_pro'] was still
+    // false), and a forged snapshot could grant Pro for free.
     final now = _now();
     final values = await _settings.snapshotForSync();
     await _settingsDoc(uid).set({'values': values, 'updatedAt': now});
     await _settings.setSettingsSyncTs(now);
-    // Keep the account-level Pro flag aligned with the settings snapshot.
-    await _userDoc(uid).set({
-      'isPro': values['is_pro'] == true,
-      'updatedAt': now,
-    }, SetOptions(merge: true));
   }
 
   Future<void> _pushSources(String uid) async {
@@ -381,14 +420,62 @@ class CloudSyncService implements SyncHooks {
 
   /// Persist a verified Pro purchase to the account so it survives
   /// reinstalls and follows the user across devices.
-  Future<void> setPro({String? productId, String? purchaseToken}) async {
+  ///
+  /// I-2: the Play `purchaseToken` is deliberately NOT stored. It is a
+  /// redeemable credential — anyone reading it can redeem the purchase
+  /// again (refund fraud, or replay on a different account), and the
+  /// purchase row in `users/{uid}` is readable by the signed-in user via
+  /// the client SDK on every device. The entitlement flag plus the
+  /// product id is all a restore needs: Play's own BillingClient is the
+  /// authority that re-verifies the token, and `_restoreProFlag` reads
+  /// back only the flag. Stopped passing the token from the paywall too,
+  /// so the parameter is gone rather than silently ignored.
+  Future<void> setPro({String? productId}) async {
     final uid = _uid;
     if (uid == null) return;
     await _userDoc(uid).set({
       'isPro': true,
       'proProductId': productId,
-      'proPurchaseToken': purchaseToken,
       'updatedAt': _now(),
     }, SetOptions(merge: true));
+  }
+
+  // ---------------------------------------------------------------------
+  // Account deletion (R-2 — Play policy: in-app deletion path required)
+  // ---------------------------------------------------------------------
+
+  /// Deletes every cloud document for [uid] ahead of `user.delete()`.
+  ///
+  /// The client SDK has no recursive delete (that is Admin-SDK/Cloud
+  /// Function territory), so the known subcollections are enumerated and
+  /// each wiped in ≤400-doc batches. ponytail: if a future subcollection
+  /// is added under users/{uid}, add it here or it will be orphaned on
+  /// deletion. Called BEFORE the auth record is removed (R-2): once
+  /// `deleteUser()` succeeds the caller can no longer prove ownership of
+  /// the data, so an orphaned tenant could never be cleaned up again.
+  Future<void> purgeUserData(String uid) async {
+    // Articles: batched delete; collection can be large, so page through
+    // it with a limit instead of `get()` without one.
+    for (;;) {
+      final snap = await _articlesCol(uid).limit(400).get();
+      if (snap.docs.isEmpty) break;
+      final batch = _firestore.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < 400) break;
+    }
+
+    // The four singleton docs (settings/main, sources/main,
+    // sync_state/main) plus the user root. Deleting the root doc does NOT
+    // cascade in Firestore — the subcollection docs above must already be
+    // gone or they remain.
+    await Future.wait<dynamic>([
+      _settingsDoc(uid).delete(),
+      _sourcesDoc(uid).delete(),
+      _syncStateDoc(uid).delete(),
+      _userDoc(uid).delete(),
+    ]);
   }
 }

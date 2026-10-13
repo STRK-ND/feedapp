@@ -105,10 +105,8 @@
       "query": { "type": "String" }
     }
   },
-  "noUnreadToMark": "No unread to mark as read",
+  "viewModeLabel": "View Mode",
   "markAllAsReadAction": "Mark all as read",
-  "switchToContinuousTooltip": "Switch to continuous list",
-  "switchToStackTooltip": "Switch to card stack",
   "continuousModeLabel": "Continuous",
   "cardStackModeLabel": "Card stack",
   "loadingLabel": "Loading",
@@ -244,6 +242,14 @@
   "signOutTitle": "Sign out?",
   "signOutBody": "Cloud sync pauses until you sign back in. Data on this device stays.",
   "signOutConfirm": "Sign out",
+
+  "deleteAccountTitle": "Delete account",
+  "deleteAccountSubtitle": "Permanently delete your account and cloud data",
+  "deleteAccountBody": "This permanently deletes your account and everything stored with it: saved articles, reading history, and synced settings. This cannot be undone.",
+  "deleteAccountTypePrompt": "Type DELETE to confirm",
+  "deleteAccountConfirm": "Delete forever",
+  "deleteAccountDoneSnack": "Account deleted",
+  "deleteAccountFailedSnack": "Couldn't delete the account. Try again, or contact support.",
 
   "loginTitle": "Sign in",
   "loginSubtitle": "Your sources, saved stories and settings — on every device.",

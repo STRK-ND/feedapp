@@ -8,10 +8,23 @@ import 'package:provider/provider.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../di/service_locator.dart';
 import '../providers/settings_notifier.dart';
+import '../services/analytics_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../utils/design_tokens.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/folio_rule.dart';
+
+/// Where the paywall was opened from — carried into analytics so the
+/// funnel (R-3) can attribute conversions per entry point.
+enum PaywallEntry { settings, saveCap, themeLock }
+
+extension PaywallEntryX on PaywallEntry {
+  String get analyticsValue => switch (this) {
+    PaywallEntry.settings => 'settings',
+    PaywallEntry.saveCap => 'save_cap',
+    PaywallEntry.themeLock => 'theme_lock',
+  };
+}
 
 /// Play Console product ID for the lifetime Pro upgrade.
 const _kProLifetime = 'cf_pro_lifetime';
@@ -21,7 +34,11 @@ const _kProLifetime = 'cf_pro_lifetime';
 // verified purchase stream is acceptable at this price point. Add server
 // validation (e.g. Firebase Functions) when revenue justifies the infra.
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+  const PaywallScreen({super.key, this.entry = PaywallEntry.settings});
+
+  /// Entry point, for funnel attribution only. Defaults to `settings` so
+  /// existing call sites stay valid.
+  final PaywallEntry entry;
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -38,6 +55,10 @@ class _PaywallScreenState extends State<PaywallScreen>
   bool _available = false;
   String? _error;
 
+  /// Set when a purchase/restore completes during this screen's lifetime,
+  /// so dispose can distinguish a conversion from a dismissal (R-3).
+  bool _completedPurchase = false;
+
   // Animation controllers matching splash screen
   late final AnimationController _drawController;
   late final AnimationController _revealController;
@@ -50,6 +71,14 @@ class _PaywallScreenState extends State<PaywallScreen>
     super.initState();
     _subscription = _iap.purchaseStream.listen(_onPurchaseUpdated);
     _loadStore();
+    // R-3: the paywall previously fired zero analytics — the funnel was
+    // unmeasurable at every step.
+    unawaited(
+      AnalyticsService.logPaywallAction(
+        action: 'open',
+        trigger: widget.entry.analyticsValue,
+      ),
+    );
 
     _drawController = AnimationController(
       vsync: this,
@@ -88,6 +117,15 @@ class _PaywallScreenState extends State<PaywallScreen>
 
   @override
   void dispose() {
+    // R-3: a close without a purchase recorded is a funnel drop-off.
+    if (!_completedPurchase) {
+      unawaited(
+        AnalyticsService.logPaywallAction(
+          action: 'dismiss',
+          trigger: widget.entry.analyticsValue,
+        ),
+      );
+    }
     _subscription?.cancel();
     _drawController.dispose();
     _revealController.dispose();
@@ -129,15 +167,18 @@ class _PaywallScreenState extends State<PaywallScreen>
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
         if (!mounted) continue;
+        _completedPurchase = true;
+        unawaited(
+          AnalyticsService.logPurchaseCompleted(productId: purchase.productID),
+        );
         final notifier = context.read<SettingsNotifier>();
         await notifier.setIsPro(true);
         // Mirror the verified purchase into the cloud account (no-op when
         // signed out) so Pro survives reinstalls and follows the user.
         if (getIt.isRegistered<CloudSyncService>()) {
-          await getIt<CloudSyncService>().setPro(
-            productId: purchase.productID,
-            purchaseToken: purchase.verificationData.serverVerificationData,
-          );
+          // I-2: no purchaseToken — it is a redeemable credential and must
+          // not be persisted anywhere a user can read back.
+          await getIt<CloudSyncService>().setPro(productId: purchase.productID);
         }
       } else if (purchase.status == PurchaseStatus.error) {
         if (mounted) {
@@ -157,12 +198,24 @@ class _PaywallScreenState extends State<PaywallScreen>
   void _buy() {
     final product = _product;
     if (product == null) return;
+    unawaited(
+      AnalyticsService.logPaywallAction(
+        action: 'buy',
+        trigger: widget.entry.analyticsValue,
+      ),
+    );
     _iap.buyNonConsumable(
       purchaseParam: PurchaseParam(productDetails: product),
     );
   }
 
   void _restore() {
+    unawaited(
+      AnalyticsService.logPaywallAction(
+        action: 'restore',
+        trigger: widget.entry.analyticsValue,
+      ),
+    );
     _iap.restorePurchases();
   }
 
@@ -248,9 +301,16 @@ class _PaywallScreenState extends State<PaywallScreen>
                         AnimatedBuilder(
                           animation: _revealProgress,
                           builder: (context, _) {
+                            // easeOutBack overshoots past 1.0 — without the
+                            // second clamp the derived opacity asserts in
+                            // debug builds (this was the L-5 flaky test's
+                            // root cause: under parallel-suite CPU
+                            // contention a pump landed on an overshoot
+                            // frame). Matches the splash-screen guard.
                             final subtitleProgress =
-                                (_revealProgress.value - 0.4).clamp(0.0, 1.0) /
-                                0.6;
+                                ((_revealProgress.value - 0.4).clamp(0.0, 1.0) /
+                                        0.6)
+                                    .clamp(0.0, 1.0);
                             return Opacity(
                               opacity: subtitleProgress,
                               child: Text(
@@ -271,9 +331,11 @@ class _PaywallScreenState extends State<PaywallScreen>
                         AnimatedBuilder(
                           animation: _revealProgress,
                           builder: (context, _) {
+                            // Same overshoot guard as the tagline above.
                             final subtitleProgress =
-                                (_revealProgress.value - 0.4).clamp(0.0, 1.0) /
-                                0.6;
+                                ((_revealProgress.value - 0.4).clamp(0.0, 1.0) /
+                                        0.6)
+                                    .clamp(0.0, 1.0);
                             return Opacity(
                               opacity: subtitleProgress,
                               child: Text(

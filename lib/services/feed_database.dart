@@ -126,7 +126,23 @@ class FeedDatabase {
         if (c != 0) return c;
         return a.id.compareTo(b.id);
       });
-    final kept = sorted.take(AppConfig.maxCachedArticles).toList();
+    // Never evict a row that saved_articles still references (F-1 fix).
+    // Evicting it orphans the saved row, and the cloud-sync rebuild —
+    // which reads the feed table — would then delete it outright from the
+    // user's Saved tab with no error. Saved data outranks cache size, so
+    // the cache may exceed [AppConfig.maxCachedArticles] by |saved|.
+    final savedIds = <String>{
+      for (final r in await db.query(_savedTable, columns: ['id']))
+        r['id'] as String,
+    };
+    final kept = <Article>[];
+    for (final a in sorted) {
+      if (kept.length >= AppConfig.maxCachedArticles &&
+          !savedIds.contains(a.id)) {
+        continue;
+      }
+      kept.add(a);
+    }
 
     // Capture the clocks we must preserve before the delete below.
     final existing = <String, int>{};

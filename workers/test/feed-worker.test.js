@@ -592,3 +592,89 @@ test('buildArticle drops future-dated items that would pin delta watermarks', ()
   assert.ok(kept);
   assert.equal(kept.title, 'Soon');
 });
+
+// ---------------------------------------------------------------------------
+// Audit fixes (burp-audite.md): M-2, L-3, P-1, P-3
+// ---------------------------------------------------------------------------
+
+test('M-2: subscribe rate limit is per caller, not per token', async () => {
+  const env = workerEnv();
+  // 10 distinct tokens from one IP — every one must pass; the 11th is
+  // rejected REGARDLESS of its token. Under the old per-token keying all
+  // 11 returned 200 because each minted its own bucket.
+  for (let i = 0; i < 10; i++) {
+    const res = await worker.fetch(
+      workerRequest('/subscribe', { method: 'POST', body: { token: `tok-${i}-aaaaaaaaaa` }, secret: 'test-secret' }),
+      env,
+      noopCtx,
+    );
+    assert.equal(res.status, 200, `call ${i} should pass`);
+  }
+  const blocked = await worker.fetch(
+    workerRequest('/subscribe', { method: 'POST', body: { token: 'a-brand-new-token-xx' }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(blocked.status, 429, '11th distinct token must still be rate limited');
+
+  // Same ceiling on DELETE /subscribe, keyed on the CALLER as well — the
+  // DELETE bucket is separate ('unsub:'), so a fresh caller is not blocked;
+  // what is pinned here is that varying the TOKEN cannot escape it.
+  for (let i = 0; i < 10; i++) {
+    const del = await worker.fetch(
+      workerRequest('/subscribe', { method: 'DELETE', body: { token: `del-tok-${i}-aaaaaaaaaa` }, secret: 'test-secret' }),
+      env,
+      noopCtx,
+    );
+    assert.equal(del.status, 200, `delete call ${i} should pass`);
+  }
+  const delBlocked = await worker.fetch(
+    workerRequest('/subscribe', { method: 'DELETE', body: { token: 'del-brand-new-token' }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(delBlocked.status, 429, '11th distinct token on DELETE must also be rate limited');
+});
+
+test('M-2: a repeated token still works within its caller bucket', async () => {
+  const env = workerEnv();
+  // The legitimate app pattern: re-register the same token on launch.
+  // First call passes; a second identical call within the window also
+  // passes because the bucket counts CALLS, and 2 < 10.
+  const first = await worker.fetch(
+    workerRequest('/subscribe', { method: 'POST', body: { token: 'tok-stable-123456' }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(first.status, 200);
+  const second = await worker.fetch(
+    workerRequest('/subscribe', { method: 'POST', body: { token: 'tok-stable-123456' }, secret: 'test-secret' }),
+    env,
+    noopCtx,
+  );
+  assert.equal(second.status, 200);
+});
+
+test('L-3: parseArticleParams truncates over-long free-text params', () => {
+  const p = parseArticleParams(
+    new URL(`https://x/articles?q=${'a'.repeat(500)}&category=${'b'.repeat(200)}&source=${'s1,'.repeat(80)}x`),
+  );
+  assert.equal(p.q.length, 200);
+  assert.equal(p.category.length, 64);
+  assert.equal(p.sources.length, 50);
+
+  // In-range values are untouched by the clamps.
+  const ok = parseArticleParams(new URL('https://x/articles?q=hello%20world&category=Tech&source=a,b'));
+  assert.equal(ok.q, 'hello world');
+  assert.equal(ok.category, 'Tech');
+  assert.deepEqual(ok.sources, ['a', 'b']);
+});
+
+test('P-1: buildArticle no longer emits the duplicated fullContent field', () => {
+  const source = SOURCES[0];
+  const body = '<title>T</title><link>https://example.com/p1</link><description>D</description>';
+  const article = buildArticle(body, source, itemOpts);
+  assert.ok(article);
+  assert.equal(article.description, 'D');
+  assert.equal('fullContent' in article, false);
+});

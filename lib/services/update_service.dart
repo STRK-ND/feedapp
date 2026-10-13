@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/version_provider.dart';
 import '../utils/constants.dart';
+import '../utils/error_handler.dart';
 import '../utils/helpers.dart';
 import 'notification_service.dart';
 
@@ -65,6 +66,21 @@ class UpdateService {
             headers: {'Accept': 'application/vnd.github.v3+json'},
           )
           .timeout(const Duration(seconds: 10));
+
+      // P-2 follow-up: GitHub buckets the unauthenticated limit (60/hour)
+      // per source IP, so on CGNAT/NAT the budget is shared with every
+      // other user behind that egress. Surface exhaustion instead of
+      // degrading to the same silent null as every other error path.
+      if (response.statusCode == 403 || response.statusCode == 429) {
+        final reset = response.headers['x-ratelimit-reset'];
+        unawaited(
+          ErrorHandler.logWarning(
+            'GitHub update check rate-limited (reset at $reset). '
+            'Update notifications will be missed until then.',
+          ),
+        );
+        return null;
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -203,8 +219,22 @@ class UpdateService {
   /// Fallback: open the APK URL in the system browser.
   /// Used when in-app download/install fails (no install permission,
   /// unsupported platform, IO error, etc.) — never strand the user.
+  ///
+  /// §7 hardening: the URL is *remote, unvalidated* data — it comes from
+  /// the GitHub Releases API response, so it is only as trustworthy as
+  /// that response (or whoever controls DNS/CDN for it). Restrict the
+  /// scheme to http/https, exactly as the article-link launcher does, so a
+  /// hostile or compromised release payload cannot hand an `intent://`,
+  /// `file://`, or `content://` URI to the system installer/browser. The
+  /// install path itself stays checksum-gated independently.
   static Future<bool> openDownloadUrl(String url) async {
-    final uri = Uri.parse(url);
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    // Scheme allowlist: only real web URLs may leave the app (blocks
+    // intent:// and other app-handoff schemes).
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return false;
+    }
     if (await canLaunchUrl(uri)) {
       return await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

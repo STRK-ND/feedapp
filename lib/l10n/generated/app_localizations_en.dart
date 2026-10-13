@@ -273,16 +273,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get noUnreadToMark => 'No unread to mark as read';
+  String get viewModeLabel => 'View Mode';
 
   @override
   String get markAllAsReadAction => 'Mark all as read';
-
-  @override
-  String get switchToContinuousTooltip => 'Switch to continuous list';
-
-  @override
-  String get switchToStackTooltip => 'Switch to card stack';
 
   @override
   String get continuousModeLabel => 'Continuous';
@@ -669,6 +663,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signOutConfirm => 'Sign out';
+
+  @override
+  String get deleteAccountTitle => 'Delete account';
+
+  @override
+  String get deleteAccountSubtitle =>
+      'Permanently delete your account and cloud data';
+
+  @override
+  String get deleteAccountBody =>
+      'This permanently deletes your account and everything stored with it: saved articles, reading history, and synced settings. This cannot be undone.';
+
+  @override
+  String get deleteAccountTypePrompt => 'Type DELETE to confirm';
+
+  @override
+  String get deleteAccountConfirm => 'Delete forever';
+
+  @override
+  String get deleteAccountDoneSnack => 'Account deleted';
+
+  @override
+  String get deleteAccountFailedSnack =>
+      'Couldn\'t delete the account. Try again, or contact support.';
 
   @override
   String get loginTitle => 'Sign in';
