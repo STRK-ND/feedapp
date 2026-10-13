@@ -5,17 +5,12 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.2] - 2026-10-14
 
-### Brand rollout (1.0.1) — new app logo on all surfaces
-- Launcher icon rebuilt from `logo.png`: navy `#0E0814` adaptive background + extracted swirl/glyph foreground (66dp safe zone) + themed-icon layer; legacy + round rasters regenerated
-- In-app splash and paywall now render the logo via the shared `AppLogo` widget (replaces the duplicated hand-painted glyph); Settings → About, onboarding, and login show the mark
-- Native launch screen carries the logo on the matching theme ground; status-bar notifications use a white-silhouette icon
-- **Fixed:** the notification icon name (`@mipmap/ic_launcher`) never resolved, which silently aborted push-token registration — now `ic_notification`, and splash bootstrap isolates notification init so it can't take down feed init
-- Regenerate with `python3 tool/generate_brand_assets.py && dart run flutter_launcher_icons` (then sync `ic_launcher_round.xml`)
-
-Remediation of the 2026-10-07/08 security & functional audit (`burp-audite.md`) — all four passes.
-Findings are referenced by the audit's IDs.
+First over-the-air release. Remediation of the 2026-10-07 security & functional audit
+(`burp-audite.md`) — all four passes. Findings are referenced by the audit's IDs.
+Supersedes 1.0.1, which was never published to GitHub Releases, so no OTA update has
+been available to installed users before this tag.
 
 ### Fixed
 - **F-1 (data loss):** saved articles are no longer silently deleted. `saveArticles` never evicts a row the Saved list still references, and the cloud-sync rebuild now unions the feed table with rows already in `saved_articles` (rows already orphaned by older builds are kept too)
