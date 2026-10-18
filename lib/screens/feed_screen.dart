@@ -1012,31 +1012,40 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // and its done_all icon reads as a read-state badge, not
               // an action.
               if (_selectedTab == 0 && _unreadCount > 0)
-                Semantics(
-                  button: true,
-                  label: _l10n.markAllReadSemantic(_unreadCount),
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: TextButton.icon(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        _onMarkAllRead();
-                      },
-                      icon: Icon(
-                        Icons.done_all_outlined,
-                        size: 18,
-                        color: appBarTitleColor,
-                      ),
-                      label: Text(
-                        _l10n.markAllAsReadAction,
-                        style: _textTheme.labelLarge?.copyWith(
+                // The AppBar's trailing row is mainAxisSize.min with no
+                // scroll: its children never shrink, so on a 320dp bar this
+                // labelled action plus the count chip and refresh glyph
+                // overflowed by up to 192px. Flexible lets it give up its
+                // natural width and the label ellipsizes instead.
+                Flexible(
+                  child: Semantics(
+                    button: true,
+                    label: _l10n.markAllReadSemantic(_unreadCount),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          _onMarkAllRead();
+                        },
+                        icon: Icon(
+                          Icons.done_all_outlined,
+                          size: 18,
                           color: appBarTitleColor,
-                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        minimumSize: const Size(0, 40),
+                        label: Text(
+                          _l10n.markAllAsReadAction,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _textTheme.labelLarge?.copyWith(
+                            color: appBarTitleColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 40),
+                        ),
                       ),
                     ),
                   ),
@@ -1050,111 +1059,123 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // below marks all read, which is the genuinely global
               // action).
               if (_selectedTab == 0 && _articles.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  // Reskin: unread count reads as a data chip, not a brand
-                  // pill. groundElev fill + hairline + mono number; the amber
-                  // dot earns the attention, not the whole container. Folio
-                  // carries the same count on the feed tab; this chip shows
-                  // on the source drill-in where Folio is hidden.
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(
-                      AppCardStyles.badgeRadius,
+                // Same trailing row: keep the count readable but never let it
+                // force the bar past the viewport.
+                Flexible(
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
                     ),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant,
-                      width: 1,
+                    // Reskin: unread count reads as a data chip, not a brand
+                    // pill. groundElev fill + hairline + mono number; the amber
+                    // dot earns the attention, not the whole container. Folio
+                    // carries the same count on the feed tab; this chip shows
+                    // on the source drill-in where Folio is hidden.
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(
+                        AppCardStyles.badgeRadius,
+                      ),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant,
+                        width: 1,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Semantics(
-                        label: '$_unreadCount unread articles',
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _unreadCount > 0
-                                ? colorScheme.primary
-                                : colorScheme.outline,
-                            shape: BoxShape.circle,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Semantics(
+                          label: '$_unreadCount unread articles',
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: _unreadCount > 0
+                                  ? colorScheme.primary
+                                  : colorScheme.outline,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$_unreadCount',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: appBarTitleColor,
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '$_unreadCount',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: appBarTitleColor,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               if (_selectedTab == 0)
-                Semantics(
-                  button: true,
-                  label: _isLoading
-                      ? _l10n.loadingLabel
-                      : _l10n.refreshFeedsLabel,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: IconButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              HapticFeedback.lightImpact();
-                              _refreshFeeds();
-                            },
-                      icon: _isLoading
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  appBarTitleColor,
+                Flexible(
+                  child: Semantics(
+                    button: true,
+                    label: _isLoading
+                        ? _l10n.loadingLabel
+                        : _l10n.refreshFeedsLabel,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: IconButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                HapticFeedback.lightImpact();
+                                _refreshFeeds();
+                              },
+                        icon: _isLoading
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    appBarTitleColor,
+                                  ),
                                 ),
+                              )
+                            : Icon(
+                                Icons.refresh_rounded,
+                                color: appBarTitleColor,
                               ),
-                            )
-                          : Icon(
-                              Icons.refresh_rounded,
-                              color: appBarTitleColor,
-                            ),
+                      ),
                     ),
                   ),
                 ),
-              Semantics(
-                button: true,
-                label: _isSearchActive
-                    ? _l10n.closeSearchLabel
-                    : _l10n.searchArticlesLabel,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: IconButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        _isSearchActive = !_isSearchActive;
-                        if (!_isSearchActive) {
-                          _searchQuery = '';
-                          _displayedArticles = _getFilteredArticles();
-                        }
-                      });
-                    },
-                    icon: Icon(
-                      _isSearchActive
-                          ? Icons.close_rounded
-                          : Icons.search_rounded,
-                      color: appBarTitleColor,
+              Flexible(
+                child: Semantics(
+                  button: true,
+                  label: _isSearchActive
+                      ? _l10n.closeSearchLabel
+                      : _l10n.searchArticlesLabel,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _isSearchActive = !_isSearchActive;
+                          if (!_isSearchActive) {
+                            _searchQuery = '';
+                            _displayedArticles = _getFilteredArticles();
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        _isSearchActive
+                            ? Icons.close_rounded
+                            : Icons.search_rounded,
+                        color: appBarTitleColor,
+                      ),
                     ),
                   ),
                 ),
