@@ -1,0 +1,869 @@
+{
+  "schemaVersion": 3,
+  "appName": "Curated Feeds",
+  "themeId": "magazine-cover-editorial",
+  "fontId": "template-serif",
+  "connectedCanvas": true,
+  "locales": [
+    "en"
+  ],
+  "locale": "en",
+  "device": "android",
+  "orientation": "portrait",
+  "appIcon": "/app-icon.png",
+  "slidesByDevice": {
+    "iphone": [
+      {
+        "id": "s_mppgoot8_1",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Your headline\nlives here."
+        },
+        "screenshot": "",
+        "transforms": {
+          "device": {
+            "x": -450.80914890045335,
+            "y": 955.2104098119215,
+            "width": 977,
+            "height": 1991,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        }
+      },
+      {
+        "id": "s_mppgoot8_2",
+        "layout": "two-devices",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Show two\nscreens at once."
+        },
+        "screenshot": "",
+        "screenshotSecondary": "",
+        "transforms": {
+          "deviceSecondary": {
+            "x": 688.4726540204801,
+            "y": 1027.8020089177937,
+            "width": 871.2,
+            "height": 1774.7929549902153,
+            "rotation": 9,
+            "zIndex": 2
+          },
+          "caption": {
+            "x": 112.3403055229146,
+            "y": 87.89358401880148,
+            "width": 1108.8,
+            "height": 803.0400000000001,
+            "rotation": 0,
+            "zIndex": 4
+          },
+          "device": {
+            "x": -499.3230870111943,
+            "y": 928.1034802753068,
+            "width": 912.27195389049,
+            "height": 1858.4640000000002,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        }
+      },
+      {
+        "id": "s_mppgoot8_3",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Flip the contrast\nfor visual rhythm."
+        },
+        "screenshot": "",
+        "inverted": true,
+        "transforms": {
+          "device": {
+            "x": 741.2739047128944,
+            "y": 899.4937720329012,
+            "width": 1013.6355043227666,
+            "height": 2064.96,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        }
+      },
+      {
+        "id": "s_mppgoot8_4",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": "",
+        "transforms": {
+          "caption": {
+            "x": 190.97767332549847,
+            "y": 2159.762397179791,
+            "width": 1056,
+            "height": 860.4,
+            "rotation": 0,
+            "zIndex": 4
+          }
+        }
+      },
+      {
+        "id": "s_mpptmmaa_i",
+        "layout": "device-bottom",
+        "label": {
+          "en": "NEW"
+        },
+        "headline": {
+          "en": "Edit this\nheadline."
+        },
+        "screenshot": "",
+        "transforms": {
+          "device": {
+            "x": -517.4781516913463,
+            "y": 846.7845828437136,
+            "width": 1013.6355043227666,
+            "height": 2064.96,
+            "rotation": 0,
+            "zIndex": 3
+          },
+          "caption": {
+            "x": 103.91492361927885,
+            "y": 195.738472385429,
+            "width": 1108.8,
+            "height": 803.0400000000001,
+            "rotation": 0,
+            "zIndex": 4
+          }
+        }
+      },
+      {
+        "id": "s_mpptvxsc_i",
+        "layout": "device-bottom",
+        "label": {
+          "en": "NEW"
+        },
+        "headline": {
+          "en": "Edit this\nheadline."
+        },
+        "screenshot": ""
+      }
+    ],
+    "android": [
+      {
+        "id": "cf-1",
+        "layout": "hero",
+        "label": {
+          "en": "THE MORNING EDITION"
+        },
+        "headline": {
+          "en": "A reading room,\nin your pocket."
+        },
+        "screenshot": "/screenshots/android/phone/en/01-feed.png",
+        "imageElements": [
+          {
+            "id": "plate-1",
+            "src": "/screenshots/uploaded/oxblood-plate.png",
+            "transform": {
+              "x": 1100,
+              "y": 800,
+              "width": 1080,
+              "height": 1120,
+              "zIndex": 1
+            },
+            "fit": "cover"
+          }
+        ]
+      },
+      {
+        "id": "cf-2",
+        "layout": "device-bottom",
+        "label": {
+          "en": "ONE STORY AT A TIME"
+        },
+        "headline": {
+          "en": "One story.\nIf it becomes a hundred."
+        },
+        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png",
+        "transforms": {
+          "device": {
+            "x": 200.70778097982702,
+            "y": 411.33371757925113,
+            "width": 678.5844380403457,
+            "height": 1470.266282420749,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        },
+        "imageElements": [
+          {
+            "id": "plate-2",
+            "src": "/screenshots/uploaded/oxblood-plate.png",
+            "transform": {
+              "x": 1080,
+              "y": 800,
+              "width": 1080,
+              "height": 1120,
+              "zIndex": 1
+            },
+            "fit": "cover"
+          }
+        ]
+      },
+      {
+        "id": "cf-3",
+        "layout": "two-devices",
+        "label": {
+          "en": "FOLD THE DAY AWAY"
+        },
+        "headline": {
+          "en": "Mark it read.\nSwipe it away."
+        },
+        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
+        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
+      },
+      {
+        "id": "cf-4",
+        "layout": "device-top",
+        "label": {
+          "en": "THE READER"
+        },
+        "headline": {
+          "en": "Every sentence,\nbreathable."
+        },
+        "screenshot": "/screenshots/android/phone/en/07-reader.png",
+        "inverted": true
+      },
+      {
+        "id": "cf-5",
+        "layout": "device-bottom",
+        "label": {
+          "en": "YOUR SHELF"
+        },
+        "headline": {
+          "en": "Everything you kept,\nin one place."
+        },
+        "screenshot": "/screenshots/android/phone/en/08-saved.png"
+      },
+      {
+        "id": "cf-6",
+        "layout": "no-device",
+        "label": {
+          "en": "IN THIS ISSUE"
+        },
+        "headline": {
+          "en": "Little edi…\nLittle waste."
+        },
+        "screenshot": "/screenshots/android/phone/en/09-search-saved.png"
+      },
+      {
+        "id": "cf-7",
+        "layout": "split-landscape",
+        "label": {
+          "en": "THE MORNING EDITION"
+        },
+        "headline": {
+          "en": "Quietly curated,\nall day."
+        },
+        "screenshot": "/screenshots/android/phone/en/10-settings.png",
+        "transforms": {
+          "device": {
+            "x": 531.8155199899229,
+            "y": 436.86688522522104,
+            "width": 581,
+            "height": 1258,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        },
+        "inverted": true
+      },
+      {
+        "id": "cf-8",
+        "layout": "device-bottom",
+        "label": {
+          "en": "THE SHELF"
+        },
+        "headline": {
+          "en": "Sources, kept\nwithout clutter."
+        },
+        "screenshot": "/screenshots/android/phone/en/11-sources.png"
+      }
+    ],
+    "ipad": [
+      {
+        "id": "s_mppgoot8_a",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe big screen."
+        },
+        "screenshot": "",
+        "transforms": {
+          "device": {
+            "x": 68.64736263219729,
+            "y": 818.7701245593419,
+            "width": 1525.7087999999999,
+            "height": 1981.4399999999998,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        }
+      },
+      {
+        "id": "s_mppgoot8_b",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Built for\nfocus."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mppgoot8_c",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Always within reach."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "tvos": [
+      {
+        "id": "s_mv8kl3uc_d",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe living room."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3uc_e",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3uc_f",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Flip the contrast."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mv8kl3uc_g",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "watchos": [
+      {
+        "id": "s_mv8kl3uc_h",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "On your\nwrist."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3uc_i",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One glance.\nDone."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3uc_j",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Always\nwith you."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "carplay": [
+      {
+        "id": "s_mv8kl3ud_k",
+        "layout": "split-landscape",
+        "label": {
+          "en": "CARPLAY"
+        },
+        "headline": {
+          "en": "Eyes on\nthe road."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_l",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Everything, one tap away."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_m",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Made for every drive."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "mac": [
+      {
+        "id": "s_mv8kl3ud_n",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nyour Mac."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_o",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Everything in\none window."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_p",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "One shortcut away."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mv8kl3ud_q",
+        "layout": "two-devices",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Work across windows."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mv8kl3ud_r",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "android-7": [
+      {
+        "id": "cf-7in-0",
+        "layout": "hero",
+        "label": {
+          "en": "THE MORNING EDITION"
+        },
+        "headline": {
+          "en": "A reading room,\nin your pocket."
+        },
+        "screenshot": "/screenshots/android/phone/en/01-feed.png"
+      },
+      {
+        "id": "cf-7in-1",
+        "layout": "device-bottom",
+        "label": {
+          "en": "ONE STORY AT A TIME"
+        },
+        "headline": {
+          "en": "One story.\nIf it becomes a hundred."
+        },
+        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png"
+      },
+      {
+        "id": "cf-7in-2",
+        "layout": "two-devices",
+        "label": {
+          "en": "FOLD THE DAY AWAY"
+        },
+        "headline": {
+          "en": "Mark it read.\nSwipe it away."
+        },
+        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
+        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
+      }
+    ],
+    "android-10": [
+      {
+        "id": "cf-10in-0",
+        "layout": "hero",
+        "label": {
+          "en": "THE MORNING EDITION"
+        },
+        "headline": {
+          "en": "A reading room,\nin your pocket."
+        },
+        "screenshot": "/screenshots/android/phone/en/01-feed.png"
+      },
+      {
+        "id": "cf-10in-1",
+        "layout": "device-bottom",
+        "label": {
+          "en": "ONE STORY AT A TIME"
+        },
+        "headline": {
+          "en": "One story.\nIf it becomes a hundred."
+        },
+        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png"
+      },
+      {
+        "id": "cf-10in-2",
+        "layout": "two-devices",
+        "label": {
+          "en": "FOLD THE DAY AWAY"
+        },
+        "headline": {
+          "en": "Mark it read.\nSwipe it away."
+        },
+        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
+        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
+      }
+    ],
+    "feature-graphic": [
+      {
+        "id": "cf-fg",
+        "layout": "feature-graphic",
+        "label": {},
+        "headline": {
+          "en": "Your pocket-sized reading room."
+        },
+        "screenshot": ""
+      }
+    ],
+    "duo-outer": [
+      {
+        "id": "s_mv8kl3ud_x",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Everything,\none hand."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_y",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_z",
+        "layout": "two-devices",
+        "label": {
+          "en": "OPEN IT"
+        },
+        "headline": {
+          "en": "Open it for\nthe full view."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mv8kl3ud_10",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Flip the contrast."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mv8kl3ud_11",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "duo-outer-landscape": [
+      {
+        "id": "s_mv8kl3ud_12",
+        "layout": "hero",
+        "label": {
+          "en": "TURN IT"
+        },
+        "headline": {
+          "en": "Made for the wide view."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_13",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_14",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Flip the contrast."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "duo-inner": [
+      {
+        "id": "s_mv8kl3ud_15",
+        "layout": "hero",
+        "label": {
+          "en": "UNFOLD IT"
+        },
+        "headline": {
+          "en": "Room for\nthe whole view."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_16",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_17",
+        "layout": "two-devices",
+        "label": {
+          "en": "FOLDED + OPEN"
+        },
+        "headline": {
+          "en": "Turn it, open it,\nkeep going."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mv8kl3ud_18",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Flip the contrast."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "duo-inner-landscape": [
+      {
+        "id": "s_mv8kl3ud_19",
+        "layout": "hero",
+        "label": {
+          "en": "UNFOLD IT"
+        },
+        "headline": {
+          "en": "Lead with the two-pane view."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_1a",
+        "layout": "two-devices",
+        "label": {
+          "en": "FOLDED + OPEN"
+        },
+        "headline": {
+          "en": "Same moment, closed and open."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mv8kl3ud_1b",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mv8kl3ud_1c",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Show what only the wide screen can."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mv8kl3ud_1d",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so much more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "creative-universal": [
+      {
+        "id": "s_mv8kl3ud_1e",
+        "layout": "split-landscape",
+        "label": {
+          "en": "NEW"
+        },
+        "headline": {
+          "en": "Your app,\nat a glance."
+        },
+        "screenshot": ""
+      }
+    ],
+    "creative-header": [
+      {
+        "id": "s_mv8kl3ud_1f",
+        "layout": "split-landscape",
+        "label": {
+          "en": "NEW"
+        },
+        "headline": {
+          "en": "Your app,\nat a glance."
+        },
+        "screenshot": ""
+      }
+    ],
+    "creative-search": [
+      {
+        "id": "s_mv8kl3ud_1g",
+        "layout": "split-landscape",
+        "label": {
+          "en": "NEW"
+        },
+        "headline": {
+          "en": "Your app,\nat a glance."
+        },
+        "screenshot": ""
+      }
+    ]
+  },
+  "crossScreenMockupsByDevice": {
+    "iphone": [],
+    "ipad": [],
+    "android": [],
+    "android-7": [],
+    "android-10": [],
+    "feature-graphic": []
+  },
+  "scene": {
+    "backdrop": "solid",
+    "span": true,
+    "decoration": "none",
+    "shadow": 60,
+    "glow": 0,
+    "tilt": 0,
+    "headlineWeight": 400,
+    "headlineScale": 1,
+    "headlineCase": "as-typed",
+    "captionAlign": "left"
+  }
+}
