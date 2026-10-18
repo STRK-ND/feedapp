@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "appName": "Curated Feeds",
-  "themeId": "magazine-cover-editorial",
-  "fontId": "template-serif",
+  "themeId": "midnight-glow-pro",
+  "fontId": "system-sans",
   "connectedCanvas": true,
   "locales": [
     "en"
@@ -184,24 +184,14 @@
       },
       {
         "id": "cf-2",
-        "layout": "device-bottom",
+        "layout": "device-top",
         "label": {
           "en": "ONE STORY AT A TIME"
         },
         "headline": {
           "en": "One story.\nIf it becomes a hundred."
         },
-        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png",
-        "transforms": {
-          "device": {
-            "x": 200.70778097982702,
-            "y": 411.33371757925113,
-            "width": 678.5844380403457,
-            "height": 1470.266282420749,
-            "rotation": 0,
-            "zIndex": 3
-          }
-        },
+        "screenshot": "/screenshots/android/phone/en/02-reader.png",
         "imageElements": [
           {
             "id": "plate-2",
@@ -221,80 +211,67 @@
         "id": "cf-3",
         "layout": "two-devices",
         "label": {
-          "en": "FOLD THE DAY AWAY"
+          "en": "READING, YOUR WAY"
         },
         "headline": {
-          "en": "Mark it read.\nSwipe it away."
+          "en": "Three rooms,\none quiet light."
         },
-        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
-        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
+        "screenshot": "/screenshots/android/phone/en/03-rooms.png"
       },
       {
         "id": "cf-4",
-        "layout": "device-top",
+        "layout": "device-bottom",
         "label": {
-          "en": "THE READER"
+          "en": "MARK IT. SAVE IT."
         },
         "headline": {
-          "en": "Every sentence,\nbreathable."
+          "en": "Keep what matters,\nclose what you don't."
         },
-        "screenshot": "/screenshots/android/phone/en/07-reader.png",
-        "inverted": true
+        "screenshot": "/screenshots/android/phone/en/04-reader-saved.png"
       },
       {
         "id": "cf-5",
-        "layout": "device-bottom",
+        "layout": "split-landscape",
         "label": {
-          "en": "YOUR SHELF"
+          "en": "EVERY STORY, FINDABLE"
         },
         "headline": {
-          "en": "Everything you kept,\nin one place."
+          "en": "Find any story\nin seconds."
         },
-        "screenshot": "/screenshots/android/phone/en/08-saved.png"
+        "screenshot": "/screenshots/android/phone/en/05-search.png"
       },
       {
         "id": "cf-6",
+        "layout": "device-top",
+        "label": {
+          "en": "YOUR FEED, YOUR RULES"
+        },
+        "headline": {
+          "en": "Sync, theme, data —\nall yours."
+        },
+        "screenshot": "/screenshots/android/phone/en/06-settings.png"
+      },
+      {
+        "id": "cf-7",
         "layout": "no-device",
         "label": {
           "en": "IN THIS ISSUE"
         },
         "headline": {
-          "en": "Little edi…\nLittle waste."
+          "en": "Fewer feeds.\nBetter reading."
         },
-        "screenshot": "/screenshots/android/phone/en/09-search-saved.png"
-      },
-      {
-        "id": "cf-7",
-        "layout": "split-landscape",
-        "label": {
-          "en": "THE MORNING EDITION"
-        },
-        "headline": {
-          "en": "Quietly curated,\nall day."
-        },
-        "screenshot": "/screenshots/android/phone/en/10-settings.png",
-        "transforms": {
-          "device": {
-            "x": 531.8155199899229,
-            "y": 436.86688522522104,
-            "width": 581,
-            "height": 1258,
-            "rotation": 0,
-            "zIndex": 3
-          }
-        },
-        "inverted": true
+        "screenshot": ""
       },
       {
         "id": "cf-8",
         "layout": "device-bottom",
         "label": {
-          "en": "THE SHELF"
+          "en": "SOURCES, YOURS"
         },
         "headline": {
-          "en": "Sources, kept\nwithout clutter."
+          "en": "Add a feed.\nDrop the rest."
         },
-        "screenshot": "/screenshots/android/phone/en/11-sources.png"
+        "screenshot": "/screenshots/android/phone/en/07-sources.png"
       }
     ],
     "ipad": [
@@ -781,15 +758,15 @@
     "feature-graphic": []
   },
   "scene": {
-    "backdrop": "solid",
-    "span": true,
+    "backdrop": "spotlight",
+    "span": false,
     "decoration": "none",
-    "shadow": 60,
-    "glow": 0,
-    "tilt": 0,
-    "headlineWeight": 400,
-    "headlineScale": 1,
-    "headlineCase": "as-typed",
-    "captionAlign": "left"
+    "shadow": 74,
+    "glow": 58,
+    "tilt": -18,
+    "headlineWeight": 700,
+    "headlineScale": 0.95,
+    "headlineCase": "upper",
+    "captionAlign": "center"
   }
 }
