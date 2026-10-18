@@ -162,6 +162,16 @@ function mergeWithDefaults(parsed: Partial<ProjectState>): ProjectState {
         ]),
       )
     : {};
+  // Backfill decks from the template only while upgrading an older schema: a
+  // current-schema file is authoritative, so a deck the user deleted stays
+  // deleted instead of being resurrected from DEFAULT_PROJECT on every load.
+  const loadedSchema = typeof parsed.schemaVersion === "number" ? parsed.schemaVersion : 0;
+  const backfillDecks = loadedSchema < PROJECT_SCHEMA_VERSION;
+  const mergedSlides = (
+    backfillDecks
+      ? { ...DEFAULT_PROJECT.slidesByDevice, ...slidesByDevice }
+      : slidesByDevice
+  ) as ProjectState["slidesByDevice"];
   const merged: ProjectState = {
     ...DEFAULT_PROJECT,
     ...parsed,
@@ -172,10 +182,7 @@ function mergeWithDefaults(parsed: Partial<ProjectState>): ProjectState {
     ...(scene ? { scene } : { scene: undefined }),
     ...(savedLooks.length > 0 ? { savedLooks } : { savedLooks: undefined }),
     connectedCanvas,
-    slidesByDevice: {
-      ...DEFAULT_PROJECT.slidesByDevice,
-      ...slidesByDevice,
-    } as ProjectState["slidesByDevice"],
+    slidesByDevice: mergedSlides,
   };
   // Duo decks are fixed to one orientation each; keep the project's in step.
   merged.orientation = orientationOf(merged.device, merged.orientation);
