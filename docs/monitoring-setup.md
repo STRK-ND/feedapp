@@ -36,7 +36,7 @@ FirebaseCrashlytics.instance.crash(); // temporary, then remove
 flutter build apk --release --flavor direct `
   --dart-define=SENTRY_DSN=<your-dsn> `
   --dart-define=FLUTTER_ENV=production `
-  --dart-define=RELEASE_VERSION=1.0.0+26
+  --dart-define=RELEASE_VERSION=1.2.0+29
 ```
 
 Everything else (error capture, severity mapping, breadcrumbs) is already
@@ -72,7 +72,7 @@ flutter build apk --release --flavor direct `
   --dart-define=POSTHOG_API_KEY=<key> `
   --dart-define=POSTHOG_HOST=https://us.i.posthog.com `
   --dart-define=FLUTTER_ENV=production `
-  --dart-define=RELEASE_VERSION=1.0.0+26
+  --dart-define=RELEASE_VERSION=1.2.0+29
 ```
 
 Without the flags the builds behave exactly as before — Crashlytics

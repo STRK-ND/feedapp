@@ -5,7 +5,7 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-18
 
 ### Fixed
 - **Feed app bar no longer overflows on narrow screens:** the AppBar `actions` row has no scroll and `mainAxisSize.min`, so its children never shrank — with an unread count the labelled "Mark all as read" button plus the count chip, refresh, search and overflow menu overflowed by up to 192px at 320dp (152px at 360, 100px at 412, 32px at 480; clean from 600dp up). The action and the count chip are now `Flexible` and the label ellipsizes, so the bar always fits. Regression: `test/unit/screens/feed_app_bar_overflow_test.dart` renders the screen at 320/360/412/480/600dp and fails on any `RenderFlex overflowed`
