@@ -1,0 +1,4 @@
+# Flutter's generate:true writes the l10n output with CRLF on this SDK, which
+# turned every `flutter test` / `flutter build` into a full-file diff. The
+# committed files are LF end-to-end; normalize on add so the noise stops.
+lib/l10n/generated/** text eol=lf
