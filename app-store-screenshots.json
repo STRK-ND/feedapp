@@ -521,78 +521,6 @@
         "screenshot": ""
       }
     ],
-    "android-7": [
-      {
-        "id": "cf-7in-0",
-        "layout": "hero",
-        "label": {
-          "en": "THE MORNING EDITION"
-        },
-        "headline": {
-          "en": "A reading room,\nin your pocket."
-        },
-        "screenshot": "/screenshots/android/phone/en/01-feed.png"
-      },
-      {
-        "id": "cf-7in-1",
-        "layout": "device-bottom",
-        "label": {
-          "en": "ONE STORY AT A TIME"
-        },
-        "headline": {
-          "en": "One story.\nIf it becomes a hundred."
-        },
-        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png"
-      },
-      {
-        "id": "cf-7in-2",
-        "layout": "two-devices",
-        "label": {
-          "en": "FOLD THE DAY AWAY"
-        },
-        "headline": {
-          "en": "Mark it read.\nSwipe it away."
-        },
-        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
-        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
-      }
-    ],
-    "android-10": [
-      {
-        "id": "cf-10in-0",
-        "layout": "hero",
-        "label": {
-          "en": "THE MORNING EDITION"
-        },
-        "headline": {
-          "en": "A reading room,\nin your pocket."
-        },
-        "screenshot": "/screenshots/android/phone/en/01-feed.png"
-      },
-      {
-        "id": "cf-10in-1",
-        "layout": "device-bottom",
-        "label": {
-          "en": "ONE STORY AT A TIME"
-        },
-        "headline": {
-          "en": "One story.\nIf it becomes a hundred."
-        },
-        "screenshot": "/screenshots/android/phone/en/04-feed-stack.png"
-      },
-      {
-        "id": "cf-10in-2",
-        "layout": "two-devices",
-        "label": {
-          "en": "FOLD THE DAY AWAY"
-        },
-        "headline": {
-          "en": "Mark it read.\nSwipe it away."
-        },
-        "screenshot": "/screenshots/android/phone/en/05-feed-stack.png",
-        "screenshotSecondary": "/screenshots/android/phone/en/06-feed-stack.png"
-      }
-    ],
     "feature-graphic": [
       {
         "id": "cf-fg",
@@ -850,8 +778,6 @@
     "iphone": [],
     "ipad": [],
     "android": [],
-    "android-7": [],
-    "android-10": [],
     "feature-graphic": []
   },
   "scene": {

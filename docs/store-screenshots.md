@@ -2,7 +2,7 @@
 
 The Next.js + ShadCN editor that produces App Store / Google Play screenshots for Curated Feeds, scaffolded by the `app-store-screenshots` skill and committed here alongside the Flutter app. It is not part of the app build: it has its own `package.json` and runs from the repository root.
 
-Deck state lives in `app-store-screenshots.json`; captures live in `public/screenshots/android/phone/en/`. Curated Feeds ships Android only, so the iOS, Mac, TV, Watch, CarPlay and Duo decks still hold template sample slides with no captures — exporting them is not meaningful.
+Deck state lives in `app-store-screenshots.json`; captures live in `public/screenshots/android/phone/en/`. Curated Feeds ships Android only, so the iOS, Mac, TV, Watch, CarPlay and Duo decks still hold template sample slides with no captures — exporting them is not meaningful. The listing targets the phone deck only and the app has no tablet layout, so the `android-7` / `android-10` decks were removed from the project state (the editor still offers Android tablet options as a device choice).
 
 ## Quick start
 

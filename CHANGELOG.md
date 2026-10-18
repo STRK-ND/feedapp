@@ -5,6 +5,11 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Store screenshot project state:** the `android-7` and `android-10` template decks are removed from `app-store-screenshots.json`. Curated Feeds has no tablet layout, and the decks referenced phone captures, so any export from them would have been letterboxed phone art. The Play listing uses the 8-slide phone deck only; the iOS, Mac, TV, Watch, CarPlay, Duo and feature-graphic decks still hold template samples.
+
 ## [1.2.0] - 2026-10-18
 
 ### Fixed
