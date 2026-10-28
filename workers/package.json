@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "lint": "node --check feed-worker.js"
+    "lint": "node --check feed-worker.js",
+    "dev": "node dev-server.mjs",
+    "contract": "bash ../tool/api-contract.sh"
   }
 }
