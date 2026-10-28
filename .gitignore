@@ -86,22 +86,8 @@ _build.txt
 _curate_ss.png
 _ss*.png
 
-# --- App Store / Play screenshot editor (Next.js scaffold in this repo) ------
-# The editor writes these; they are reproducible, so keep them out of git.
-node_modules
-.next
-out
-*.tsbuildinfo
-next-env.d.ts
-.env*.local
-
-# Uploaded screenshots belong to the generated project: commit them alongside
-# app-store-screenshots.json so decks remain reproducible after cloning.
-
-# Fonts imported from the editor toolbar are user assets too (and font licences
-# often forbid redistributing them), so keep them out of the template as well.
-public/fonts/imported/*
-!public/fonts/imported/.gitkeep
-
-# Tester Army output
-.e2e/
+# --- Android device e2e suite (e2e/ + @e2e-dev/mobile) ----------------------
+# The suite installs a build, records traces and screenshots on failures.
+e2e/node_modules/
+e2e/.e2e/
+e2e/e2e.local.config.ts

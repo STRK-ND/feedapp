@@ -10,14 +10,13 @@ Windows, or web builds.
 
 ## Store screenshots
 
-The Google Play / App Store listing art is produced by a Next.js editor
-living in this repository (see [`docs/store-screenshots.md`](docs/store-screenshots.md)).
-It has its own `package.json` and does not affect the Flutter build.
+The Google Play listing art is produced from `logo.png` by
+`python3 tool/generate_brand_assets.py` (see `docs/releasing.md`).
 
-```bash
-bun install
-bun dev       # http://localhost:3000
-```
+## End-to-end tests
+
+The Android app's device tests live in [`e2e/`](e2e/) and run on the e2e
+mobile engine (see [`docs/testing/mobile-e2e.md`](docs/testing/mobile-e2e.md)).
 
 ## License
 
