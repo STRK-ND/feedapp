@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../services/worker_errors.dart';
+
 /// App error severity levels
 enum ErrorSeverity { low, medium, high, critical }
 
@@ -118,6 +120,12 @@ class ErrorHandler {
   /// Get user-friendly message for common errors
   static String getUserMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
+
+    // Checked before the status-code rules below: the worker's busy feed is
+    // transient and named, so it must not be flattened into "Server error".
+    if (error is WorkerBusyException) {
+      return 'Feed is refreshing. Try again in a moment.';
+    }
 
     if (errorString.contains('network') ||
         errorString.contains('socket') ||

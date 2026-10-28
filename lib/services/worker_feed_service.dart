@@ -6,17 +6,7 @@ import '../models/paginated_response.dart';
 import '../models/filter_params.dart';
 import '../utils/constants.dart';
 import '../utils/error_handler.dart';
-
-/// Rate limit error from Worker API
-class RateLimitError implements Exception {
-  final String message;
-  final Duration? retryAfter;
-
-  RateLimitError({this.message = 'Rate limit exceeded', this.retryAfter});
-
-  @override
-  String toString() => 'RateLimitError: $message';
-}
+import 'worker_errors.dart';
 
 /// Worker Feed Service for fetching articles from Cloudflare Worker API
 /// Now uses dependency injection for better testability
@@ -25,6 +15,30 @@ class WorkerFeedService {
 
   WorkerFeedService({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
+
+  /// The worker answers a mid-refresh 503 with `{"error":"busy"}`; anything
+  /// else on 503 is a real server fault and must not be retried as transient.
+  static bool _isBusy(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> && decoded['error'] == 'busy';
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// The worker's own explanation ("Feed is refreshing") when it sent one.
+  static String _workerMessage(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic> && decoded['message'] is String) {
+        return decoded['message'] as String;
+      }
+    } on FormatException {
+      // No reason offered; the default wording stands.
+    }
+    return 'Feed is refreshing';
+  }
 
   /// Fetch articles with pagination and filtering
   /// Includes retry with exponential backoff for rate limit (429) responses
@@ -101,6 +115,24 @@ class WorkerFeedService {
           throw RateLimitError(
             message: 'Rate limit exceeded. Please try again later.',
           );
+        } else if (response.statusCode == 503 && _isBusy(response.body)) {
+          // The feed is refreshing server-side. It clears within the refresh
+          // window, so back off and retry rather than failing the pull.
+          if (attempt < maxRetries) {
+            final delayMs = baseDelayMs * (1 << attempt);
+            debugPrint(
+              '[Worker] Feed busy (503), retry ${attempt + 1}/$maxRetries in ${delayMs}ms',
+            );
+            await Future.delayed(Duration(milliseconds: delayMs));
+            continue;
+          }
+          unawaited(
+            ErrorHandler.logError(
+              'Worker API still busy after $maxRetries retries',
+              severity: ErrorSeverity.medium,
+            ),
+          );
+          throw WorkerBusyException(message: _workerMessage(response.body));
         } else {
           unawaited(
             ErrorHandler.logError(
