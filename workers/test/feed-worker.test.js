@@ -22,6 +22,7 @@ import {
   applyFilters,
   consumeRate,
   matchingTokens,
+  resetRateMemory,
   rowMatchesCategories,
 } from '../feed-worker.js';
 import worker from '../feed-worker.js';
@@ -70,6 +71,11 @@ const itemOpts = {
   authorTag: 'author',
   fullContentTag: 'content:encoded',
 };
+
+// The limiter's per-isolate counter is module state, and tests build a fresh
+// env each time. Reset it so the same wall-clock window in two tests does not
+// leak a full bucket into the second.
+test.beforeEach(() => { resetRateMemory(); });
 
 test('parseRss parses RSS fixture (2 items) and Atom fixture (2 entries)', () => {
   const source = SOURCES[0];
@@ -309,6 +315,26 @@ test('consumeRate allows up to limit then blocks within the window', async () =>
 
   // Different key is unaffected
   assert.equal(await consumeRate(fakeEnv, 'art:5.6.7.8', 5, 60), true);
+});
+
+test('consumeRate keeps a repeated caller off the KV write path', async () => {
+  resetRateMemory();
+  const gets = { n: 0 };
+  const puts = { n: 0 };
+  const fakeEnv = {
+    ARTICLES_KV: {
+      get: async (key, type) => { gets.n++; return type === 'json' && key.includes('rl:') ? { n: 0 } : null; },
+      put: async () => { puts.n++; },
+    },
+  };
+
+  // Ten calls from one caller, all inside the limit. The limiter counts the
+  // first call in KV (so a cold isolate can learn an earlier count) and then
+  // serves the rest from memory: the read path pays no KV write per request.
+  for (let i = 0; i < 10; i++) assert.equal(await consumeRate(fakeEnv, 'art:9.9.9.9', 120, 60), true);
+
+  assert.equal(gets.n, 1, 'only the first call reads KV');
+  assert.equal(puts.n, 1, 'only the first call writes KV');
 });
 
 // ---------------------------------------------------------------------------

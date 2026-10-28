@@ -184,16 +184,51 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
+// Per-isolate fast path for the rate limiter. The KV counter below was
+// already advisory — no compare-and-swap, ~10% burst overshoot measured —
+// so counting per isolate trades a wider burst ceiling for removing a KV
+// read and a KV write from every single request (the write was the largest
+// part of the read path's cost). Cloudflare keeps one isolate hot per colo,
+// so an ordinary client still lands in one bucket; a caller who could
+// deliberately spread requests across isolates sees a higher effective
+// ceiling, which these generous limits absorb. If that ever stops being
+// true, switch to a Rate Limiting binding and delete this.
+const RATE_MEMORY = new Map();
+const RATE_MEMORY_MAX = 1024;
+// Flush to KV this often, and on window roll, so a cold isolate still learns
+// the count an earlier one built rather than restarting from zero.
+const RATE_FLUSH_EVERY = 16;
+
+function ratePrune(win) {
+  if (RATE_MEMORY.size < RATE_MEMORY_MAX) return;
+  const stale = [...RATE_MEMORY.keys()].filter(k => Number(k.split(':').pop()) !== win);
+  for (const k of stale) RATE_MEMORY.delete(k);
+  // Still full (one huge window): drop the oldest insertion.
+  if (RATE_MEMORY.size >= RATE_MEMORY_MAX) {
+    for (const k of RATE_MEMORY.keys()) { RATE_MEMORY.delete(k); break; }
+  }
+}
+
 async function consumeRate(env, key, limit, windowSec) {
-  // ponytail/L-1: KV has no compare-and-swap, so this read-modify-write
-  // counter is advisory under concurrent burst (measured ~10% overshoot:
-  // 67/300 concurrent requests passed a 60/min limit). Do not rely on it
-  // as a hard control; use a Rate Limiting binding if that ever matters.
   const win = Math.floor(Date.now() / (windowSec * 1000));
   const k = `rl:${key}:${win}`;
+  ratePrune(win);
+
+  const seen = RATE_MEMORY.get(k);
+  if (seen !== undefined) {
+    if (seen.n >= limit) return false;
+    seen.n += 1;
+    if (seen.n === 1 || seen.n % RATE_FLUSH_EVERY === 0) {
+      await env.ARTICLES_KV.put(k, JSON.stringify({ n: seen.n }), { expirationTtl: windowSec * 2 });
+    }
+    return true;
+  }
+
   const cur = await env.ARTICLES_KV.get(k, 'json');
-  if (cur && cur.n >= limit) return false;
-  await env.ARTICLES_KV.put(k, JSON.stringify({ n: (cur?.n ?? 0) + 1 }), { expirationTtl: windowSec * 2 });
+  const n = typeof cur?.n === 'number' ? cur.n : 0;
+  if (n >= limit) return false;
+  RATE_MEMORY.set(k, { n: n + 1 });
+  await env.ARTICLES_KV.put(k, JSON.stringify({ n: n + 1 }), { expirationTtl: windowSec * 2 });
   return true;
 }
 
@@ -992,4 +1027,8 @@ function cors(response, { etag } = {}) {
   return r;
 }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex };
+// Test seam: the per-isolate counter is module state, so a test that builds a
+// fresh env but runs inside the same rate window must be able to start clean.
+function resetRateMemory() { RATE_MEMORY.clear(); }
+
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };
