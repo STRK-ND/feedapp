@@ -61,12 +61,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     await _settingsService.initializeDefaults();
 
-    // Batch all storage reads in parallel. Theme/reader/edition/body
-    // font/etc. live in SettingsNotifier — we don't need to mirror them
-    // here.
+    // Batch all reads in parallel. Theme/reader/edition/body font/etc.
+    // live in SettingsNotifier — we don't need to mirror them here.
+    // The two counts come from the database's own row count: this screen
+    // needs how many rows exist, not their contents, so decoding every
+    // multi-KB payload here bought one integer per table.
     final results = await Future.wait([
-      _storageService.loadArticles(),
-      _storageService.loadSavedArticles(),
+      _storageService.countArticles(),
+      _storageService.countSavedArticles(),
       _settingsService.getInAppNotificationsEnabled(),
       _settingsService.getNotificationsEnabled(),
       _settingsService.getNewArticleNotifications(),
@@ -75,8 +77,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (mounted) {
       setState(() {
-        _cachedArticles = (results[0] as List).length;
-        _savedArticles = (results[1] as List).length;
+        _cachedArticles = results[0] as int;
+        _savedArticles = results[1] as int;
         _inAppNotifsEnabled = results[2] as bool;
         _notificationsEnabled = results[3] as bool;
         _newArticleNotifs = results[4] as bool;
@@ -660,9 +662,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outline),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: _divideTiles(children),
+      // The card's own fill sits between its tiles and the screen-level
+      // Material. ListTile paints its ink splash on the nearest Material
+      // ancestor, which is then *below* this translucent fill — so every
+      // interactive row answered the tap but showed the user nothing
+      // (Flutter: "ListTile background color or ink splashes may be
+      // invisible"). A transparent Material inside the card becomes that
+      // nearest ancestor, so the splash paints above the fill and inside the
+      // rounded card. Reader controls use the same shape for the same reason.
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _divideTiles(children),
+        ),
       ),
     );
   }

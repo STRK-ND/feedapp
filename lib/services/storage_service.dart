@@ -51,6 +51,30 @@ class StorageService {
     }
   }
 
+  /// Row count of the cached feed. Counts storage, not a snapshot: the
+  /// repository's in-memory list is capped at the user's `maxArticles`,
+  /// so its length under-reports the rows a clear actually removes.
+  Future<int> countArticles() async {
+    try {
+      return await _database.countArticles();
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Failed to count articles', error: e));
+      return 0;
+    }
+  }
+
+  /// Row count of the saved list.
+  Future<int> countSavedArticles() async {
+    try {
+      return await _database.countSavedArticles();
+    } catch (e) {
+      unawaited(
+        ErrorHandler.logError('Failed to count saved articles', error: e),
+      );
+      return 0;
+    }
+  }
+
   /// Save saved articles
   Future<void> saveSavedArticles(List<Article> articles) async {
     try {

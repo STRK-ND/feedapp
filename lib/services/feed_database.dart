@@ -175,6 +175,39 @@ class FeedDatabase {
 
   Future<List<Article>> loadArticles() => _loadAll(_articlesTable);
 
+  /// Row count of the cached feed, straight from the index.
+  ///
+  /// The Settings "Clear cache" row and its confirmation dialog only need
+  /// the number of rows the delete will remove. Loading and JSON-decoding
+  /// every payload just to take `.length` spent the entire decode budget
+  /// (each row's `fullContent` is multi-KB) on one integer.
+  Future<int> countArticles() async {
+    try {
+      final db = await _open();
+      return Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM $_articlesTable'),
+          ) ??
+          0;
+    } catch (e) {
+      debugPrint('[FeedDatabase] countArticles failed: $e');
+      return 0;
+    }
+  }
+
+  /// Row count of the saved list — same projection, different need.
+  Future<int> countSavedArticles() async {
+    try {
+      final db = await _open();
+      return Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM $_savedTable'),
+          ) ??
+          0;
+    } catch (e) {
+      debugPrint('[FeedDatabase] countSavedArticles failed: $e');
+      return 0;
+    }
+  }
+
   /// Replace or insert one row in the articles table. The triage hot
   /// path: read/save flags live inside the payload, so a flag change is
   /// a single-row rewrite instead of replacing up to

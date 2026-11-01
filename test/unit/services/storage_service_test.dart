@@ -126,6 +126,75 @@ void main() {
       });
     });
 
+    group('countArticles / countSavedArticles', () {
+      // The Settings "Clear cache" row and its confirmation dialog need
+      // only how many rows exist. Counting storage rather than decoding
+      // every payload is behaviour that must be observable: the count has
+      // to be exact and independent of parseability, since the dialog
+      // promises to delete exactly that many rows.
+      test('counts stored rows without decoding their payloads', () async {
+        await service.saveArticles([
+          _makeArticle(id: '1', title: 'One'),
+          _makeArticle(id: '2', title: 'Two'),
+        ]);
+
+        expect(await service.countArticles(), 2);
+        expect(await service.countSavedArticles(), 0);
+      });
+
+      test('count stays exact when a payload is undecodable', () async {
+        final db = await openMemoryDb();
+        final svc = StorageService(
+          storage: mockStorage,
+          database: FeedDatabase(db: db),
+        );
+        await svc.saveArticles([_makeArticle(id: 'good-1', title: 'Good')]);
+        // A row that loadArticles() would skip.
+        await db.insert('articles', {
+          'id': 'bad',
+          'pub_date': 0,
+          'payload': '{"id":"bad","title":123}',
+        });
+
+        // loadArticles() can only see the good row; the clear-cache
+        // dialog deletes both.
+        expect((await svc.loadArticles()).length, 1);
+        expect(await svc.countArticles(), 2);
+      });
+
+      test('saved counts follow the saved table', () async {
+        await service.saveSavedArticles([
+          _makeArticle(id: 's1', title: 'Saved one', isSaved: true),
+          _makeArticle(id: 's2', title: 'Saved two', isSaved: true),
+        ]);
+
+        expect(await service.countSavedArticles(), 2);
+        expect(await service.countArticles(), 0);
+      });
+
+      test('empty tables count zero', () async {
+        expect(await service.countArticles(), 0);
+        expect(await service.countSavedArticles(), 0);
+      });
+
+      test('clearFeedCache drops the count to zero', () async {
+        await service.saveArticles([
+          _makeArticle(id: '1', title: 'One'),
+          _makeArticle(id: '2', title: 'Two'),
+        ]);
+        await service.saveSavedArticles([
+          _makeArticle(id: 's1', title: 'Saved', isSaved: true),
+        ]);
+
+        // "Clear cache" is targeted: saved articles are user data and
+        // must survive.
+        await service.clearFeedCache();
+
+        expect(await service.countArticles(), 0);
+        expect(await service.countSavedArticles(), 1);
+      });
+    });
+
     group('corruption recovery', () {
       test('skips corrupt payload rows instead of losing the list', () async {
         final db = await openMemoryDb();

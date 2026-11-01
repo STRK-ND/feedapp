@@ -124,6 +124,9 @@ class _MemStorageService extends StorageService {
   Future<List<Article>> loadArticles() async => List.of(_articles);
 
   @override
+  Future<int> countArticles() async => _articles.length;
+
+  @override
   Future<void> saveSavedArticles(List<Article> articles) async {
     _saved
       ..clear()
@@ -132,6 +135,9 @@ class _MemStorageService extends StorageService {
 
   @override
   Future<List<Article>> loadSavedArticles() async => List.of(_saved);
+
+  @override
+  Future<int> countSavedArticles() async => _saved.length;
 }
 
 Future<void> _pumpFeed(

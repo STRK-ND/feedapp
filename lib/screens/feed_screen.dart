@@ -135,7 +135,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     // cross-device changes). Guarded: tests run without the sync service.
     if (getIt.isRegistered<CloudSyncService>()) {
       _cloudSyncSub = getIt<CloudSyncService>().articlesRestored.listen((_) {
-        if (mounted) unawaited(_loadData());
+        // Cloud sync writes storage directly, so the repository's process
+        // snapshot is stale by the time this fires: revalidate it.
+        if (mounted) unawaited(_loadData(forceRefresh: true));
       });
     }
   }
@@ -264,25 +266,40 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     });
   }
 
-  Future<void> _loadData() async {
+  /// Load the local feed. [forceRefresh] revalidates the repository's
+  /// process snapshot against storage — the cloud-sync restore path uses
+  /// it, because that path writes storage underneath the cache.
+  Future<void> _loadData({bool forceRefresh = false}) async {
     try {
       final results = await Future.wait([
         _settingsService.getMaxArticles(),
-        _storage.loadArticles(),
-        _storage.loadSavedArticles(),
+        _articleRepository.fetchAllArticles(forceRefresh: forceRefresh),
+        _articleRepository.fetchSavedArticles(forceRefresh: forceRefresh),
         _storage.loadLastRefreshTime(),
       ]);
 
       final maxArticles = results[0] as int;
-      final articles = results[1] as List<Article>;
-      final savedArticles = results[2] as List<Article>;
+      final articles = results[1] as Result<List<Article>>;
+      final savedResult = results[2] as Result<List<Article>>;
       final lastRefresh = results[3] as DateTime?;
+
+      // A failed local read keeps the previous list rather than blanking
+      // it — the cached feed is still on screen while the error surfaces.
+      final loadedArticles = articles.isSuccess
+          ? (articles.data ?? <Article>[])
+          : _articles;
+      final loadedSaved = savedResult.isSuccess
+          ? (savedResult.data ?? <Article>[])
+          : _savedArticles;
 
       if (mounted) {
         setState(() {
-          _articles = articles.take(maxArticles).toList();
-          _displayedArticles = List.from(_articles);
-          _savedArticles = savedArticles;
+          _articles = loadedArticles.take(maxArticles).toList();
+          // Same interpreter as the refresh path: a cold launch must not
+          // bypass the shared filter (a source/category/search selection
+          // from a previous session would otherwise leak through).
+          _displayedArticles = _getFilteredArticles();
+          _savedArticles = loadedSaved;
           _lastRefreshTime = lastRefresh;
         });
       }
@@ -896,10 +913,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Future<void> _refreshSavedArticles() async {
-    final savedArticles = await _storage.loadSavedArticles();
+    // This is an explicit user "re-read storage" gesture, not a snapshot
+    // reuse: force the repository to revalidate its local set so the
+    // snapshot it holds afterwards matches what this read returned.
+    final result = await _articleRepository.fetchSavedArticles(
+      forceRefresh: true,
+    );
     if (mounted) {
       setState(() {
-        _savedArticles = savedArticles;
+        _savedArticles = result.data ?? <Article>[];
       });
     }
   }

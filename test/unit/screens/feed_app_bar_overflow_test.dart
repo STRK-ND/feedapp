@@ -114,23 +114,31 @@ class _MemStorageService extends StorageService {
   Future<void> saveArticles(List<Article> articles) async {}
 
   @override
-  Future<List<Article>> loadArticles() async =>
-      List.generate(30, (i) => Article(
-        id: 'unread-$i',
-        title: 'Unread headline number $i',
-        description: 'Body copy $i',
-        fullContent: 'Content $i',
-        link: 'https://example.com/a/$i',
-        sourceId: 'src',
-        sourceName: 'Source',
-        pubDate: DateTime.now().subtract(Duration(minutes: i)),
-      ));
+  Future<List<Article>> loadArticles() async => List.generate(
+    30,
+    (i) => Article(
+      id: 'unread-$i',
+      title: 'Unread headline number $i',
+      description: 'Body copy $i',
+      fullContent: 'Content $i',
+      link: 'https://example.com/a/$i',
+      sourceId: 'src',
+      sourceName: 'Source',
+      pubDate: DateTime.now().subtract(Duration(minutes: i)),
+    ),
+  );
+
+  @override
+  Future<int> countArticles() async => 30;
 
   @override
   Future<void> saveSavedArticles(List<Article> articles) async {}
 
   @override
   Future<List<Article>> loadSavedArticles() async => const [];
+
+  @override
+  Future<int> countSavedArticles() async => 0;
 
   @override
   Future<void> saveLastRefreshTime(DateTime? time) async {}

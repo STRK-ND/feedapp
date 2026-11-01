@@ -225,13 +225,22 @@ class ArticleRepository {
     }
   }
 
-  /// Fetch saved articles
-  Future<Result<List<Article>>> fetchSavedArticles() async {
+  /// Fetch saved articles.
+  ///
+  /// [forceRefresh] bypasses the process snapshot and re-reads storage.
+  /// The cold-launch path leaves it false: splash already preloaded the
+  /// validated set, and re-reading here would decode the whole
+  /// `saved_articles` table a second time for one launch. Cloud-sync
+  /// restores pass true — they write storage underneath this cache, so
+  /// the snapshot must be revalidated, not reused.
+  Future<Result<List<Article>>> fetchSavedArticles({
+    bool forceRefresh = false,
+  }) async {
     try {
       debugPrint('[Repository] Fetching saved articles');
 
       final cached = _cachedSavedArticles;
-      if (cached != null) {
+      if (!forceRefresh && cached != null) {
         return Result.success(cached);
       }
 
