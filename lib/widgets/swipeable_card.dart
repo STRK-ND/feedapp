@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 
 /// Smooth swipeable card widget for article cards.
 /// Low swipe threshold (~80px) for easy, fluid swiping.
@@ -112,11 +112,43 @@ class _SwipeableCardState extends State<SwipeableCard>
   }
 
   void _animateOut() {
+    final oldAnimation = _animation;
+    final oldListener = _animationListener;
+
+    final targetX = _position.dx >= 0 ? 600.0 : -600.0;
+    final targetOffset = Offset(targetX, _position.dy);
+    final targetRotation = targetX * _rotationFactor;
+
+    _animation = Tween<Offset>(
+      begin: _position,
+      end: targetOffset,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _rotationAnimation = Tween<double>(
+      begin: _rotation,
+      end: targetRotation,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    _controller.reset();
+
+    if (oldAnimation != null && oldListener != null) {
+      oldAnimation.removeListener(oldListener);
+    }
+
+    _animationListener = () {
+      if (mounted) {
+        setState(() {
+          _position = _animation!.value;
+          _rotation = _rotationAnimation!.value;
+        });
+      }
+    };
+
+    _animation!.addListener(_animationListener!);
+
     setState(() {
       _isAnimatingOut = true;
     });
 
-    _controller.reset();
     _controller.forward();
   }
 
@@ -179,7 +211,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                       alpha: _position.dx < 0 ? _position.dx.abs() / 400 : 0,
                     ),
                     borderRadius: BorderRadius.circular(
-                      AppCardStyles.cardRadius,
+                      AppRadius.card,
                     ),
                   ),
                   child: _position.dx < -40
@@ -216,7 +248,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                       alpha: _position.dx > 0 ? (_position.dx / 400) * 0.12 : 0,
                     ),
                     borderRadius: BorderRadius.circular(
-                      AppCardStyles.cardRadius,
+                      AppRadius.card,
                     ),
                   ),
                   child: _position.dx > 40

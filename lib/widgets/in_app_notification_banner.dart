@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/in_app_notification.dart';
 import '../services/in_app_notification_manager.dart';
+import '../utils/design_tokens.dart';
 
 /// Widget that displays an in-app notification banner
 class InAppNotificationBanner extends StatefulWidget {
@@ -125,28 +126,25 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                   ),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                     boxShadow: [
                       BoxShadow(
-                        color: type.backgroundColor.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                        spreadRadius: -4,
-                      ),
-                      BoxShadow(
-                        color: type.backgroundColor.withValues(alpha: 0.10),
-                        blurRadius: 30,
-                        offset: const Offset(0, 12),
-                        spreadRadius: -8,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.black.withValues(alpha: 0.4)
+                            : colorScheme.shadow.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                     border: Border.all(
-                      color: type.backgroundColor.withValues(alpha: 0.2),
-                      width: 1,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.ruleOnGround
+                          : colorScheme.outlineVariant,
+                      width: 0.5,
                     ),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [

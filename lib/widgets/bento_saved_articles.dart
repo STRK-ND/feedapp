@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../providers/settings_notifier.dart';
+import '../utils/article_view.dart';
 import '../utils/design_tokens.dart';
 import 'section_eyebrow.dart';
 
@@ -87,13 +88,30 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
         final article = g.items[i];
         final globalIndex = widget.articles.indexOf(article);
         items.add(
-          _SavedRow(
-            article: article,
-            onTap: () => widget.onTap(globalIndex),
-            onLongPress: () {
-              HapticFeedback.mediumImpact();
-              widget.onToggleSave(globalIndex);
+          Dismissible(
+            key: Key('saved_${article.id}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s5),
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.15),
+              child: Icon(
+                Icons.delete_outline_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+            onDismissed: (_) {
+              unawaited(HapticFeedback.mediumImpact());
+              widget.onDismiss(globalIndex);
             },
+            child: _SavedRow(
+              article: article,
+              onTap: () => widget.onTap(globalIndex),
+              onLongPress: () {
+                HapticFeedback.mediumImpact();
+                widget.onToggleSave(globalIndex);
+              },
+            ),
           ),
         );
       }
@@ -102,7 +120,9 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     return Consumer<SettingsNotifier>(
       builder: (context, settings, _) {
         return ListView(
-          physics: const BouncingScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           padding: const EdgeInsets.only(bottom: AppSpacing.s16),
           children: items,
         );
@@ -114,48 +134,60 @@ class _BentoSavedArticlesGridState extends State<BentoSavedArticlesGrid>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
     final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s6,
-        vertical: AppSpacing.s16,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  width: 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s6,
+                vertical: AppSpacing.s16,
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.bookmark_outline_rounded,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s5),
+                    Text(
+                      AppLocalizations.of(context).savedEmptyTitle,
+                      style: AppType.headlineSmall(color: ink),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.s3),
+                    Text(
+                      AppLocalizations.of(context).savedEmptyHint,
+                      style: AppType.bodyLarge(color: soft),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.bookmark_outline_rounded,
-                color: AppColors.primary,
-                size: 28,
-              ),
             ),
-            const SizedBox(height: AppSpacing.s5),
-            Text(
-              AppLocalizations.of(context).savedEmptyTitle,
-              style: AppType.headlineSmall(color: ink),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.s3),
-            Text(
-              AppLocalizations.of(context).savedEmptyHint,
-              style: AppType.bodyLarge(color: soft),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -244,7 +276,7 @@ class _SavedRow extends StatelessWidget {
     final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
     final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
     final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
-    final sourceColor = _sourceColor(article.sourceColor);
+    final sourceColor = article.accent;
 
     return Semantics(
       button: true,
@@ -289,7 +321,7 @@ class _SavedRow extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s2),
                   Text(
-                    _formatDateline(article.pubDate),
+                    article.dateline,
                     style: AppType.monoDateline(color: soft),
                   ),
                 ],
@@ -323,25 +355,4 @@ class _SavedRow extends StatelessWidget {
   }
 }
 
-/// Trim to "08/12 · 14:03" / "Yesterday" / "5D AGO" / "DD/MM/YY".
-String _formatDateline(DateTime dt) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final dtDay = DateTime(dt.year, dt.month, dt.day);
-  final diff = today.difference(dtDay).inDays;
-  if (diff == 0) {
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-  if (diff == 1) return 'YESTERDAY';
-  if (diff < 7) return '${diff}D AGO';
-  return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year % 100).toString().padLeft(2, '0')}';
-}
 
-Color _sourceColor(String? hex) {
-  if (hex == null || hex.isEmpty) return AppColors.primary;
-  final cleaned = hex.replaceFirst('#', '');
-  if (cleaned.length == 6) {
-    return Color(int.parse('0xFF$cleaned'));
-  }
-  return AppColors.primary;
-}

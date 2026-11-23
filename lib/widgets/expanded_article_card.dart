@@ -14,7 +14,7 @@ import '../services/tts_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
 import '../services/analytics_service.dart';
-import '../utils/constants.dart' hide AppColors;
+import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
 import '../utils/reader_theme.dart';
@@ -255,8 +255,11 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         _isLoadingContent = false;
       });
 
-      // Cache the fetched content in the article
-      widget.article.fetchedFullContent = content;
+      // Cache the fetched content only if it's actual content
+      if (!content.startsWith('Unable to extract') &&
+          !content.startsWith('Failed to load')) {
+        widget.article.fetchedFullContent = content;
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -285,8 +288,8 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
         // Decode cap mirrors card_stack.dart — full-resolution heroes
         // cost tens of MB of bitmap memory each.
         memCacheWidth: 800,
-        fadeInDuration: AppCardStyles.fadeInDuration,
-        fadeOutDuration: AppCardStyles.fadeInDuration,
+        fadeInDuration: AppMotion.base,
+        fadeOutDuration: AppMotion.base,
         placeholder: (context, url) =>
             _buildImagePlaceholder(height, borderRadius),
         errorWidget: (context, url, error) =>
@@ -345,11 +348,13 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
 
   @override
   Widget build(BuildContext context) {
-    final registry = getIt<RssFeedService>();
-    final source =
-        registry.getSourceById(widget.article.sourceId) ??
-        registry.sources.first;
-    final sourceColor = source.color;
+    final registry = getIt.isRegistered<RssFeedService>()
+        ? getIt<RssFeedService>()
+        : null;
+    final source = registry?.getSourceById(widget.article.sourceId);
+    final sourceColor = widget.article.accent;
+    final sourceName = source?.name ?? widget.article.sourceName;
+    final sourceIcon = source?.icon ?? Icons.rss_feed_rounded;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Consumer<SettingsNotifier>(
@@ -394,7 +399,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                   backgroundColor: color.withValues(alpha: 0.08),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(
-                      AppCardStyles.buttonRadius,
+                      AppRadius.button,
                     ),
                   ),
                 ),
@@ -458,14 +463,14 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    source.icon,
+                                    sourceIcon,
                                     size: 14,
                                     color: sourceColor,
                                   ),
                                   const SizedBox(width: 8),
                                   Flexible(
                                     child: Text(
-                                      source.name,
+                                      sourceName,
                                       style: GoogleFonts.dmSans(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
@@ -479,68 +484,79 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               ),
                             ),
                           ),
-                          Row(
-                            children: [
-                              buildHeaderButton(
-                                icon: _ttsIcon,
-                                onPressed: _onListenTap,
-                                color: sourceColor,
-                                label: _ttsLabel,
-                              ),
-                              buildHeaderButton(
-                                icon: Icons.open_in_new_rounded,
-                                onPressed: () async {
-                                  final uri = Uri.parse(widget.article.link);
-                                  // Scheme allowlist: the link comes from
-                                  // feed content, so only real web URLs may
-                                  // leave the app (blocks intent:// and
-                                  // other app-handoff schemes).
-                                  if (uri.scheme != 'http' &&
-                                      uri.scheme != 'https') {
-                                    return;
-                                  }
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  }
-                                },
-                                color: sourceColor,
-                                label: 'Open in browser',
-                              ),
-                              buildHeaderButton(
-                                icon: Icons.share_rounded,
-                                onPressed: () {
-                                  SharePlus.instance.share(
-                                    ShareParams(
-                                      text:
-                                          '${widget.article.title}\n\n${widget.article.link}',
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_tts != null)
+                                    buildHeaderButton(
+                                      icon: _ttsIcon,
+                                      onPressed: _onListenTap,
+                                      color: sourceColor,
+                                      label: _ttsLabel,
                                     ),
-                                  );
-                                },
-                                color: sourceColor,
-                                label: 'Share article',
+                                  buildHeaderButton(
+                                    icon: Icons.open_in_new_rounded,
+                                    onPressed: () async {
+                                      final uri = Uri.parse(widget.article.link);
+                                      // Scheme allowlist: the link comes from
+                                      // feed content, so only real web URLs may
+                                      // leave the app (blocks intent:// and
+                                      // other app-handoff schemes).
+                                      if (uri.scheme != 'http' &&
+                                          uri.scheme != 'https') {
+                                        return;
+                                      }
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(
+                                          uri,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      }
+                                    },
+                                    color: sourceColor,
+                                    label: 'Open in browser',
+                                  ),
+                                  buildHeaderButton(
+                                    icon: Icons.share_rounded,
+                                    onPressed: () {
+                                      SharePlus.instance.share(
+                                        ShareParams(
+                                          text:
+                                              '${widget.article.title}\n\n${widget.article.link}',
+                                        ),
+                                      );
+                                    },
+                                    color: sourceColor,
+                                    label: 'Share article',
+                                  ),
+                                  buildHeaderButton(
+                                    icon: widget.article.isSaved
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    onPressed: () {
+                                      widget.onToggleSave();
+                                      setState(() {});
+                                    },
+                                    color: widget.article.isSaved
+                                        ? colorScheme.error
+                                        : sourceColor,
+                                    label: widget.article.isSaved
+                                        ? 'Saved'
+                                        : 'Save',
+                                  ),
+                                  buildHeaderButton(
+                                    icon: Icons.close_rounded,
+                                    onPressed: widget.onClose,
+                                    color: palette.soft,
+                                    label: 'Close',
+                                  ),
+                                ],
                               ),
-                              buildHeaderButton(
-                                icon: widget.article.isSaved
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                onPressed: widget.onToggleSave,
-                                color: widget.article.isSaved
-                                    ? colorScheme.error
-                                    : sourceColor,
-                                label: widget.article.isSaved
-                                    ? 'Saved'
-                                    : 'Save',
-                              ),
-                              buildHeaderButton(
-                                icon: Icons.close_rounded,
-                                onPressed: widget.onClose,
-                                color: palette.soft,
-                                label: 'Close',
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -553,7 +569,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: _widenMeasure ? 720 : 960,
+                              maxWidth: _widenMeasure ? 840 : 640,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,7 +583,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                     child: _buildFadeInImage(
                                       widget.article.imageUrl!,
                                       220,
-                                      AppCardStyles.imageRadius,
+                                      AppRadius.image,
                                     ),
                                   ),
                                 if (showImages &&
@@ -678,56 +694,79 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
-                                SelectableText(
-                                  widget.article.description,
-                                  style: _bodyStyle().copyWith(
-                                    fontSize: _fontSize,
-                                    color: palette.text,
-                                    height: _lineHeight,
-                                    letterSpacing: 0.1,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                if (_isLoadingContent)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 40,
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        children: [
-                                          CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  sourceColor,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            AppLocalizations.of(
-                                              context,
-                                            ).loadingFullArticle,
-                                            style: GoogleFonts.dmSans(
-                                              fontSize: 14,
-                                              color: palette.soft,
+                                Builder(
+                                  builder: (context) {
+                                    final hasFullContent = _fullContent != null &&
+                                        _fullContent!.trim().isNotEmpty;
+                                    final isContentIdentical = hasFullContent &&
+                                        _fullContent!.trim() ==
+                                            widget.article.description.trim();
+
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isContentIdentical &&
+                                            widget.article.description.isNotEmpty) ...[
+                                          SelectableText(
+                                            widget.article.description,
+                                            style: _bodyStyle().copyWith(
+                                              fontSize: _fontSize,
+                                              color: palette.text,
+                                              height: _lineHeight,
+                                              letterSpacing: 0.1,
                                             ),
                                           ),
+                                          const SizedBox(height: 24),
                                         ],
-                                      ),
-                                    ),
-                                  )
-                                else if (_fullContent != null &&
-                                    _fullContent!.isNotEmpty)
-                                  SelectableText(
-                                    _fullContent!,
-                                    style: _bodyStyle().copyWith(
-                                      fontSize: _fontSize - 1,
-                                      color: palette.soft,
-                                      height: _lineHeight + 0.1,
-                                      letterSpacing: 0.05,
-                                    ),
-                                  ),
+                                        if (_isLoadingContent)
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 40,
+                                            ),
+                                            child: Center(
+                                              child: Column(
+                                                children: [
+                                                  CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<Color>(
+                                                          sourceColor,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    ).loadingFullArticle,
+                                                    style: GoogleFonts.dmSans(
+                                                      fontSize: 14,
+                                                      color: palette.soft,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        else if (hasFullContent)
+                                          SelectableText(
+                                            _fullContent!,
+                                            style: _bodyStyle().copyWith(
+                                              fontSize: isContentIdentical
+                                                  ? _fontSize
+                                                  : _fontSize - 1,
+                                              color: isContentIdentical
+                                                  ? palette.text
+                                                  : palette.soft,
+                                              height: isContentIdentical
+                                                  ? _lineHeight
+                                                  : _lineHeight + 0.1,
+                                              letterSpacing: 0.05,
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  },
+                                ),
                                 const SizedBox(height: 120),
                               ],
                             ),

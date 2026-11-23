@@ -121,6 +121,26 @@ void main() {
         client: mockClient,
       );
       expect(info, isNull);
+      expect(UpdateService.lastCheckSucceeded, isFalse);
+      expect(UpdateService.lastCheckRateLimited, isFalse);
+    });
+
+    test('sets lastCheckRateLimited on HTTP 403 or 429', () async {
+      final mockClient = MockClient(
+        (request) async => http.Response(
+          'rate limited',
+          403,
+          headers: {'x-ratelimit-reset': '1700000000'},
+        ),
+      );
+
+      final info = await UpdateService.checkForUpdates(
+        forceCheck: true,
+        client: mockClient,
+      );
+      expect(info, isNull);
+      expect(UpdateService.lastCheckRateLimited, isTrue);
+      expect(UpdateService.lastCheckSucceeded, isFalse);
     });
 
     test('throttles: second call within window returns null even if a newer '
@@ -189,6 +209,22 @@ void main() {
       final client = MockClient((request) async {
         return http.Response(
           '0000...  other-file.apk\n$digest  Curated Feeds v1.2.2.apk\n',
+          200,
+        );
+      });
+      final got = await UpdateService.fetchExpectedChecksum(
+        checksumUrl: 'https://example.com/SHA256SUMS-v1.2.2.txt',
+        apkFileName: 'Curated Feeds v1.2.2.apk',
+        client: client,
+      );
+      expect(got, digest);
+    });
+
+    test('fetchExpectedChecksum handles binary-mode asterisk prefixes', () async {
+      final digest = 'c' * 64;
+      final client = MockClient((request) async {
+        return http.Response(
+          '$digest *Curated Feeds v1.2.2.apk\n',
           200,
         );
       });

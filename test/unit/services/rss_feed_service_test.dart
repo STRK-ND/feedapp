@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:curatedfeeds/models/rss_source.dart';
 import 'package:curatedfeeds/services/rss_feed_service.dart';
 import 'package:curatedfeeds/models/article.dart';
+import 'package:curatedfeeds/utils/category_accent.dart';
 import 'package:curatedfeeds/utils/constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -178,7 +179,7 @@ void main() {
         expect(await registry.refreshFromWorker(), isTrue);
         expect(registry.sources.single.icon, RssSource.customIcon);
         // Malformed hex falls back to the category color.
-        expect(registry.sources.single.color, AppColors.sportsSecondary);
+        expect(registry.sources.single.color, CategoryAccent.sports);
       });
 
       test('keeps current list on failure', () async {

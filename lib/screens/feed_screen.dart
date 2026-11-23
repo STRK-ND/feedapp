@@ -25,6 +25,7 @@ import '../widgets/bento_saved_articles.dart';
 import '../widgets/shimmer_loading.dart';
 import '../widgets/grain_overlay.dart';
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
@@ -69,6 +70,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   Timer? _autoRefreshTimer;
   Timer? _searchDebounceTimer;
   StreamSubscription<void>? _cloudSyncSub;
+  StreamSubscription<void>? _repoArticlesSub;
   // Single-flight guard for refresh calls (manually tap, connectivity
   // tick, auto-refresh tick can all fire close together). Drains the
   // call heap to one in-flight; the rest become no-ops.
@@ -99,8 +101,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   String get _appBarTitle {
     final sourceId = widget.sourceId;
     if (sourceId != null) {
-      return getIt<RssFeedService>().getSourceById(sourceId)?.name ??
-          _l10n.navFeed;
+      final name = getIt<RssFeedService>().getSourceById(sourceId)?.name;
+      if (name != null) return name;
+      final matching = _articles.where((a) => a.sourceId == sourceId);
+      if (matching.isNotEmpty) return matching.first.sourceName;
+      return _l10n.navFeed;
     }
     switch (_selectedTab) {
       case 1:
@@ -140,6 +145,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         if (mounted) unawaited(_loadData(forceRefresh: true));
       });
     }
+
+    _repoArticlesSub = _articleRepository.onArticlesChanged.listen((_) {
+      if (mounted) {
+        final cached = _articleRepository.cachedArticles;
+        final cachedSaved = _articleRepository.cachedSavedArticles;
+        setState(() {
+          if (cached != null) {
+            _articles = List.of(cached);
+            _displayedArticles = _getFilteredArticles();
+          }
+          if (cachedSaved != null) {
+            _savedArticles = List.of(cachedSaved);
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -237,6 +258,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _autoRefreshTimer?.cancel();
     _searchDebounceTimer?.cancel();
     _cloudSyncSub?.cancel();
+    _repoArticlesSub?.cancel();
     super.dispose();
   }
 
@@ -529,7 +551,19 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     // Row-level persist: a read flag touches one row, not the whole cache.
     _articleRepository.syncFrom(_articles, _savedArticles);
     unawaited(_storage.saveArticle(_articles[articleIndex]));
-    _showSnackBar(_l10n.articleMarkedReadSnack);
+    _showSnackBar(
+      _l10n.articleMarkedReadSnack,
+      actionLabel: _l10n.undoAction,
+      onAction: () {
+        if (!mounted) return;
+        setState(() {
+          _articles[articleIndex].isRead = false;
+          _displayedArticles = _getFilteredArticles();
+        });
+        _articleRepository.syncFrom(_articles, _savedArticles);
+        unawaited(_storage.saveArticle(_articles[articleIndex]));
+      },
+    );
   }
 
   void _onToggleSave(Article article) {
@@ -567,6 +601,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           category: 'feed',
         );
       }
+      _displayedArticles = _getFilteredArticles();
     });
 
     // Row-level persist: a toggle touches one feed row plus one saved row.
@@ -620,7 +655,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           _onToggleSave(_articles[articleIndex]);
         },
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _displayedArticles = _getFilteredArticles();
+        });
+      }
+    });
   }
 
   List<Article> _getFilteredArticles() {
@@ -750,78 +791,90 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         ? _l10n.emptyFeedTitle
         : _l10n.savedEmptyTitle;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                width: 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Semantics(
+                      label: title,
+                      child: Icon(icon, size: 72, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _errorMessage ?? title,
+                    style: _textTheme.headlineSmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontSize: 22,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _refreshFeeds,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: Text(_l10n.retryCta),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ] else if (isSearchEmpty) ...[
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = '';
+                          _isSearchActive = false;
+                          _displayedArticles = _getFilteredArticles();
+                        });
+                      },
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      label: Text(_l10n.clearSearchCta),
+                    ),
+                  ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: Text(
+                        _l10n.emptyFeedHint,
+                        textAlign: TextAlign.center,
+                        style: _textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ),
-            child: Semantics(
-              label: title,
-              child: Icon(icon, size: 72, color: colorScheme.onSurfaceVariant),
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            _errorMessage ?? title,
-            style: _textTheme.headlineSmall?.copyWith(
-              color: colorScheme.onSurface,
-              fontSize: 22,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _refreshFeeds,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: Text(_l10n.retryCta),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ] else if (isSearchEmpty) ...[
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                  _isSearchActive = false;
-                  _displayedArticles = _getFilteredArticles();
-                });
-              },
-              icon: const Icon(Icons.clear_rounded, size: 18),
-              label: Text(_l10n.clearSearchCta),
-            ),
-          ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                _l10n.emptyFeedHint,
-                textAlign: TextAlign.center,
-                style: _textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -854,7 +907,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(
-                        AppCardStyles.badgeRadius,
+                        AppRadius.badge,
                       ),
                       border: Border.all(
                         color: colorScheme.outlineVariant,
@@ -927,19 +980,12 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   }
 
   Widget _buildSavedArticlesView() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return RefreshIndicator(
-      color: colorScheme.primary,
-      backgroundColor: colorScheme.surface,
-      strokeWidth: 2.5,
-      onRefresh: _refreshSavedArticles,
-      child: BentoSavedArticlesGrid(
-        articles: _savedArticles,
-        onTap: (index) => _onTapSavedArticle(index),
-        onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
-        onDismiss: (index) => _removeSavedArticle(index),
-        isEmpty: _savedArticles.isEmpty,
-      ),
+    return BentoSavedArticlesGrid(
+      articles: _savedArticles,
+      onTap: (index) => _onTapSavedArticle(index),
+      onToggleSave: (index) => _onToggleSave(_savedArticles[index]),
+      onDismiss: (index) => _removeSavedArticle(index),
+      isEmpty: _savedArticles.isEmpty,
     );
   }
 
@@ -955,7 +1001,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
     _articleRepository.syncFrom(_articles, _savedArticles);
     unawaited(_storage.removeSavedArticle(article.id));
     unawaited(_storage.saveArticle(article));
-    _showSnackBar(_l10n.articleRemovedSnack);
+    _showSnackBar(
+      _l10n.articleRemovedSnack,
+      actionLabel: _l10n.undoAction,
+      onAction: () {
+        if (!mounted) return;
+        setState(() {
+          article.isSaved = true;
+          if (!_savedArticles.any((a) => a.id == article.id)) {
+            _savedArticles = [article, ..._savedArticles];
+          }
+        });
+        _articleRepository.syncFrom(_articles, _savedArticles);
+        unawaited(_storage.saveArticle(article));
+        unawaited(_storage.saveSavedArticle(article));
+      },
+    );
   }
 
   void _onTapSavedArticle(int index) {
@@ -1080,7 +1141,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // scrolling the stack's card list downward (the folio dot
               // below marks all read, which is the genuinely global
               // action).
-              if (_selectedTab == 0 && _articles.isNotEmpty)
+              if (_selectedTab == 0 && widget.sourceId != null && _articles.isNotEmpty)
                 // Same trailing row: keep the count readable but never let it
                 // force the bar past the viewport.
                 Flexible(
@@ -1098,7 +1159,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(
-                        AppCardStyles.badgeRadius,
+                        AppRadius.badge,
                       ),
                       border: Border.all(
                         color: colorScheme.outlineVariant,
@@ -1138,41 +1199,44 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     ),
                   ),
                 ),
-              if (_selectedTab == 0)
-                Flexible(
-                  child: Semantics(
-                    button: true,
-                    label: _isLoading
-                        ? _l10n.loadingLabel
-                        : _l10n.refreshFeedsLabel,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () {
-                                HapticFeedback.lightImpact();
+              Flexible(
+                child: Semantics(
+                  button: true,
+                  label: _isLoading
+                      ? _l10n.loadingLabel
+                      : _l10n.refreshFeedsLabel,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              if (_selectedTab == 0) {
                                 _refreshFeeds();
-                              },
-                        icon: _isLoading
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    appBarTitleColor,
-                                  ),
+                              } else {
+                                _refreshSavedArticles();
+                              }
+                            },
+                      icon: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  appBarTitleColor,
                                 ),
-                              )
-                            : Icon(
-                                Icons.refresh_rounded,
-                                color: appBarTitleColor,
                               ),
-                      ),
+                            )
+                          : Icon(
+                              Icons.refresh_rounded,
+                              color: appBarTitleColor,
+                            ),
                     ),
                   ),
                 ),
+              ),
               Flexible(
                 child: Semantics(
                   button: true,
@@ -1230,6 +1294,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             await showUpdateDialog(
                               context: context,
                               updateInfo: updateInfo,
+                            );
+                          } else if (UpdateService.lastCheckRateLimited) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Update check rate-limited by GitHub. Try again later.',
+                                ),
+                              ),
+                            );
+                          } else if (!UpdateService.lastCheckSucceeded) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Could not connect to update server.',
+                                ),
+                              ),
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1319,7 +1399,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         fillColor: colorScheme.surfaceContainerHighest,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(
-                            AppCardStyles.badgeRadius,
+                            AppRadius.badge,
                           ),
                           borderSide: BorderSide(
                             color: colorScheme.outlineVariant,
@@ -1328,7 +1408,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(
-                            AppCardStyles.badgeRadius,
+                            AppRadius.badge,
                           ),
                           borderSide: BorderSide(
                             color: colorScheme.outlineVariant,
@@ -1337,7 +1417,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(
-                            AppCardStyles.badgeRadius,
+                            AppRadius.badge,
                           ),
                           borderSide: BorderSide(
                             color: colorScheme.primary,
@@ -1418,13 +1498,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                 });
                               },
                               borderRadius: BorderRadius.circular(
-                                AppCardStyles.badgeRadius,
+                                AppRadius.badge,
                               ),
                               splashColor: colorScheme.primary.withValues(
                                 alpha: 0.08,
                               ),
                               child: AnimatedContainer(
-                                duration: AppCardStyles.quickDuration,
+                                duration: AppMotion.fast,
                                 // §10 quality floor: ≥44dp touch target.
                                 constraints: const BoxConstraints(
                                   minHeight: 44,
@@ -1443,7 +1523,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                       ? colorScheme.surfaceContainerHighest
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(
-                                    AppCardStyles.badgeRadius,
+                                    AppRadius.badge,
                                   ),
                                   border: Border(
                                     bottom: BorderSide(
@@ -1513,7 +1593,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(
-                        AppCardStyles.badgeRadius,
+                        AppRadius.badge,
                       ),
                       border: Border.all(
                         color: colorScheme.error.withValues(alpha: 0.3),
@@ -1554,7 +1634,11 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     onRefresh: _isLoading
                         ? () async {}
                         : () async {
-                            await _refreshFeeds();
+                            if (_selectedTab == 0) {
+                              await _refreshFeeds();
+                            } else {
+                              await _refreshSavedArticles();
+                            }
                           },
                     child: _isLoading && _articles.isEmpty
                         ? _buildLoadingState()

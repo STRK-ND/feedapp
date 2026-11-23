@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:curatedfeeds/l10n/generated/app_localizations.dart';
@@ -61,6 +63,40 @@ void main() {
     expect(prefs.getString('ignored_update_version'), '1.2.2');
   });
 
-  // Note: "Update Now" is deliberately NOT tapped — it performs a real
-  // network download + install flow.
+  testWidgets(
+    'tapping Update Now shows downloading state and handles failure cleanly',
+    (tester) async {
+      final mockClient = MockClient(
+        (request) async => http.Response('error', 500),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdateDialog(
+              updateInfo: sampleInfo(),
+              client: mockClient,
+              onLater: () {},
+              onDownload: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Update Now'), findsOneWidget);
+      await tester.tap(find.text('Update Now'));
+      await tester.pump(); // Starts _run
+
+      // In-flight spinner is visible and label says Downloading…
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Downloading…'), findsOneWidget);
+
+      await tester.pumpAndSettle();
+
+      // After failure, label switches to "Try again" and localized error text is shown
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text('Update failed. Try again.'), findsOneWidget);
+    },
+  );
 }

@@ -252,14 +252,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: onSurface,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         )
                       : Text(
                           _register
                               ? l10n.loginRegisterCta
                               : l10n.loginEmailCta,
-                          style: AppType.labelLarge(color: onSurface),
+                          style: AppType.labelLarge(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         ),
                 ),
                 const SizedBox(height: AppSpacing.s2),

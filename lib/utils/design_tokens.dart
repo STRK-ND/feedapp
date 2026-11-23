@@ -28,7 +28,9 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
   static const double chip = 8;
+  static const double badge = 10;
   static const double button = 14;
+  static const double image = 16;
   static const double card = 20;
   static const double sheetTop = 28;
 }

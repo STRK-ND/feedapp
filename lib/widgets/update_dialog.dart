@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 
 import '../l10n/generated/app_localizations.dart';
 import '../services/update_service.dart';
@@ -17,12 +19,14 @@ class UpdateDialog extends StatelessWidget {
   final UpdateInfo updateInfo;
   final VoidCallback onLater;
   final VoidCallback onDownload;
+  final http.Client? client;
 
   const UpdateDialog({
     super.key,
     required this.updateInfo,
     required this.onLater,
     required this.onDownload,
+    this.client,
   });
 
   @override
@@ -74,7 +78,8 @@ class UpdateDialog extends StatelessWidget {
               ),
               child: Text(
                 l10n.versionLabel(updateInfo.version),
-                style: TextStyle(
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
                   color: theme.colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w600,
                 ),
@@ -149,21 +154,22 @@ class UpdateDialog extends StatelessWidget {
           child: Text(l10n.openInBrowserAction),
         ),
         // Primary path: in-app download + install
-        _DownloadAndInstallButton(updateInfo: updateInfo),
+        _DownloadAndInstallButton(updateInfo: updateInfo, client: client),
       ],
     );
   }
 
   Future<void> _openInBrowser(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final success = await UpdateService.openDownloadUrl(updateInfo.downloadUrl);
     if (!success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to open download. Please visit: ${updateInfo.htmlUrl}',
+            l10n.failedOpenVisit(updateInfo.htmlUrl),
           ),
           action: SnackBarAction(
-            label: 'Open',
+            label: l10n.openInBrowserAction,
             onPressed: () => UpdateService.openDownloadUrl(updateInfo.htmlUrl),
           ),
         ),
@@ -197,8 +203,12 @@ class UpdateDialog extends StatelessWidget {
 /// whole dialog into a StatefulWidget.
 class _DownloadAndInstallButton extends StatefulWidget {
   final UpdateInfo updateInfo;
+  final http.Client? client;
 
-  const _DownloadAndInstallButton({required this.updateInfo});
+  const _DownloadAndInstallButton({
+    required this.updateInfo,
+    this.client,
+  });
 
   @override
   State<_DownloadAndInstallButton> createState() =>
@@ -220,9 +230,9 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
     final l10n = AppLocalizations.of(context);
     final label = switch (_stage) {
       _Stage.idle => l10n.updateNowCta,
-      _Stage.downloading => 'Downloading…',
-      _Stage.installing => 'Installing…',
-      _Stage.done => 'Opening…',
+      _Stage.downloading => l10n.downloadingCta,
+      _Stage.installing => l10n.installingCta,
+      _Stage.done => l10n.openingCta,
       _Stage.failed => l10n.tryAgainCta,
     };
 
@@ -241,7 +251,9 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.onPrimary,
+                    ),
                   ),
                 )
               : const Icon(Icons.download),
@@ -272,6 +284,7 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
         url: widget.updateInfo.downloadUrl,
         version: widget.updateInfo.version,
         checksumUrl: widget.updateInfo.checksumUrl,
+        client: widget.client,
       );
       if (!mounted) return;
 
@@ -308,7 +321,7 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
     } else {
       setState(() {
         _stage = _Stage.failed;
-        _errorText = "Couldn't open download. Open in browser instead.";
+        _errorText = l10n.updateFailedError;
       });
     }
   }
@@ -325,12 +338,14 @@ enum _Stage { idle, downloading, installing, done, failed }
 Future<void> showUpdateDialog({
   required BuildContext context,
   required UpdateInfo updateInfo,
+  http.Client? client,
 }) async {
   await showDialog(
     context: context,
     barrierDismissible: false,
     builder: (context) => UpdateDialog(
       updateInfo: updateInfo,
+      client: client,
       onLater: () => Navigator.pop(context),
       onDownload: () {
         // The dialog itself owns the install flow (stateful button).

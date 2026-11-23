@@ -8,30 +8,47 @@ library;
 import 'package:xml/xml.dart';
 import '../models/rss_source.dart';
 
-/// Pull every xmlUrl (and htmlUrl as fallback) out of an OPML document.
-Set<String> parseOpmlUrls(String opmlText) {
-  final urls = <String>{};
+/// Single outline entry from an OPML document with its URL and optional title.
+class OpmlEntry {
+  final String url;
+  final String title;
+  const OpmlEntry({required this.url, required this.title});
+}
+
+/// Pull every outline entry (URL and title) out of an OPML document.
+List<OpmlEntry> parseOpmlEntries(String opmlText) {
+  final entries = <OpmlEntry>[];
+  final seenUrls = <String>{};
   try {
     final doc = XmlDocument.parse(opmlText);
     for (final outline in doc.findAllElements('outline')) {
       final xmlUrl = outline.getAttribute('xmlUrl');
-      if (xmlUrl != null && xmlUrl.isNotEmpty) {
-        urls.add(xmlUrl);
-        continue;
-      }
       final htmlUrl = outline.getAttribute('htmlUrl');
-      if (htmlUrl != null && htmlUrl.isNotEmpty) {
-        urls.add(htmlUrl);
+      final url = (xmlUrl != null && xmlUrl.isNotEmpty)
+          ? xmlUrl
+          : ((htmlUrl != null && htmlUrl.isNotEmpty) ? htmlUrl : null);
+      if (url != null && seenUrls.add(url)) {
+        final title = outline.getAttribute('title') ??
+            outline.getAttribute('text') ??
+            '';
+        entries.add(OpmlEntry(url: url, title: title));
       }
     }
   } catch (_) {
-    // Fallback regex for slightly malformed OPML — grabs xmlUrl attributes.
     final xmlUrlRe = RegExp(r'xmlUrl="([^"]+)"');
     for (final m in xmlUrlRe.allMatches(opmlText)) {
-      urls.add(m.group(1)!);
+      final url = m.group(1)!;
+      if (seenUrls.add(url)) {
+        entries.add(OpmlEntry(url: url, title: ''));
+      }
     }
   }
-  return urls;
+  return entries;
+}
+
+/// Pull every xmlUrl (and htmlUrl as fallback) out of an OPML document.
+Set<String> parseOpmlUrls(String opmlText) {
+  return parseOpmlEntries(opmlText).map((e) => e.url).toSet();
 }
 
 /// Match parsed OPML URLs against canonical sources (by [RssSource.url]).

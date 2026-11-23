@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
-import '../utils/constants.dart' hide AppColors;
-import '../utils/design_tokens.dart';
+import '../utils/article_view.dart';
+import '../utils/constants.dart';
 import 'swipeable_card.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
@@ -118,7 +118,7 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sourceColor = _sourceColor(article.sourceColor);
+    final sourceColor = article.accent;
     final cardColor = isDark ? AppColors.groundElev : colorScheme.surface;
     final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
     final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
@@ -137,14 +137,14 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+            borderRadius: BorderRadius.circular(AppRadius.card),
             // Reskin: no amber shadow on a dark ground — it reads muddy.
             // A hairline border gives the card a quiet edge instead.
             color: cardColor,
             border: Border.all(color: ruleColor, width: 0.5),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppCardStyles.cardRadius),
+            borderRadius: BorderRadius.circular(AppRadius.card),
             child: AspectRatio(
               aspectRatio: 3 / 4,
               child: Stack(
@@ -298,30 +298,39 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
         final article = widget.articles.first;
         final imageMaxWidth = settings.dataSaverMode ? 400 : 800;
 
-        return SwipeableCard(
-          key: ValueKey('card_${article.id}'),
-          child: _buildArticleCard(
-            article,
-            0,
-            true,
-            settings.showImages,
-            imageMaxWidth,
-          ),
-          onSwipeRight: () => widget.onSwipeRight(0),
-          onSwipeLeft: () => widget.onSwipeLeft(0),
-          onTap: () => widget.onTap(0),
+        return Stack(
+          children: [
+            if (widget.articles.length > 1)
+              Transform.translate(
+                offset: const Offset(0, 10),
+                child: Transform.scale(
+                  scale: 0.95,
+                  child: _buildArticleCard(
+                    widget.articles[1],
+                    1,
+                    false,
+                    settings.showImages,
+                    imageMaxWidth,
+                  ),
+                ),
+              ),
+            SwipeableCard(
+              key: ValueKey('card_${article.id}'),
+              child: _buildArticleCard(
+                article,
+                0,
+                true,
+                settings.showImages,
+                imageMaxWidth,
+              ),
+              onSwipeRight: () => widget.onSwipeRight(0),
+              onSwipeLeft: () => widget.onSwipeLeft(0),
+              onTap: () => widget.onTap(0),
+            ),
+          ],
         );
       },
     );
   }
 }
 
-/// Parse a source's brand color (hex) → Color, falling back to the amber
-/// attention color when absent. Mirrors the helper in every row/card so
-/// the source's own identity, not amber, color-tags the article.
-Color _sourceColor(String? hex) {
-  if (hex == null || hex.isEmpty) return AppColors.primary;
-  final cleaned = hex.replaceFirst('#', '');
-  if (cleaned.length == 6) return Color(int.parse('0xFF$cleaned'));
-  return AppColors.primary;
-}

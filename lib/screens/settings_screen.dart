@@ -15,7 +15,7 @@ import '../services/in_app_notification_manager.dart';
 import '../services/notification_service.dart';
 import '../services/background_sync_service.dart';
 import '../repositories/article_repository.dart';
-import '../utils/constants.dart' hide AppColors;
+import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
@@ -23,6 +23,8 @@ import '../widgets/app_logo.dart';
 import 'sources_screen.dart' show SourcesScreen;
 import 'paywall_screen.dart';
 import 'login_screen.dart';
+import '../services/update_service.dart';
+import '../widgets/update_dialog.dart';
 
 /// Settings screen with Stitch design system
 class SettingsScreen extends StatefulWidget {
@@ -124,6 +126,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${_l10n.checkForUpdates}…'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+    try {
+      final updateInfo = await UpdateService.checkForUpdates(forceCheck: true);
+      if (!mounted) return;
+      if (updateInfo != null) {
+        await showUpdateDialog(context: context, updateInfo: updateInfo);
+      } else if (UpdateService.lastCheckRateLimited) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Update check rate-limited by GitHub. Try again later.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else if (!UpdateService.lastCheckSucceeded) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not reach update server. Check your connection.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(_l10n.upToDateMessage),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not check for updates. Please try again later.'),
+        ),
+      );
+    }
+  }
+
   String _categorySubtitle() {
     final all = AppConfig.categories.where((c) => c != 'All').toList();
     if (_notifCategories.isEmpty || _notifCategories.length == all.length) {
@@ -202,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(
           Icons.timer_outlined,
@@ -426,18 +473,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icons.text_fields_outlined,
                   title: _l10n.bodyFontTitle,
                   value: bodyFont == 'lora' ? 'Lora' : 'DM Sans',
+                  onTap: _openReaderSheet,
                 ),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.format_line_spacing_outlined,
                   title: _l10n.lineHeightTitle,
                   value: lineHeight,
+                  onTap: _openReaderSheet,
                 ),
                 _buildDivider(),
                 _buildInfoTile(
                   icon: Icons.format_size_outlined,
                   title: _l10n.fontSizeTitle,
                   value: fontSizePt,
+                  onTap: _openReaderSheet,
                 ),
               ]),
               const SizedBox(height: 24),
@@ -483,6 +533,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: colorScheme.onSurface,
                     ),
                   ),
+                  subtitle: Text(
+                    'Tap to check for updates',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   trailing: FutureBuilder<String>(
                     future: AppConfig.getVersion(),
                     builder: (context, snapshot) => Text(
@@ -493,6 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  onTap: _checkForUpdates,
                 ),
                 _buildDivider(),
                 _buildActionTile(
@@ -630,12 +688,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Container(
         width: 40,
         height: 40,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
         child: Text(
-          edition.toString().padLeft(2, '0').substring(0, 2),
+          edition > 99 ? '$edition' : edition.toString().padLeft(2, '0'),
           textAlign: TextAlign.center,
           style: AppType.folioTop(
             color: colorScheme.onSurface,
@@ -685,8 +744,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = <Widget>[];
     final colorScheme = Theme.of(context).colorScheme;
     for (var i = 0; i < tiles.length; i++) {
-      result.add(tiles[i]);
-      if (i < tiles.length - 1) {
+      final tile = tiles[i];
+      if (tile is Divider) {
+        result.add(tile);
+        continue;
+      }
+      result.add(tile);
+      if (i < tiles.length - 1 && tiles[i + 1] is! Divider) {
         result.add(Divider(height: 1, indent: 72, color: colorScheme.outline));
       }
     }
@@ -715,7 +779,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
       ),
@@ -749,17 +813,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required String title,
     required String value,
+    VoidCallback? onTap,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return ListTile(
+      onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
       ),
@@ -800,7 +866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: iconColor != null
               ? iconColor.withAlpha(38)
               : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(
           icon,
@@ -842,7 +908,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final selected = themeMode == mode;
       return Expanded(
         child: GestureDetector(
-          onTap: () => notifier.setThemeMode(mode),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            notifier.setThemeMode(mode);
+          },
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
             duration: AppMotion.fast,
@@ -944,7 +1013,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(
           Icons.format_list_numbered,
@@ -1006,7 +1075,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppCardStyles.badgeRadius),
+          borderRadius: BorderRadius.circular(AppRadius.badge),
         ),
         child: Icon(
           Icons.view_agenda_outlined,
@@ -1080,6 +1149,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
 
   late double _fontSize = widget.initial.fontSize;
   late double _lineHeight = widget.initial.lineHeight;
+  late bool _widenMeasure = widget.initial.widenMeasure;
   late String _bodyFont = widget.initial.bodyFont;
 
   @override
@@ -1141,6 +1211,32 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               await widget.notifier.setLineHeight(v);
             },
           ),
+          const SizedBox(height: AppSpacing.s3),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'WIDEN MEASURE',
+              style: AppType.monoEyebrow(
+                color: isDark
+                    ? AppColors.paperOnGroundSoft
+                    : AppColors.inkSoft,
+              ),
+            ),
+            subtitle: Text(
+              _widenMeasure
+                  ? 'Expanded reading column for wide screens.'
+                  : 'Standard editorial column (caps line length at ~65 characters).',
+              style: AppType.bodyMedium(
+                color: isDark ? AppColors.paperOnGround : AppColors.ink,
+              ),
+            ),
+            value: _widenMeasure,
+            activeThumbColor: AppColors.primary,
+            onChanged: (v) async {
+              setState(() => _widenMeasure = v);
+              await widget.notifier.setWidenMeasure(v);
+            },
+          ),
           const SizedBox(height: AppSpacing.s4),
           Row(
             children: [
@@ -1193,9 +1289,9 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
               ),
             ),
             child: Text(
-              'DONE',
+              _l10n.dialogOk.toUpperCase(),
               style: AppType.labelLarge(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ).copyWith(letterSpacing: 1.4),
             ),
           ),
@@ -1539,9 +1635,19 @@ class _AccountCardState extends State<_AccountCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outline),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: user == null ? [tile] : [tile, deleteTile],
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: user == null
+              ? [tile]
+              : [
+                  tile,
+                  Divider(height: 1, indent: 72, color: colorScheme.outline),
+                  deleteTile,
+                ],
+        ),
       ),
     );
   }

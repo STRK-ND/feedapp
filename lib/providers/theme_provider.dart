@@ -140,11 +140,11 @@ class ThemeProvider extends ChangeNotifier {
       colorScheme: ColorScheme(
         brightness: Brightness.light,
         primary: _primaryColor,
-        onPrimary: Colors.white,
+        onPrimary: const Color(0xFF15131C),
         secondary: _primaryColor,
-        onSecondary: Colors.white,
+        onSecondary: const Color(0xFF15131C),
         tertiary: _primaryColor,
-        onTertiary: Colors.white,
+        onTertiary: const Color(0xFF15131C),
         error: const Color(0xFFDC3640),
         onError: Colors.white,
         surface: const Color(0xFFFFFFFF),
@@ -192,7 +192,7 @@ class ThemeProvider extends ChangeNotifier {
       iconTheme: const IconThemeData(color: Color(0xFF15131C)),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: Color(0xFFC4944E),
-        foregroundColor: Colors.white,
+        foregroundColor: Color(0xFF15131C),
         elevation: 0,
       ),
       snackBarTheme: SnackBarThemeData(
@@ -226,6 +226,15 @@ class ThemeProvider extends ChangeNotifier {
         tileColor: Color(0xFFFFFFFF),
         textColor: Color(0xFF15131C),
         iconColor: Color(0xFF15131C),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return _primaryColor;
+          }
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(Color(0xFF15131C)),
       ),
       // Spec §10 quality floor: keyboard/d-pad focus must be visible on
       // every IconButton and tappable card — amber at 12%.
@@ -331,6 +340,15 @@ class ThemeProvider extends ChangeNotifier {
         tileColor: Color(0xFF1A1423),
         textColor: Color(0xFFF8F7F4),
         iconColor: Color(0xFFF8F7F4),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return _accentColor;
+          }
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(Color(0xFF0E0814)),
       ),
       // Spec §10 quality floor: visible focus on dark, same amber rule.
       focusColor: _accentColor.withValues(alpha: 0.12),

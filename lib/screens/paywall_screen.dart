@@ -453,7 +453,7 @@ class _ErrorState extends StatelessWidget {
           child: Text(
             l10n.retryCta,
             style: AppType.labelLarge(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
             ).copyWith(letterSpacing: 1.2),
           ),
         ),
@@ -510,12 +510,12 @@ class _PurchaseContent extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.button),
               ),
               backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: Text(
               l10n.buyOnce(price ?? ''),
               style: AppType.labelLarge(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ).copyWith(letterSpacing: 1.2),
             ),
           ),

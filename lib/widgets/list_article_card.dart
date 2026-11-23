@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../providers/settings_notifier.dart';
 import '../services/cache_manager.dart';
+import '../utils/article_view.dart';
 import '../utils/design_tokens.dart';
 
 class ListArticleCard extends StatelessWidget {
@@ -42,7 +43,7 @@ class ListArticleCard extends StatelessWidget {
     final ruleColor = isDark ? AppColors.ruleOnGround : AppColors.rule;
     final ink = isDark ? AppColors.paperOnGround : AppColors.ink;
     final soft = isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft;
-    final sourceColor = _sourceColor(article.sourceColor);
+    final sourceColor = article.accent;
 
     return Semantics(
       button: true,
@@ -89,7 +90,7 @@ class ListArticleCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.s2),
                     Text(
-                      _formatDateline(article.pubDate),
+                      article.dateline,
                       style: AppType.monoDateline(
                         color: soft,
                       ).copyWith(letterSpacing: 0.05),
@@ -154,27 +155,4 @@ class ListArticleCard extends StatelessWidget {
   }
 }
 
-/// Format as "08/12 · 14:03" or "Yesterday" — concise editorial dateline.
-String _formatDateline(DateTime dt) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final dtDay = DateTime(dt.year, dt.month, dt.day);
-  final diff = today.difference(dtDay).inDays;
-  if (diff == 0) {
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} · $hh:$mm';
-  }
-  if (diff == 1) return 'YESTERDAY';
-  if (diff < 7) return '${diff}D AGO';
-  return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year % 100).toString().padLeft(2, '0')}';
-}
 
-Color _sourceColor(String? hex) {
-  if (hex == null || hex.isEmpty) return AppColors.primary;
-  final cleaned = hex.replaceFirst('#', '');
-  if (cleaned.length == 6) {
-    return Color(int.parse('0xFF$cleaned'));
-  }
-  return AppColors.primary;
-}

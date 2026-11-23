@@ -357,7 +357,9 @@ class _AaPanelState extends State<_AaPanel> {
               style: AppType.monoEyebrow(color: soft),
             ),
             subtitle: Text(
-              'Cap line length at 64 characters. Reads as a column.',
+              _widenMeasure
+                  ? 'Expanded reading column for wide screens.'
+                  : 'Standard editorial column (caps line length at ~65 characters).',
               style: AppType.bodyMedium(color: ink),
             ),
             value: _widenMeasure,

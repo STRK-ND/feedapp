@@ -155,6 +155,12 @@ class _MainNavigationState extends State<MainNavigation> {
     final ctx = appNavigatorKey.currentContext;
     if (ctx == null) return;
     final messenger = ScaffoldMessenger.maybeOf(ctx);
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text('Downloading update v${info.version}…'),
+        duration: const Duration(seconds: 4),
+      ),
+    );
     try {
       final handle = await UpdateService.downloadApk(
         url: info.downloadUrl,

@@ -155,4 +155,45 @@ void main() {
       expect(xml, contains('<body'));
     });
   });
+
+  group('OPML entries parsing', () {
+    test('extracts title and url from outlines', () {
+      const opml = '''
+      <opml version="2.0">
+        <body>
+          <outline text="The Verge" title="The Verge" xmlUrl="https://www.theverge.com/rss/index.xml"/>
+          <outline text="My Custom Blog" xmlUrl="https://myblog.example.com/feed.xml"/>
+        </body>
+      </opml>
+      ''';
+      final entries = parseOpmlEntries(opml);
+      expect(entries.length, 2);
+      expect(entries[0].title, 'The Verge');
+      expect(entries[0].url, 'https://www.theverge.com/rss/index.xml');
+      expect(entries[1].title, 'My Custom Blog');
+      expect(entries[1].url, 'https://myblog.example.com/feed.xml');
+    });
+
+    test('falls back to domain name when text attribute is missing', () {
+      const opml = '''
+      <opml version="2.0">
+        <body>
+          <outline xmlUrl="https://subdomain.example.org/rss"/>
+        </body>
+      </opml>
+      ''';
+      final entries = parseOpmlEntries(opml);
+      expect(entries.length, 1);
+      expect(entries[0].title, 'subdomain.example.org');
+      expect(entries[0].url, 'https://subdomain.example.org/rss');
+    });
+
+    test('extracts entries from malformed unclosed opml via regex fallback', () {
+      const opml =
+          '<opml><body><outline text="Broken XML" xmlUrl="https://broken.example.com/rss.xml">';
+      final entries = parseOpmlEntries(opml);
+      expect(entries.length, 1);
+      expect(entries[0].url, 'https://broken.example.com/rss.xml');
+    });
+  });
 }

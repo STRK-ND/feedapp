@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/constants.dart';
+import '../../utils/design_tokens.dart';
 import 'curved_nav_indicator.dart';
 import 'curved_nav_item.dart';
 
@@ -71,65 +72,68 @@ class _CurvedBottomNavBarState extends State<CurvedBottomNavBar>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.only(bottom: CurvedNavTokens.barBottomMargin),
-      child: Container(
-        height: CurvedNavTokens.barHeight,
-        margin: const EdgeInsets.symmetric(
-          horizontal: CurvedNavTokens.barHorizontalPadding,
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final barWidth = constraints.maxWidth;
-            final itemWidth = barWidth / widget.itemCount;
+    return Container(
+      color: isDark ? AppColors.groundElev : CurvedNavTokens.lightBarFill,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: CurvedNavTokens.barBottomMargin),
+        child: Container(
+          height: CurvedNavTokens.barHeight,
+          margin: const EdgeInsets.symmetric(
+            horizontal: CurvedNavTokens.barHorizontalPadding,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final barWidth = constraints.maxWidth;
+              final itemWidth = barWidth / widget.itemCount;
 
-            _tabCenterXs.clear();
-            for (int i = 0; i < widget.itemCount; i++) {
-              _tabCenterXs.add(itemWidth * i + itemWidth / 2);
-            }
+              _tabCenterXs.clear();
+              for (int i = 0; i < widget.itemCount; i++) {
+                _tabCenterXs.add(itemWidth * i + itemWidth / 2);
+              }
 
-            return AnimatedBuilder(
-              animation: _slideAnimation,
-              builder: (context, child) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    CurvedNavTokens.barRadius,
-                  ),
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: CurvedNavBarPainter(
-                        isDark: isDark,
-                        animationProgress: _slideAnimation.value,
-                        previousIndex: _previousIndex,
-                        targetIndex: _displayedIndex,
-                        itemCount: widget.itemCount,
-                        tabCenterXs: List.from(_tabCenterXs),
-                      ),
-                      size: Size(barWidth, CurvedNavTokens.barHeight),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          for (int i = 0; i < widget.itemCount; i++)
-                            Expanded(
-                              child: CurvedNavItem(
-                                index: i,
-                                icon: _iconForTab(i, false),
-                                selectedIcon: _iconForTab(i, true),
-                                label: _labelForTab(i),
-                                isSelected: _displayedIndex == i,
-                                onTap: () => widget.onItemSelected(i),
+              return AnimatedBuilder(
+                animation: _slideAnimation,
+                builder: (context, child) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      CurvedNavTokens.barRadius,
+                    ),
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: CurvedNavBarPainter(
+                          isDark: isDark,
+                          animationProgress: _slideAnimation.value,
+                          previousIndex: _previousIndex,
+                          targetIndex: _displayedIndex,
+                          itemCount: widget.itemCount,
+                          tabCenterXs: List.from(_tabCenterXs),
+                        ),
+                        size: Size(barWidth, CurvedNavTokens.barHeight),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            for (int i = 0; i < widget.itemCount; i++)
+                              Expanded(
+                                child: CurvedNavItem(
+                                  index: i,
+                                  icon: _iconForTab(i, false),
+                                  selectedIcon: _iconForTab(i, true),
+                                  label: _labelForTab(i),
+                                  isSelected: _displayedIndex == i,
+                                  onTap: () => widget.onItemSelected(i),
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );

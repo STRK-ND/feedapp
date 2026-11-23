@@ -37,6 +37,11 @@ class UpdateService {
   // APK with the system installer intent.
   static const String _apkMimeType = 'application/vnd.android.package-archive';
 
+  // Diagnostic state for manual checks (Settings / Feed menu) to distinguish
+  // up-to-date from rate-limit or network failures.
+  static bool lastCheckRateLimited = false;
+  static bool lastCheckSucceeded = false;
+
   // Keys for SharedPreferences
   static const String _lastCheckedKey = 'last_update_check';
   static const String _ignoredVersionKey = 'ignored_update_version';
@@ -50,6 +55,8 @@ class UpdateService {
     http.Client? client,
   }) async {
     http.Client? ownedClient;
+    lastCheckRateLimited = false;
+    lastCheckSucceeded = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastChecked = prefs.getInt(_lastCheckedKey) ?? 0;
@@ -72,6 +79,7 @@ class UpdateService {
       // other user behind that egress. Surface exhaustion instead of
       // degrading to the same silent null as every other error path.
       if (response.statusCode == 403 || response.statusCode == 429) {
+        lastCheckRateLimited = true;
         final reset = response.headers['x-ratelimit-reset'];
         unawaited(
           ErrorHandler.logWarning(
@@ -83,6 +91,7 @@ class UpdateService {
       }
 
       if (response.statusCode == 200) {
+        lastCheckSucceeded = true;
         final data = json.decode(response.body) as Map<String, dynamic>;
         final latestVersion = data['tag_name'] as String;
 
@@ -135,13 +144,21 @@ class UpdateService {
   static String _getApkDownloadUrl(Map<String, dynamic> releaseData) {
     final assets = releaseData['assets'] as List<dynamic>?;
     if (assets != null && assets.isNotEmpty) {
+      String? fallbackApkUrl;
       for (final asset in assets) {
         final name = asset['name'] as String?;
         if (name != null && name.endsWith('.apk')) {
           final url = asset['browser_download_url'] as String?;
-          if (url != null) return url;
+          if (url != null) {
+            // Prefer universal or main branded APK if multiple per-arch APKs exist
+            if (name.toLowerCase().contains('universal') || !name.contains('-arm') && !name.contains('-x86')) {
+              return url;
+            }
+            fallbackApkUrl ??= url;
+          }
         }
       }
+      if (fallbackApkUrl != null) return fallbackApkUrl;
     }
     return releaseData['html_url'] as String? ?? '';
   }
@@ -153,9 +170,14 @@ class UpdateService {
   static String? _getChecksumUrl(Map<String, dynamic> releaseData, String tag) {
     final assets = releaseData['assets'] as List<dynamic>?;
     if (assets == null) return null;
+    final cleanTag = tag.startsWith('v') ? tag.substring(1) : tag;
     for (final asset in assets) {
       final name = asset['name'] as String?;
-      if (name != null && name == 'SHA256SUMS-$tag.txt') {
+      if (name != null &&
+          (name == 'SHA256SUMS-$tag.txt' ||
+           name == 'SHA256SUMS-v$cleanTag.txt' ||
+           name == 'SHA256SUMS-$cleanTag.txt' ||
+           name == 'SHA256SUMS.txt')) {
         return asset['browser_download_url'] as String?;
       }
     }
@@ -192,12 +214,14 @@ class UpdateService {
       // Filenames may contain spaces (e.g. "Curated Feeds v1.0.0.apk"), so
       // the first token is the digest and everything after the first
       // whitespace run is the filename — do not require exactly two columns.
+      // Also handles binary-mode output (e.g. "<sha256> *filename").
       for (final line in response.body.split('\n')) {
         final match = RegExp(
           r'^([0-9A-Fa-f]{64})\s+(.+)$',
         ).firstMatch(line.trim());
         if (match == null) continue;
-        if (match.group(2) == apkFileName) {
+        final candidate = match.group(2)!.replaceFirst(RegExp(r'^\*'), '').trim();
+        if (candidate == apkFileName) {
           return match.group(1)!.toLowerCase();
         }
       }
@@ -370,6 +394,11 @@ class UpdateService {
       }
 
       final complete = File(file.path.replaceAll(RegExp(r'\.part$'), ''));
+      if (await complete.exists()) {
+        try {
+          await complete.delete();
+        } catch (_) {}
+      }
       await file.rename(complete.path);
       return UpdateDownloadHandle(
         file: complete,

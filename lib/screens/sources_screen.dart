@@ -26,7 +26,7 @@ import '../models/rss_source.dart';
 import '../repositories/article_repository.dart';
 import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
-import '../utils/constants.dart' hide AppColors;
+import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
 import '../utils/opml.dart';
@@ -191,6 +191,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
             final customs = await settings.getCustomSources();
             final created = customs.firstWhere(
               (s) => s.url.toLowerCase() == url.toLowerCase(),
+              orElse: () => customs.last,
             );
             final subs = await settings.getSubscribedSourceIds();
             subs.add(created.id);
@@ -294,7 +295,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
         subscribedCanonical.length + subscribedCustom.length;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -496,9 +497,9 @@ class _SourcesScreenState extends State<SourcesScreen> {
       }
 
       final text = utf8.decode(bytes);
-      final urls = parseOpmlUrls(text);
+      final entries = parseOpmlEntries(text);
 
-      if (urls.isEmpty) {
+      if (entries.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
@@ -506,27 +507,61 @@ class _SourcesScreenState extends State<SourcesScreen> {
         return;
       }
 
-      // Match OPML URLs to canonical sources (by source.url)
-      final matching = matchCanonicalSources(
-        urls,
-        getIt<RssFeedService>().sources,
-      );
+      final canonical = getIt<RssFeedService>().sources;
+      final canonicalUrls = {
+        for (final s in canonical) s.url.toLowerCase(): s.id,
+      };
+      final settings = getIt<SettingsService>();
+      final existingCustoms = await settings.getCustomSources();
+      final existingCustomUrls = {
+        for (final s in existingCustoms) s.url.toLowerCase(): s.id,
+      };
 
-      if (matching.isEmpty) {
+      final toSubscribe = <String>{};
+      int newCustomCount = 0;
+
+      for (final entry in entries) {
+        final lower = entry.url.toLowerCase();
+        if (canonicalUrls.containsKey(lower)) {
+          toSubscribe.add(canonicalUrls[lower]!);
+        } else if (existingCustomUrls.containsKey(lower)) {
+          toSubscribe.add(existingCustomUrls[lower]!);
+        } else {
+          // Non-canonical feed — import as custom source so user feeds are kept.
+          await settings.addCustomSource(entry.title, entry.url);
+          newCustomCount++;
+        }
+      }
+
+      if (newCustomCount > 0) {
+        final updatedCustoms = await settings.getCustomSources();
+        for (final entry in entries) {
+          final lower = entry.url.toLowerCase();
+          final match = updatedCustoms.where(
+            (s) => s.url.toLowerCase() == lower,
+          );
+          if (match.isNotEmpty) {
+            toSubscribe.add(match.first.id);
+          }
+        }
+      }
+
+      if (toSubscribe.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.opmlNoMatches(urls.length))),
+          SnackBar(content: Text(l10n.opmlNoMatches(entries.length))),
         );
         return;
       }
 
-      final merged = {..._subscriptions, ...matching};
+      final merged = {..._subscriptions, ...toSubscribe};
       setState(() => _subscriptions = merged);
-      await getIt<SettingsService>().setSubscribedSourceIds(merged);
+      await settings.setSubscribedSourceIds(merged);
+      await _load();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.opmlImported(matching.length))),
+        SnackBar(content: Text(l10n.opmlImported(toSubscribe.length))),
       );
     } catch (e) {
       // Log the raw error; show only a generic message — exception text can
@@ -794,10 +829,10 @@ class _CategoryGroup extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: subscriptions.contains(s.id)
-                          ? const Icon(
+                          ? Icon(
                               Icons.check,
                               size: 12,
-                              color: Colors.white,
+                              color: cs.onPrimary,
                             )
                           : null,
                     ),

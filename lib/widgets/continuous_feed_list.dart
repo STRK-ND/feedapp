@@ -48,7 +48,9 @@ class ContinuousFeedList extends StatelessWidget {
     }
 
     return ListView.builder(
-      physics: const BouncingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       padding: const EdgeInsets.only(bottom: AppSpacing.s16),
       itemCount: items.length,
       itemBuilder: (context, i) {

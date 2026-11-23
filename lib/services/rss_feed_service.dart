@@ -6,18 +6,22 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/article.dart';
 import '../models/rss_source.dart';
-import '../utils/constants.dart';
+import '../utils/category_accent.dart';
+import '../utils/design_tokens.dart';
 
 /// Bundled source list. Used only before the first successful /sources
 /// fetch and when neither the cached list nor the network is available —
 /// the worker's GET /sources list is the source of truth.
+///
+/// The accent is not stored per entry: it is whatever the category says it
+/// is, so a palette change reaches the seeds automatically.
 const List<RssSource> _kOfflineSeedSources = [
   RssSource(
     id: 'verge',
     name: 'The Verge',
     url: 'https://www.theverge.com/rss/index.xml',
     category: 'Tech',
-    color: AppColors.techSecondary,
+    color: CategoryAccent.tech,
     icon: Icons.devices,
   ),
   RssSource(
@@ -25,7 +29,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'Wired',
     url: 'https://www.wired.com/feed/rss',
     category: 'Tech',
-    color: AppColors.techSecondary,
+    color: CategoryAccent.tech,
     icon: Icons.memory,
   ),
   RssSource(
@@ -33,7 +37,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'BBC World',
     url: 'https://feeds.bbci.co.uk/news/rss.xml',
     category: 'News',
-    color: AppColors.newsPrimary,
+    color: CategoryAccent.news,
     icon: Icons.public,
   ),
   RssSource(
@@ -41,7 +45,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'New Scientist',
     url: 'https://www.newscientist.com/feed/home?format=rss',
     category: 'Science',
-    color: AppColors.scienceSecondary,
+    color: CategoryAccent.science,
     icon: Icons.biotech,
   ),
   RssSource(
@@ -49,7 +53,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'Sky Sports',
     url: 'https://www.skysports.com/rss/12040',
     category: 'Sports',
-    color: AppColors.sportsSecondary,
+    color: CategoryAccent.sports,
     icon: Icons.sports_soccer,
   ),
   RssSource(
@@ -57,7 +61,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'Variety',
     url: 'https://variety.com/feed/',
     category: 'Entertainment',
-    color: AppColors.entertainmentPrimary,
+    color: CategoryAccent.entertainment,
     icon: Icons.theaters_rounded,
   ),
   RssSource(
@@ -65,7 +69,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'Ars Technica',
     url: 'https://feeds.arstechnica.com/arstechnica/index',
     category: 'Tech',
-    color: AppColors.techSecondary,
+    color: CategoryAccent.tech,
     icon: Icons.computer,
   ),
   RssSource(
@@ -73,7 +77,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'TechCrunch',
     url: 'https://techcrunch.com/feed/',
     category: 'Tech',
-    color: AppColors.techSecondary,
+    color: CategoryAccent.tech,
     icon: Icons.rocket_launch,
   ),
   RssSource(
@@ -81,7 +85,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'Engadget',
     url: 'https://www.engadget.com/rss.xml',
     category: 'Tech',
-    color: AppColors.techSecondary,
+    color: CategoryAccent.tech,
     icon: Icons.devices_other,
   ),
   RssSource(
@@ -89,7 +93,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'The Guardian',
     url: 'https://www.theguardian.com/world/rss',
     category: 'News',
-    color: AppColors.newsPrimary,
+    color: CategoryAccent.news,
     icon: Icons.newspaper,
   ),
   RssSource(
@@ -97,7 +101,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'IGN',
     url: 'https://feeds.ign.com/ign/games-all',
     category: 'Gaming',
-    color: AppColors.gamingSecondary,
+    color: CategoryAccent.gaming,
     icon: Icons.sports_esports,
   ),
   RssSource(
@@ -105,7 +109,7 @@ const List<RssSource> _kOfflineSeedSources = [
     name: 'NASA',
     url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss',
     category: 'Science',
-    color: AppColors.scienceSecondary,
+    color: CategoryAccent.science,
     icon: Icons.rocket,
   ),
 ];
@@ -234,15 +238,7 @@ class RssFeedService {
         return Color(int.parse(hex.replaceFirst('#', '0xFF')));
       } catch (_) {}
     }
-    return switch (category) {
-      'Tech' => AppColors.techSecondary,
-      'News' => AppColors.newsPrimary,
-      'Science' => AppColors.scienceSecondary,
-      'Sports' => AppColors.sportsSecondary,
-      'Entertainment' => AppColors.entertainmentPrimary,
-      'Gaming' => AppColors.gamingSecondary,
-      _ => RssSource.customColor,
-    };
+    return CategoryAccent.forCategory(category) ?? RssSource.customColor;
   }
 
   /// Get source by ID

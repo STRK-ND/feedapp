@@ -28,7 +28,7 @@ class SettingsNotifier extends ChangeNotifier {
   int _maxArticles = 500;
 
   // ----- Reading preferences (added in the redesign pass) -----
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.dark;
   ReaderTheme _readerTheme = ReaderTheme.defaultTheme;
   double _fontSize = 16;
   double _lineHeight = 1.6;

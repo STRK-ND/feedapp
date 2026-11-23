@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:curatedfeeds/utils/category_accent.dart';
 import 'package:curatedfeeds/utils/design_tokens.dart';
-import 'package:curatedfeeds/utils/constants.dart' as constants;
 
 /// Drift guard for the curated-feeds design spec (§3.1 palette table).
 ///
 /// If someone edits a hex in `design_tokens.dart` (or the category
-/// accents in `constants.dart`), the spec in
+/// accents in `category_accent.dart`), the spec in
 /// `docs/superpowers/specs/2026-07-11-curated-feeds-redesign-design.md`
 /// and the code will disagree. These assertions pin the code to the
 /// spec so the mismatch surfaces as a test failure, not a silent
@@ -43,13 +43,13 @@ void main() {
       expect(AppColors.einkText, const Color(0xFFE8E2D9));
     });
 
-    test('palette §3.1 — category accents kept in constants AppColors', () {
-      expect(constants.AppColors.techPrimary, const Color(0xFF3B82F6));
-      expect(constants.AppColors.newsPrimary, const Color(0xFFDC2626));
-      expect(constants.AppColors.sciencePrimary, const Color(0xFF0891B2));
-      expect(constants.AppColors.sportsPrimary, const Color(0xFF059669));
-      expect(constants.AppColors.entertainmentPrimary, const Color(0xFF7C3AED));
-      expect(constants.AppColors.gamingPrimary, const Color(0xFF8B5CF6));
+    test('palette §3.1 — category accents in CategoryAccent', () {
+      expect(CategoryAccent.tech, const Color(0xFF60A5FA));
+      expect(CategoryAccent.news, const Color(0xFFDC2626));
+      expect(CategoryAccent.science, const Color(0xFF22D3EE));
+      expect(CategoryAccent.sports, const Color(0xFF34D399));
+      expect(CategoryAccent.entertainment, const Color(0xFF7C3AED));
+      expect(CategoryAccent.gaming, const Color(0xFFA78BFA));
     });
   });
 }

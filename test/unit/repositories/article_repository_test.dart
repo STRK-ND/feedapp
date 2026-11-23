@@ -212,5 +212,20 @@ void main() {
         expect(since!.isBefore(DateTime.now()), isTrue);
       });
     });
+
+    group('onArticlesChanged stream', () {
+      test('syncFrom notifies onArticlesChanged listeners', () async {
+        final repo = ArticleRepository();
+        bool notified = false;
+        final sub = repo.onArticlesChanged.listen((_) {
+          notified = true;
+        });
+
+        repo.syncFrom(<Article>[], <Article>[]);
+        await Future<void>.delayed(Duration.zero);
+        expect(notified, isTrue);
+        await sub.cancel();
+      });
+    });
   });
 }

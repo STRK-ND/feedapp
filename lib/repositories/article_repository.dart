@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../models/filter_params.dart';
+import '../models/rss_source.dart';
+import '../services/rss_feed_service.dart';
 import '../services/worker_feed_service.dart';
 import '../services/client_feed_service.dart';
 import '../services/storage_service.dart';
@@ -41,10 +43,22 @@ class ArticleRepository {
   List<Article>? _cachedArticles;
   List<Article>? _cachedSavedArticles;
 
+  final StreamController<void> _articlesChangedController =
+      StreamController<void>.broadcast();
+
+  /// Fired whenever articles or saved articles are updated in the repository.
+  Stream<void> get onArticlesChanged => _articlesChangedController.stream;
+
+  List<Article>? get cachedArticles => _cachedArticles;
+  List<Article>? get cachedSavedArticles => _cachedSavedArticles;
+
   /// Clear the internal cache
   void clearCache() {
     _cachedArticles = null;
     _cachedSavedArticles = null;
+    if (!_articlesChangedController.isClosed) {
+      _articlesChangedController.add(null);
+    }
   }
 
   /// Mirror the feed screen's authoritative in-memory lists into the cache.
@@ -56,6 +70,9 @@ class ArticleRepository {
   void syncFrom(List<Article> articles, List<Article> savedArticles) {
     _cachedArticles = List.of(articles);
     _cachedSavedArticles = List.of(savedArticles);
+    if (!_articlesChangedController.isClosed) {
+      _articlesChangedController.add(null);
+    }
   }
 
   /// Fetch all articles from storage
@@ -137,16 +154,30 @@ class ArticleRepository {
       int page = 1;
       bool hasMore = true;
 
-      while (hasMore && page <= 5) {
-        final response = await _workerFeedService.fetchArticles(
-          params: FilterParams(page: page, pageSize: 50, since: watermark),
+      try {
+        while (hasMore && page <= 5) {
+          final response = await _workerFeedService.fetchArticles(
+            params: FilterParams(page: page, pageSize: 50, since: watermark),
+          );
+
+          workerArticles.addAll(response.items);
+          hasMore = response.hasMore;
+          page++;
+
+          if (response.items.isEmpty) break;
+        }
+      } catch (workerError) {
+        debugPrint(
+          '[Repository] Worker API unavailable ($workerError); falling back to direct client fetch',
         );
-
-        workerArticles.addAll(response.items);
-        hasMore = response.hasMore;
-        page++;
-
-        if (response.items.isEmpty) break;
+        unawaited(
+          ErrorHandler.logWarning(
+            'Worker API failed, initiating client-side fallback',
+            error: workerError,
+          ),
+        );
+        final fallbackArticles = await _fetchCanonicalFallbackArticles();
+        workerArticles.addAll(fallbackArticles);
       }
 
       // User-added feeds are fetched client-side every refresh (capped per
@@ -221,6 +252,38 @@ class ArticleRepository {
       return results.expand((list) => list).toList();
     } catch (e) {
       unawaited(ErrorHandler.logError('Custom source fetch skipped', error: e));
+      return [];
+    }
+  }
+
+  /// Fallback client-side fetch for canonical feeds when the Worker API fails.
+  Future<List<Article>> _fetchCanonicalFallbackArticles() async {
+    final clientFeedService = _clientFeedService;
+    if (clientFeedService == null) return [];
+    try {
+      final sources = getIt.isRegistered<RssFeedService>()
+          ? getIt<RssFeedService>().sources
+          : <RssSource>[];
+      if (sources.isEmpty) return [];
+
+      final settingsService = _settingsService;
+      final subscribed = settingsService != null
+          ? await settingsService.getSubscribedSourceIds()
+          : <String>{};
+      final active = sources
+          .where((s) => subscribed.isEmpty || subscribed.contains(s.id))
+          .toList();
+
+      final results = await Future.wait(
+        active.map(
+          (s) => clientFeedService
+              .fetchSourceArticles(s)
+              .catchError((Object _) => <Article>[]),
+        ),
+      );
+      return results.expand((list) => list).toList();
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Canonical fallback fetch failed', error: e));
       return [];
     }
   }
@@ -306,6 +369,10 @@ class ArticleRepository {
         }
       }
 
+      if (!_articlesChangedController.isClosed) {
+        _articlesChangedController.add(null);
+      }
+
       return Result.success(null);
     } catch (e, stackTrace) {
       unawaited(
@@ -358,6 +425,9 @@ class ArticleRepository {
       debugPrint(
         '[Repository] Marked all read. Flipped ${flipped.length} article(s).',
       );
+      if (!_articlesChangedController.isClosed) {
+        _articlesChangedController.add(null);
+      }
       return Result.success(previousReadState);
     } catch (e, stackTrace) {
       unawaited(
@@ -404,6 +474,9 @@ class ArticleRepository {
       debugPrint(
         '[Repository] Restored ${flipped.length} article(s) to unread.',
       );
+      if (!_articlesChangedController.isClosed) {
+        _articlesChangedController.add(null);
+      }
       return Result.success(null);
     } catch (e, stackTrace) {
       unawaited(

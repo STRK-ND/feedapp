@@ -11,8 +11,10 @@ library;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../di/service_locator.dart';
+import '../providers/settings_notifier.dart';
 import '../services/rss_feed_service.dart';
 import '../services/settings_service.dart';
 import '../utils/design_tokens.dart';
@@ -74,6 +76,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     await settings.setHasCompletedOnboarding(true);
     EditionState.current = await settings.getEditionNumber();
+    if (!mounted) return;
+    try {
+      await context.read<SettingsNotifier>().loadSettings();
+    } catch (_) {}
     if (!mounted) return;
     unawaited(
       Navigator.of(context).pushReplacement(
@@ -216,7 +222,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ).obAddAndContinueCta(_pickedSources.length)
                         : AppLocalizations.of(context).obContinueWithoutCta),
               style: AppType.labelLarge(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ).copyWith(letterSpacing: 1.2),
             ),
           ),
@@ -778,7 +784,11 @@ class _SourceRow extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: picked
-                    ? const Icon(Icons.check, size: 12, color: Colors.white)
+                    ? Icon(
+                        Icons.check,
+                        size: 12,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      )
                     : null,
               ),
             ],

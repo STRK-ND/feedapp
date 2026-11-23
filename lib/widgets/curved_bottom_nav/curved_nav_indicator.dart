@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-import '../../utils/constants.dart' hide AppColors;
+import '../../utils/constants.dart';
 import '../../utils/design_tokens.dart';
 
 /// CustomPainter for the reskinned bottom nav. Out: frosted-glass pill +
@@ -36,23 +36,16 @@ class CurvedNavBarPainter extends CustomPainter {
 
     // ── 1. Solid rail fill + hairline top edge ─────────────────────
     final bgRect = Rect.fromLTWH(0, 0, width, height);
-    final bgRRect = RRect.fromRectAndRadius(
+    canvas.drawRect(
       bgRect,
-      const Radius.circular(CurvedNavTokens.barRadius),
-    );
-
-    canvas.drawRRect(
-      bgRRect,
       Paint()
         ..color = isDark ? AppColors.groundElev : CurvedNavTokens.lightBarFill,
     );
-    canvas.drawRRect(
-      bgRRect,
+    canvas.drawLine(
+      Offset.zero,
+      Offset(width, 0),
       Paint()
-        ..color = (isDark ? AppColors.ruleOnGround : AppColors.rule).withValues(
-          alpha: 1,
-        )
-        ..style = PaintingStyle.stroke
+        ..color = isDark ? AppColors.ruleOnGround : AppColors.rule
         ..strokeWidth = 0.5,
     );
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../utils/category_accent.dart';
+import '../utils/design_tokens.dart';
 
 /// Model for in-app notifications
 class InAppNotification {
@@ -58,34 +60,34 @@ extension NotificationTypeExtension on NotificationType {
   Color get backgroundColor {
     switch (this) {
       case NotificationType.info:
-        return const Color(0xFF2196F3);
+        return CategoryAccent.tech;
       case NotificationType.success:
-        return const Color(0xFF4CAF50);
+        return CategoryAccent.sports;
       case NotificationType.warning:
-        return const Color(0xFFFF9800);
+        return AppColors.curation;
       case NotificationType.error:
-        return const Color(0xFFF44336);
+        return CategoryAccent.news;
       case NotificationType.newArticle:
-        return const Color(0xFF9C27B0);
+        return AppColors.curation;
       case NotificationType.breakingNews:
-        return const Color(0xFFE53935);
+        return CategoryAccent.news;
     }
   }
 
   Color get iconColor {
     switch (this) {
       case NotificationType.info:
-        return const Color(0xFF1976D2);
+        return CategoryAccent.tech;
       case NotificationType.success:
-        return const Color(0xFF388E3C);
+        return CategoryAccent.sports;
       case NotificationType.warning:
-        return const Color(0xFFF57C00);
+        return AppColors.curation;
       case NotificationType.error:
-        return const Color(0xFFD32F2F);
+        return CategoryAccent.news;
       case NotificationType.newArticle:
-        return const Color(0xFF7B1FA2);
+        return AppColors.curation;
       case NotificationType.breakingNews:
-        return const Color(0xFFC62828);
+        return CategoryAccent.news;
     }
   }
 
