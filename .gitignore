@@ -91,3 +91,5 @@ _ss*.png
 e2e/node_modules/
 e2e/.e2e/
 e2e/e2e.local.config.ts
+cc*.json
+build*.json
