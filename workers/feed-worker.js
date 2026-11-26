@@ -56,6 +56,26 @@ const SOURCES_OVERRIDE_KEY = 'config:sources';
 const ARTICLES_TTL_SECONDS = 5 * 60;
 const REFRESH_LOCK_KEY = 'refresh:lock';
 const MAX_XML_BYTES = 5 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Teaser-feed full-text extraction (market roadmap Tier 1, feature 2).
+// Many feeds ship only a headline + one sentence; when an item's body is a
+// teaser, the refresh fetches the article page and extracts the main text
+// server-side so the reader shows the whole story with no client fetch.
+// Budget guards keep a refresh from blowing up or ballooning the KV cache.
+// ---------------------------------------------------------------------------
+const EXTRACT_MAX_ITEMS_PER_CYCLE = 25;
+const EXTRACT_MIN_DESCRIPTION_CHARS = 400; // shorter → teaser candidate
+const EXTRACT_FETCH_TIMEOUT_MS = 8000;
+const EXTRACT_MAX_HTML_BYTES = 512 * 1024;
+const EXTRACT_MAX_TEXT_CHARS = 12 * 1024;
+// Only store the extracted body when it is materially longer than the
+// teaser — P-1 taught us never to ship a fullContent that mirrors the
+// description.
+const EXTRACT_MATERIAL_RATIO = 1.5;
+// Hard guard: the whole feed cache lives in one KV value (25 MiB hard
+// limit). Shed extracted bodies before the serialized cache gets near it.
+const CACHE_SOFT_LIMIT_BYTES = 20 * 1024 * 1024;
 const CORS_ALLOWED_ORIGIN = 'https://curated-feeds-worker.raj15400881.workers.dev';
 
 // ---------------------------------------------------------------------------
@@ -478,8 +498,27 @@ async function refreshArticlesAndMaybeNotify(env) {
       }
     }
 
+    // Teaser-feed full text: extract server-side for genuinely-new teaser
+    // items only (items already in the cache were handled in an earlier
+    // cycle), newest first, capped per cycle. A failure anywhere is a
+    // silent skip — the client falls back to the teaser body.
+    const newIdSet = new Set(newIds);
+    const teaserCandidates = articles
+      .filter((a) => newIdSet.has(a.id) && isTeaser(a))
+      .slice(0, EXTRACT_MAX_ITEMS_PER_CYCLE);
+    if (teaserCandidates.length > 0) {
+      try {
+        await extractFullContentFor(teaserCandidates);
+      } catch (e) {
+        // Promise.all inside batches already swallows per-item failures;
+        // this guards the orchestration itself.
+        console.warn('extract_full_content_failed', { error: String(e) });
+      }
+    }
+
     // Persist — KV with TTL so we naturally expire to "cold" between crons.
-    await env.ARTICLES_KV.put(ARTICLES_CACHE_KEY, JSON.stringify(articles), {
+    const serialized = shedFullContentForLimit(articles, CACHE_SOFT_LIMIT_BYTES);
+    await env.ARTICLES_KV.put(ARTICLES_CACHE_KEY, serialized, {
       expirationTtl: ARTICLES_TTL_SECONDS * 2, // keep alive through 2 cron ticks
     });
     // Seen IDs get a longer TTL — we want them to outlive article cache so the
@@ -666,11 +705,13 @@ function buildArticle(body, source, opts) {
     id: stableId(source.id, link),
     title,
     description,
-    // P-1: `fullContent` intentionally omitted. It was always a
-    // byte-for-byte copy of `description` (measured: 100/100 articles),
-    // costing 26% of every payload. Clients treat the field as optional
-    // (Article.fromJson defaults it to '') and the reader falls back to
-    // `description`; remove this comment once no deployed client reads it.
+    // `fullContent` is attached later, only for teaser items whose page
+    // fetch yields materially more text (see extractFullContentFor). It is
+    // NOT a copy of `description` — the P-1 finding was about waste, and
+    // this field only ever carries genuinely extracted bodies. Clients
+    // treat the field as optional (Article.fromJson defaults it to '') and
+    // prefer it in the reader when present.
+    fullContent: null,
     link,
     sourceId: source.id,
     sourceName: source.name,
@@ -719,6 +760,125 @@ function xmlDecodeUrl(url) {
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
+}
+
+// ---------------------------------------------------------------------------
+// Teaser-feed full-text extraction
+// ---------------------------------------------------------------------------
+
+/// A teaser is an item whose feed body is too short to be the article.
+function isTeaser(article) {
+  return (article.description || '').length < EXTRACT_MIN_DESCRIPTION_CHARS;
+}
+
+/// Fetch [url] and return the extracted main text, or null on any failure
+/// (timeout, oversize, non-200, unparseable). Failures are silent by
+/// design: the client falls back to the teaser body it already has.
+async function fetchArticleText(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EXTRACT_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      // Browser-like UA: some publishers 403 obvious bot agents. A 403/429
+      // response is still handled below as a silent skip — never hammer a
+      // rate-limiting host.
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; CuratedFeeds/1.0; +https://curatedfeeds.app)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!response.ok) return null;
+    const html = await readTextCapped(response, EXTRACT_MAX_HTML_BYTES);
+    if (html === null) return null;
+    return extractMainText(html);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/// Heuristic main-content extraction without a DOM: drop the known noise
+/// containers, prefer the longest <article> block, fall back to <main>,
+/// then to the stripped page. Returns collapsed plain text.
+function extractMainText(html) {
+  const work = String(html)
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(
+      /<(script|style|noscript|svg|nav|header|footer|aside|form)\b[^>]*>[\s\S]*?<\/\1>/gi,
+      ' ',
+    );
+
+  let best = '';
+  const articleRe = /<article\b[^>]*>([\s\S]*?)<\/article>/gi;
+  let match;
+  while ((match = articleRe.exec(work)) !== null) {
+    const text = collapseWhitespace(strip(match[1]));
+    if (text.length > best.length) best = text;
+  }
+
+  if (best.length < 200) {
+    const mainMatch = work.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+    if (mainMatch) best = collapseWhitespace(strip(mainMatch[1]));
+  }
+  if (best.length < 200) {
+    best = collapseWhitespace(strip(work));
+  }
+
+  if (best.length > EXTRACT_MAX_TEXT_CHARS) {
+    best = best.slice(0, EXTRACT_MAX_TEXT_CHARS);
+  }
+  return best;
+}
+
+function collapseWhitespace(s) {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/// Attach [text] to [article] when it is a genuine article body: non-empty
+/// and materially longer than the teaser. Pure predicate + mutation so the
+/// rule is unit-testable. Returns true when attached.
+function attachExtractedFullContent(article, text) {
+  if (!text || text.length < 200) return false;
+  const descriptionLength = (article.description || '').length;
+  if (text.length <= descriptionLength * EXTRACT_MATERIAL_RATIO) return false;
+  article.fullContent = text;
+  return true;
+}
+
+/// Fetch + attach full text for the given teaser articles, in small
+/// parallel batches so a cycle stays well inside its wall-clock budget
+/// (25 items × 8 s worst case would be too slow sequentially).
+async function extractFullContentFor(articles) {
+  const BATCH = 5;
+  for (let i = 0; i < articles.length; i += BATCH) {
+    const batch = articles.slice(i, i + BATCH);
+    const texts = await Promise.all(batch.map((a) => fetchArticleText(a.link)));
+    for (let j = 0; j < batch.length; j++) {
+      attachExtractedFullContent(batch[j], texts[j]);
+    }
+  }
+}
+
+/// Shed extracted bodies (oldest first) until the serialized cache fits
+/// [limitBytes]. Pure with respect to the returned JSON string; mutates
+/// the articles. The estimate avoids re-serializing per shed item.
+function shedFullContentForLimit(articles, limitBytes) {
+  let serialized = JSON.stringify(articles);
+  if (serialized.length <= limitBytes) return serialized;
+  let excess = serialized.length - limitBytes;
+  for (let i = articles.length - 1; i >= 0 && excess > 0; i--) {
+    const body = articles[i].fullContent;
+    if (body) {
+      // ~20 bytes of JSON framing per field, empirically generous.
+      excess -= body.length + 20;
+      delete articles[i].fullContent;
+    }
+  }
+  return JSON.stringify(articles);
 }
 
 // ---------------------------------------------------------------------------
@@ -1076,4 +1236,4 @@ function cors(response, { etag } = {}) {
 // fresh env but runs inside the same rate window must be able to start clean.
 function resetRateMemory() { RATE_MEMORY.clear(); }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, rowClearsMutes, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, rowClearsMutes, isTeaser, fetchArticleText, extractMainText, attachExtractedFullContent, shedFullContentForLimit, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };

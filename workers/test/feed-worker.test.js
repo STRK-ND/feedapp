@@ -25,6 +25,11 @@ import {
   resetRateMemory,
   rowMatchesCategories,
   rowClearsMutes,
+  isTeaser,
+  fetchArticleText,
+  extractMainText,
+  attachExtractedFullContent,
+  shedFullContentForLimit,
 } from '../feed-worker.js';
 import worker from '../feed-worker.js';
 
@@ -784,11 +789,149 @@ test('L-3: parseArticleParams truncates over-long free-text params', () => {
   assert.deepEqual(ok.sources, ['a', 'b']);
 });
 
-test('P-1: buildArticle no longer emits the duplicated fullContent field', () => {
+test('P-1: buildArticle emits fullContent only as a null placeholder', () => {
   const source = SOURCES[0];
   const body = '<title>T</title><link>https://example.com/p1</link><description>D</description>';
   const article = buildArticle(body, source, itemOpts);
   assert.ok(article);
   assert.equal(article.description, 'D');
-  assert.equal('fullContent' in article, false);
+  // P-1 was about waste: fullContent used to be a byte-for-byte copy of
+  // description in 100/100 articles. It is now null at build time and only
+  // ever attached by the teaser extractor with genuinely extracted text.
+  assert.equal(article.fullContent, null);
 });
+
+// ---------------------------------------------------------------------------
+// Teaser-feed full-text extraction
+// ---------------------------------------------------------------------------
+
+test('isTeaser: short bodies are candidates, long bodies are not', () => {
+  assert.equal(isTeaser({ description: 'short' }), true);
+  assert.equal(isTeaser({ description: '' }), true);
+  assert.equal(isTeaser({ description: 'x'.repeat(400) }), false);
+  assert.equal(isTeaser({ description: 'x'.repeat(1000) }), false);
+  assert.equal(isTeaser({}), true);
+});
+
+test('extractMainText: prefers the longest article block, drops noise', () => {
+  const html = `<html><head><style>.x{color:red}</style></head><body>
+    <nav>Home About</nav>
+    <article><p>${'Paragraph one. '.repeat(30)}</p></article>
+    <article><p>tiny</p></article>
+    <script>track('x');</script>
+  </body></html>`;
+  const text = extractMainText(html);
+  assert.ok(text.startsWith('Paragraph one.'), text.slice(0, 40));
+  assert.ok(!text.includes('track('));
+  assert.ok(!text.includes('Home About'));
+  assert.ok(!text.includes('<p>'));
+  assert.ok(text.length > 300);
+});
+
+test('extractMainText: falls back to main, then the whole page', () => {
+  const mainOnly = '<html><body><main><p>' + 'Main content. '.repeat(40) + '</p></main></body></html>';
+  assert.ok(extractMainText(mainOnly).startsWith('Main content.'));
+
+  const bare = '<html><body><p>' + 'Bare page. '.repeat(40) + '</p></body></html>';
+  assert.ok(extractMainText(bare).startsWith('Bare page.'));
+});
+
+test('extractMainText: decodes entities and collapses whitespace', () => {
+  const html = '<article><p>It&#8217;s &quot;fine&quot; &amp;   well</p></article>';
+  assert.equal(extractMainText(html), 'It’s "fine" & well');
+});
+
+test('extractMainText: truncates to the per-article cap', () => {
+  const html = '<article><p>' + 'word '.repeat(20000) + '</p></article>';
+  assert.ok(extractMainText(html).length <= 12 * 1024);
+});
+
+test('attachExtractedFullContent: only materially longer bodies attach', () => {
+  const teaser = { description: 'Short teaser body.' };
+  assert.equal(attachExtractedFullContent(teaser, null), false);
+  assert.equal('fullContent' in teaser, false);
+
+  // Too short to be an article body
+  assert.equal(attachExtractedFullContent(teaser, 'tiny'), false);
+
+  // Not materially longer than the teaser (≤ 1.5×)
+  const notMaterial = 'x'.repeat(Math.ceil('Short teaser body.'.length * 1.5));
+  assert.equal(attachExtractedFullContent(teaser, notMaterial), false);
+
+  // Genuine body attaches
+  const body = 'Full article text. '.repeat(40);
+  assert.equal(attachExtractedFullContent(teaser, body), true);
+  assert.equal(teaser.fullContent, body);
+
+  // Empty description: any real body passes the ratio
+  const empty = { description: '' };
+  assert.equal(attachExtractedFullContent(empty, 'A real body. '.repeat(20)), true);
+});
+
+test('shedFullContentForLimit: no-op under the limit, sheds oldest first over it', () => {
+  const mk = (i, body) => ({
+    id: `a${i}`,
+    title: `t${i}`,
+    description: 'd',
+    ...(body ? { fullContent: body } : {}),
+  });
+  const small = [mk(0, null), mk(1, null)];
+  assert.equal(shedFullContentForLimit(small, 10 ** 6), JSON.stringify(small));
+  assert.ok(small.every((a) => !('fullContent' in a) || a.fullContent === undefined));
+
+  // 3 articles × ~1KB bodies, limit forces shedding — oldest (highest index
+  // in the newest-first array) loses its body first.
+  const big = [mk(0, 'A'.repeat(1024)), mk(1, 'B'.repeat(1024)), mk(2, 'C'.repeat(1024))];
+  const out = shedFullContentForLimit(big, 1200);
+  assert.ok(out.length <= 1200, `serialized ${out.length} > 1200`);
+  assert.ok(!('fullContent' in big[2]), 'oldest shed first');
+  assert.ok(!('fullContent' in big[1]), 'second-oldest shed next');
+  assert.equal(big[0].fullContent, 'A'.repeat(1024), 'newest kept');
+});
+
+test('fetchArticleText: extracts on 200, skips silently on failure paths', async () => {
+  const page = '<html><body><article><p>' + 'Real article body. '.repeat(30) + '</p></article></body></html>';
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  try {
+    globalThis.fetch = async (url, opts) => {
+      calls.push({ url: String(url), opts });
+      if (String(url).includes('ok')) {
+        return { ok: true, body: { getReader: () => stringReader(page) } };
+      }
+      if (String(url).includes('forbidden')) return { ok: false, status: 403 };
+      if (String(url).includes('huge')) {
+        return { ok: true, body: { getReader: () => stringReader('x'.repeat(600 * 1024)) } };
+      }
+      throw new Error('boom');
+    };
+
+    const good = await fetchArticleText('https://example.com/ok');
+    assert.ok(good && good.startsWith('Real article body.'), String(good).slice(0, 40));
+    assert.equal(await fetchArticleText('https://example.com/forbidden'), null);
+    // readTextCapped returns truncated text (never null), so an oversized
+    // page yields '' or a capped extract — either way nothing attachable
+    // and never the full 600 KB.
+    const huge = await fetchArticleText('https://example.com/huge');
+    assert.ok(huge === null || huge.length <= 12 * 1024, `len=${huge?.length}`);
+    assert.equal(attachExtractedFullContent({ description: 'x' }, huge), false);
+    assert.equal(await fetchArticleText('https://example.com/throws'), null);
+
+    // Browser-like UA and an abort signal are set on every call
+    assert.ok(calls.every((c) => c.opts.signal instanceof AbortSignal));
+    assert.ok(calls.every((c) => /Mozilla/.test(c.opts.headers['User-Agent'])));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Minimal ReadableStream-like reader for readTextCapped.
+function stringReader(text) {
+  const encoder = new TextEncoder();
+  const chunk = encoder.encode(text);
+  let done = false;
+  return {
+    read: async () => (done ? { done: true } : ((done = true), { done: false, value: chunk })),
+    cancel: async () => {},
+  };
+}

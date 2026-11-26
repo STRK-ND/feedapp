@@ -483,6 +483,45 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                               ),
                             ),
                           ),
+                          // Server-extracted full text (teaser feeds):
+                          // the reader is showing the whole article, not
+                          // the feed's teaser body. Matches the header
+                          // buttons' hardcoded-label style.
+                          if (widget.article.fullContent.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.soft,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.badge,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.article_rounded,
+                                    size: 14,
+                                    color: palette.text,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Full text',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: palette.text,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(width: 8),
                           Flexible(
                             child: SingleChildScrollView(

@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Teaser-feed full text at ingestion (market roadmap Tier 1, feature 2):**
+  many feeds ship only a headline + one sentence; the worker now fetches
+  the article page server-side and extracts the main text for genuinely-new
+  teaser items (body < 400 chars), so the reader shows the whole story with
+  no client fetch. Guards: 25 items/cycle in batches of 5, 8 s timeout and
+  512 KB page cap per fetch, extracted text capped at 12 KB, and the body
+  is attached only when it is materially longer than the teaser (> 1.5×);
+  every failure is a silent skip — the client falls back to the teaser
+  body it already has. A hard shed guard keeps the serialized KV cache
+  under 20 MB by dropping extracted bodies oldest-first. The expanded card
+  shows a "Full text" badge when the body was server-extracted, and the
+  reader keeps preferring `fullContent` over the teaser (pre-existing
+  P-1 fallback). Regression: the extraction group in
+  `workers/test/feed-worker.test.js` (extraction heuristics, attach rule,
+  shed guard, fetch failure paths) and
+  `test/unit/widgets/expanded_article_card_test.dart` (badge + no client
+  fetch when the body is already present).
 - **Mute filters (market roadmap Tier 1, feature 1):** a user-managed list of
   muted keywords hides matching articles from the feed tab. Stored in
   `SettingsService` (`muted_terms`), normalized by the shared contract in
