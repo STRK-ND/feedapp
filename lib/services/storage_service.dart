@@ -63,6 +63,20 @@ class StorageService {
     }
   }
 
+  /// Full-text (body) search passthrough. Null means the device's SQLite
+  /// lacks FTS5 and the caller must fall back to the substring filter.
+  Future<List<BodySearchHit>?> searchBodies(
+    String query, {
+    bool saved = false,
+  }) async {
+    try {
+      return await _database.searchBodies(query, saved: saved);
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Body search failed', error: e));
+      return null;
+    }
+  }
+
   /// Row count of the saved list.
   Future<int> countSavedArticles() async {
     try {

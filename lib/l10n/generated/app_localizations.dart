@@ -578,6 +578,24 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get dialogDone;
 
+  /// No description provided for @bodySearchBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Also matching inside article bodies'**
+  String get bodySearchBanner;
+
+  /// No description provided for @bodySearchLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} match} other{{count} matches}} in article bodies'**
+  String bodySearchLockedTitle(int count);
+
+  /// No description provided for @bodySearchLockedCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Pro to open these results'**
+  String get bodySearchLockedCta;
+
   /// No description provided for @markAllAsReadAction.
   ///
   /// In en, this message translates to:

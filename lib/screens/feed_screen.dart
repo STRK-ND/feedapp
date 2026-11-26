@@ -13,6 +13,7 @@ import '../repositories/article_repository.dart';
 import '../services/storage_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/settings_service.dart';
+import '../services/feed_database.dart';
 import '../services/update_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/settings_notifier.dart';
@@ -71,6 +72,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _autoRefreshTimer;
   Timer? _searchDebounceTimer;
+
+  // Full-text (body) search state. `_bodyHits` is null when no body search
+  // has run for the current query (or FTS5 is unavailable); non-null holds
+  // the hit count even for free users (count shown, results locked).
+  // `_bodyHitArticles` is the Pro-only resolved list merged into the
+  // visible results underneath the title hits.
+  List<BodySearchHit>? _bodyHits;
+  List<Article> _bodyHitArticles = [];
   StreamSubscription<void>? _cloudSyncSub;
   StreamSubscription<void>? _repoArticlesSub;
   // Single-flight guard for refresh calls (manually tap, connectivity
@@ -745,7 +754,82 @@ class _RssFeedScreenState extends State<RssFeedScreen>
           .toList();
     }
 
+    // Body-search hits (FTS5): appended after the title pass so instant
+    // title hits rank first and body hits land underneath, deduped. Read
+    // and saved articles are deliberately searchable here — a query is an
+    // explicit act, and hiding a read article from search would make the
+    // index lie.
+    if (_selectedTab == 0 &&
+        _isSearchActive &&
+        _searchQuery.isNotEmpty &&
+        _bodyHitArticles.isNotEmpty) {
+      final seenIds = <String>{for (final a in articles) a.id};
+      final extra = _bodyHitArticles
+          .where((a) => !seenIds.contains(a.id))
+          .toList();
+      if (extra.isNotEmpty) articles = [...articles, ...extra];
+    }
+
     return articles;
+  }
+
+  /// Full-text search over article bodies (FTS5). Runs on the debounced
+  /// query for the feed tab. Free users get the match count only — the
+  /// results are Pro (see the locked teaser in _buildEmptyState); Pro
+  /// users get the hits merged underneath the title hits. Null hits mean
+  /// the device's SQLite lacks FTS5 and the feature is silently off.
+  Future<void> _runBodySearch(String query) async {
+    final trimmed = query.trim();
+    if (!_isSearchActive || trimmed.isEmpty || _selectedTab != 0) {
+      if (mounted && (_bodyHits != null || _bodyHitArticles.isNotEmpty)) {
+        setState(() {
+          _bodyHits = null;
+          _bodyHitArticles = [];
+          _displayedArticles = _getFilteredArticles();
+        });
+      }
+      return;
+    }
+
+    final hits = await _articleRepository.searchBodies(trimmed);
+    if (!mounted) return;
+    if (hits == null) {
+      setState(() {
+        _bodyHits = null;
+        _bodyHitArticles = [];
+        _displayedArticles = _getFilteredArticles();
+      });
+      return;
+    }
+
+    final isPro = context.read<SettingsNotifier>().isPro;
+    if (!isPro) {
+      if (hits.isNotEmpty) {
+        unawaited(
+          AnalyticsService.logBodySearchLocked(matchCount: hits.length),
+        );
+      }
+      setState(() {
+        _bodyHits = hits;
+        _bodyHitArticles = []; // results stay locked for free users
+        _displayedArticles = _getFilteredArticles();
+      });
+      return;
+    }
+
+    // Resolve hits against the screen's own loaded list — it is the same
+    // validated snapshot the repository exposes (1.2.1), and it is what
+    // the list views render.
+    final byId = {for (final a in _articles) a.id: a};
+    final resolved = [
+      for (final hit in hits)
+        if (byId[hit.id] != null) byId[hit.id]!,
+    ];
+    setState(() {
+      _bodyHits = hits;
+      _bodyHitArticles = resolved;
+      _displayedArticles = _getFilteredArticles();
+    });
   }
 
   void _showSnackBar(
@@ -900,12 +984,35 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         setState(() {
                           _searchQuery = '';
                           _isSearchActive = false;
+                          _bodyHits = null;
+                          _bodyHitArticles = [];
                           _displayedArticles = _getFilteredArticles();
                         });
                       },
                       icon: const Icon(Icons.clear_rounded, size: 18),
                       label: Text(_l10n.clearSearchCta),
                     ),
+                    // Body search (FTS5) is Pro. The count is free — the
+                    // results are not: demonstrated intent routes to the
+                    // paywall (R-1 pattern).
+                    if (_bodyHits != null &&
+                        _bodyHits!.isNotEmpty &&
+                        !context.read<SettingsNotifier>().isPro) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _l10n.bodySearchLockedTitle(_bodyHits!.length),
+                        style: _textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () => _promptUpgrade(trigger: 'body_search'),
+                        icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                        label: Text(_l10n.bodySearchLockedCta),
+                      ),
+                    ],
                   ] else if (_selectedTab == 0 &&
                       _articles.isEmpty &&
                       !_isLoading) ...[
@@ -993,6 +1100,39 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                 )
               : const SizedBox.shrink(),
         ),
+        // Body-search banner: hits merged underneath the title hits.
+        if (_isSearchActive &&
+            _searchQuery.isNotEmpty &&
+            _bodyHitArticles.isNotEmpty) ...[
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadius.badge),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.article_rounded,
+                  size: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _l10n.bodySearchBanner,
+                    style: _textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         // Card stack content
         Expanded(
           child: _displayedArticles.isEmpty && !_isLoading
@@ -1302,6 +1442,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                           _isSearchActive = !_isSearchActive;
                           if (!_isSearchActive) {
                             _searchQuery = '';
+                            _bodyHits = null;
+                            _bodyHitArticles = [];
                             _displayedArticles = _getFilteredArticles();
                           }
                         });
@@ -1481,6 +1623,8 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                     _searchDebounceTimer?.cancel();
                                     setState(() {
                                       _searchQuery = '';
+                                      _bodyHits = null;
+                                      _bodyHitArticles = [];
                                       _displayedArticles =
                                           _getFilteredArticles();
                                     });
@@ -1503,6 +1647,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                                 _searchQuery = value;
                                 _displayedArticles = _getFilteredArticles();
                               });
+                              unawaited(_runBodySearch(value));
                             }
                           },
                         );

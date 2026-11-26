@@ -106,6 +106,12 @@ class AnalyticsService {
   static Future<void> logCapHit({required int savedCount}) =>
       _log('cap_hit', {'saved_count': savedCount});
 
+  /// Body search is Pro-gated; this fires when a free user's query has
+  /// matches inside article bodies (the count is shown, the results are
+  /// not) — the demonstrated-intent moment for the body_search paywall.
+  static Future<void> logBodySearchLocked({required int matchCount}) =>
+      _log('body_search_locked', {'match_count': matchCount});
+
   // =========================================================================
   // In-app review prompt (R-4).
   // =========================================================================

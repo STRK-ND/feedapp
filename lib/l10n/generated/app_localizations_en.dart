@@ -299,6 +299,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dialogDone => 'Done';
 
   @override
+  String get bodySearchBanner => 'Also matching inside article bodies';
+
+  @override
+  String bodySearchLockedTitle(int count) {
+    return count == 1
+        ? '1 match in article bodies'
+        : '$count matches in article bodies';
+  }
+
+  @override
+  String get bodySearchLockedCta => 'Go Pro to open these results';
+
+  @override
   String get markAllAsReadAction => 'Mark all as read';
 
   @override

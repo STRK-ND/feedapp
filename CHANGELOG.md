@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Full-text body search (market roadmap Tier 1, feature 3):** SQLite FTS5
+  virtual tables over title + description + extracted body, schema v2→v3
+  with a one-time backfill of existing rows. Index maintenance lives in
+  the write methods (save/upsert/saveSaved/markUnsaved/clear), not SQL
+  triggers. Search runs on the debounced query as a second pass: instant
+  title hits first, body hits merged underneath under an "Also matching
+  inside article bodies" banner. Pro-gated per the market plan: free
+  users see the match count with a locked teaser routing to the paywall
+  (`body_search` entry, `body_search_locked` analytics); devices whose
+  SQLite lacks FTS5 silently keep the substring search. Regression:
+  `test/unit/services/feed_database_fts_test.dart` (indexing, multi-term
+  quoting, per-table scope, reindexing, migration backfill) and
+  `test/unit/screens/feed_body_search_test.dart` (free/Pro/no-match
+  gates).
 - **Teaser-feed full text at ingestion (market roadmap Tier 1, feature 2):**
   many feeds ship only a headline + one sentence; the worker now fetches
   the article page server-side and extracts the main text for genuinely-new

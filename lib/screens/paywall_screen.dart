@@ -16,13 +16,14 @@ import '../widgets/folio_rule.dart';
 
 /// Where the paywall was opened from — carried into analytics so the
 /// funnel (R-3) can attribute conversions per entry point.
-enum PaywallEntry { settings, saveCap, themeLock }
+enum PaywallEntry { settings, saveCap, themeLock, bodySearch }
 
 extension PaywallEntryX on PaywallEntry {
   String get analyticsValue => switch (this) {
     PaywallEntry.settings => 'settings',
     PaywallEntry.saveCap => 'save_cap',
     PaywallEntry.themeLock => 'theme_lock',
+    PaywallEntry.bodySearch => 'body_search',
   };
 }
 

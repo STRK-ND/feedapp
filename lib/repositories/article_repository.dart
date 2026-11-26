@@ -7,6 +7,7 @@ import '../services/rss_feed_service.dart';
 import '../services/worker_feed_service.dart';
 import '../services/client_feed_service.dart';
 import '../services/storage_service.dart';
+import '../services/feed_database.dart';
 import '../services/settings_service.dart';
 import '../utils/error_handler.dart';
 import '../di/service_locator.dart';
@@ -51,6 +52,28 @@ class ArticleRepository {
 
   List<Article>? get cachedArticles => _cachedArticles;
   List<Article>? get cachedSavedArticles => _cachedSavedArticles;
+
+  /// Full-text (body) search. Returns hits joined back to the repository's
+  /// validated snapshot (the 1.2.1 rule: the snapshot is the source of
+  /// truth — no second full-table read), in FTS relevance order, or null
+  /// when the device's SQLite lacks FTS5 (caller falls back to the
+  /// substring filter). Hits whose row is no longer in the snapshot are
+  /// dropped.
+  Future<List<BodySearchHit>?> searchBodies(
+    String query, {
+    bool savedOnly = false,
+  }) async {
+    final hits = await _storageService.searchBodies(query, saved: savedOnly);
+    if (hits == null) return null;
+    final snapshot = savedOnly ? _cachedSavedArticles : _cachedArticles;
+    if (snapshot == null) return const [];
+    final byId = {for (final a in snapshot) a.id: a};
+    return [
+      for (final hit in hits)
+        if (byId.containsKey(hit.id))
+          BodySearchHit(id: hit.id, snippet: hit.snippet),
+    ];
+  }
 
   /// Clear the internal cache
   void clearCache() {

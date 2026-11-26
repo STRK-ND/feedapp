@@ -21,6 +21,14 @@ import 'package:sqflite/sqflite.dart';
 import '../models/article.dart';
 import '../utils/constants.dart';
 
+/// One full-text (body) search hit: the article id plus a short snippet
+/// around the first match, ready for UI display.
+class BodySearchHit {
+  final String id;
+  final String snippet;
+  const BodySearchHit({required this.id, required this.snippet});
+}
+
 class FeedDatabase {
   FeedDatabase({Database? db, String? path})
     : _dbOrNull = db,
@@ -35,6 +43,16 @@ class FeedDatabase {
 
   static const String _articlesTable = 'articles';
   static const String _savedTable = 'saved_articles';
+  static const String _articlesFtsTable = 'articles_fts';
+  static const String _savedFtsTable = 'saved_fts';
+
+  /// False when the device's SQLite build lacks FTS5 (rare on API 21+).
+  /// [searchBodies] returns null in that case and callers fall back to
+  /// the substring filter; index maintenance becomes a no-op.
+  bool _ftsAvailable = true;
+
+  @visibleForTesting
+  bool get ftsAvailableForTest => _ftsAvailable;
 
   Future<Database> _open() async {
     final existing = _opened;
@@ -53,7 +71,7 @@ class FeedDatabase {
         : '${await getDatabasesPath()}/';
     final opened = await openDatabase(
       '$dirPath$path',
-      version: 2,
+      version: 3,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: migrate,
     );
@@ -85,11 +103,76 @@ class FeedDatabase {
         updated_at INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    await _createFtsTables(db);
+  }
+
+  /// FTS5 virtual tables over the searchable body text (title +
+  /// description + fullContent). Regular FTS5 tables keyed by an UNINDEXED
+  /// id column: deletes work with plain SQL, and index maintenance lives
+  /// in the write methods (which funnel every write) instead of SQL
+  /// triggers. Created defensively — a SQLite build without FTS5 must not
+  /// break the launch path, so failure just flips [_ftsAvailable].
+  Future<void> _createFtsTables(Database db) async {
+    _ftsAvailable = await createFtsTablesForTest(db);
+  }
+
+  /// Static so [migrate] (static) can share it; returns whether FTS5 is
+  /// available on this SQLite build.
+  @visibleForTesting
+  static Future<bool> createFtsTablesForTest(Database db) async {
+    try {
+      await db.execute(
+        'CREATE VIRTUAL TABLE IF NOT EXISTS $_articlesFtsTable '
+        'USING fts5(id UNINDEXED, body)',
+      );
+      await db.execute(
+        'CREATE VIRTUAL TABLE IF NOT EXISTS $_savedFtsTable '
+        'USING fts5(id UNINDEXED, body)',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[FeedDatabase] FTS5 unavailable, body search disabled: $e');
+      return false;
+    }
+  }
+
+  /// The indexed body text for [a]. Keep in lockstep with what the reader
+  /// can display: title, description and the extracted/full body.
+  static String _indexableBody(Article a) {
+    return '${a.title}\n${a.description}\n${a.fullContent}';
+  }
+
+  /// Reindex [articles] into [table] (fts). Callers own the delete: this
+  /// only inserts.
+  Future<void> _indexRows(
+    Transaction txn,
+    String table,
+    List<Article> articles,
+  ) async {
+    if (!_ftsAvailable) return;
+    final batch = txn.batch();
+    for (final a in articles) {
+      batch.insert(table, {'id': a.id, 'body': _indexableBody(a)});
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> _deleteIndexedRow(
+    Transaction txn,
+    String table,
+    String id,
+  ) async {
+    if (!_ftsAvailable) return;
+    await txn.delete(table, where: 'id = ?', whereArgs: [id]);
   }
 
   /// v1 → v2: adds the `updated_at` clock column used by cloud-sync
   /// last-write-wins merges. Legacy rows read as 0 so remote state wins
   /// on the first sync after upgrade.
+  ///
+  /// v2 → v3: creates the FTS5 body-search tables and backfills them from
+  /// the existing payloads (one-time decode cost on the first launch after
+  /// upgrade; steady-state indexing happens in the write methods).
   @visibleForTesting
   static Future<void> migrate(
     Database db,
@@ -103,6 +186,38 @@ class FeedDatabase {
       await db.execute(
         'ALTER TABLE $_savedTable ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
       );
+    }
+    if (oldVersion < 3) {
+      final ftsAvailable = await createFtsTablesForTest(db);
+      if (ftsAvailable) await _backfillFts(db);
+    }
+  }
+
+  /// One-time v3 backfill: index every existing row. Decoding every
+  /// payload here is deliberate — it happens once per device, not on
+  /// every launch (steady-state writes carry the article object).
+  static Future<void> _backfillFts(Database db) async {
+    try {
+      for (final table in [_articlesTable, _savedTable]) {
+        final rows = await db.query(table, columns: ['id', 'payload']);
+        final fts = table == _articlesTable
+            ? _articlesFtsTable
+            : _savedFtsTable;
+        final batch = db.batch();
+        for (final row in rows) {
+          try {
+            final a = decodeArticle(row['payload'] as String);
+            batch.insert(fts, {'id': a.id, 'body': _indexableBody(a)});
+          } catch (_) {
+            // A corrupt payload has no search body — skip it.
+          }
+        }
+        await batch.commit(noResult: true);
+      }
+    } catch (e) {
+      // Backfill is best-effort: a failed index rebuilds on the next
+      // full saveArticles anyway.
+      debugPrint('[FeedDatabase] FTS backfill failed: $e');
     }
   }
 
@@ -170,6 +285,10 @@ class FeedDatabase {
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
+      // Full rebuild is correct here: the table was just replaced
+      // wholesale, so the index mirrors it.
+      await txn.delete(_articlesFtsTable);
+      await _indexRows(txn, _articlesFtsTable, kept);
     });
   }
 
@@ -214,12 +333,16 @@ class FeedDatabase {
   /// [AppConfig.maxCachedArticles] rows on every swipe.
   Future<void> upsertArticle(Article article) async {
     final db = await _open();
-    await db.insert(_articlesTable, {
-      'id': article.id,
-      'pub_date': article.pubDate.millisecondsSinceEpoch,
-      'payload': encodeArticle(article),
-      'updated_at': _nowMs(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.transaction((txn) async {
+      await txn.insert(_articlesTable, {
+        'id': article.id,
+        'pub_date': article.pubDate.millisecondsSinceEpoch,
+        'payload': encodeArticle(article),
+        'updated_at': _nowMs(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await _deleteIndexedRow(txn, _articlesFtsTable, article.id);
+      await _indexRows(txn, _articlesFtsTable, [article]);
+    });
   }
 
   /// Upsert several article rows in one transaction — bulk flag flips
@@ -246,6 +369,10 @@ class FeedDatabase {
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
+      for (final a in articles) {
+        await _deleteIndexedRow(txn, _articlesFtsTable, a.id);
+      }
+      await _indexRows(txn, _articlesFtsTable, articles);
     });
   }
 
@@ -282,6 +409,8 @@ class FeedDatabase {
           'position': 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
+      await _deleteIndexedRow(txn, _savedFtsTable, article.id);
+      await _indexRows(txn, _savedFtsTable, [article]);
     });
   }
 
@@ -311,12 +440,17 @@ class FeedDatabase {
               where: 'id = ?',
               whereArgs: [id],
             );
+            // The payload changed — reindex the row so body search stays
+            // in lockstep with what the reader can display.
+            await _deleteIndexedRow(txn, _articlesFtsTable, id);
+            await _indexRows(txn, _articlesFtsTable, [flipped!]);
           }
         } catch (e) {
           debugPrint('[FeedDatabase] markUnsaved payload decode failed: $e');
         }
       }
       await txn.delete(_savedTable, where: 'id = ?', whereArgs: [id]);
+      await _deleteIndexedRow(txn, _savedFtsTable, id);
     });
     return flipped;
   }
@@ -340,6 +474,8 @@ class FeedDatabase {
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
+      await txn.delete(_savedFtsTable);
+      await _indexRows(txn, _savedFtsTable, articles);
     });
   }
 
@@ -368,13 +504,75 @@ class FeedDatabase {
 
   Future<void> clearFeedCache() async {
     final db = await _open();
-    await db.delete(_articlesTable);
+    await db.transaction((txn) async {
+      await txn.delete(_articlesTable);
+      if (_ftsAvailable) await txn.delete(_articlesFtsTable);
+    });
   }
 
   Future<void> clearAll() async {
     final db = await _open();
-    await db.delete(_articlesTable);
-    await db.delete(_savedTable);
+    await db.transaction((txn) async {
+      await txn.delete(_articlesTable);
+      await txn.delete(_savedTable);
+      if (_ftsAvailable) {
+        await txn.delete(_articlesFtsTable);
+        await txn.delete(_savedFtsTable);
+      }
+    });
+  }
+
+  /// Full-text (body) search over the cached feed or the saved list.
+  ///
+  /// Returns hits in FTS relevance order, or null when the device's
+  /// SQLite build lacks FTS5 — callers fall back to the substring filter
+  /// in that case. Terms are ANDed; each term is quoted so user input
+  /// can never inject FTS5 MATCH syntax.
+  Future<List<BodySearchHit>?> searchBodies(
+    String query, {
+    bool saved = false,
+  }) async {
+    if (!_ftsAvailable) return null;
+    final match = _buildMatchQuery(query);
+    if (match == null) return const [];
+    try {
+      final db = await _open();
+      final table = saved ? _savedFtsTable : _articlesFtsTable;
+      final rows = await db.rawQuery(
+        'SELECT id, snippet($table, 1, \'\', \'\', \' … \', 12) AS snippet '
+        'FROM $table WHERE $table MATCH ? '
+        'ORDER BY rank LIMIT 100',
+        [match],
+      );
+      return [
+        for (final r in rows)
+          BodySearchHit(
+            id: r['id'] as String,
+            snippet: (r['snippet'] as String?) ?? '',
+          ),
+      ];
+    } catch (e) {
+      debugPrint('[FeedDatabase] searchBodies failed: $e');
+      return null;
+    }
+  }
+
+  /// "quantum computing" → '"quantum" AND "computing"'. null when the
+  /// query has no searchable terms.
+  @visibleForTesting
+  static String? buildMatchQueryForTest(String query) {
+    return _buildMatchQuery(query);
+  }
+
+  static String? _buildMatchQuery(String query) {
+    final terms = query
+        .split(RegExp(r'[^\w]+'))
+        .map((t) => t.trim().toLowerCase())
+        .where((t) => t.isNotEmpty)
+        .take(10)
+        .toList();
+    if (terms.isEmpty) return null;
+    return terms.map((t) => '"$t"').join(' AND ');
   }
 
   Future<void> close() async {

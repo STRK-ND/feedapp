@@ -286,7 +286,18 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get dialogDone => 'Done';
+  String get dialogDone => 'पूर्ण';
+
+  @override
+  String get bodySearchBanner => 'लेख विषय-वस्तु में भी मेल';
+
+  @override
+  String bodySearchLockedTitle(int count) {
+    return 'लेख विषय-वस्तु में $count मेल';
+  }
+
+  @override
+  String get bodySearchLockedCta => 'इन परिणामों को खोलने के लिए Pro लें';
 
   @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
