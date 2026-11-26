@@ -1,0 +1,342 @@
+{
+    "all_commit_details": [
+        {
+            "author_date": "2026-11-23T05:43:59.000Z",
+            "author_email": "rajat@curatedfeeds.app",
+            "author_login": null,
+            "author_name": "Rajat",
+            "body": "- Standardize spacing, radii, and category accents across screens and widgets\n- Add client-side direct RSS fallback when Worker API is unavailable\n- Provide undo snackbars when marking articles as read or removing saved items\n- Stream article cache changes from repository to keep feed views synchronized\n- Update theme colors and checkbox styles to match design token palette\n- Add implementation plan for interactive settings row tap feedback",
+            "branch": "master",
+            "commit": "f5e4f2ae39d903455c287796ed0f4aa53981f669",
+            "commit_url": "https://github.com/STRK-ND/feedapp/commit/f5e4f2ae39d903455c287796ed0f4aa53981f669",
+            "committer_date": "2026-11-23T05:43:59.000Z",
+            "committer_email": "rajat@curatedfeeds.app",
+            "committer_login": null,
+            "committer_name": "Rajat",
+            "subject": "feat: adopt design tokens, add client feed fallback and undo actions"
+        }
+    ],
+    "all_commit_details_truncated": false,
+    "author_date": "2026-11-23T05:43:59.000Z",
+    "author_email": "rajat@curatedfeeds.app",
+    "author_name": "Rajat",
+    "body": "- Standardize spacing, radii, and category accents across screens and widgets\n- Add client-side direct RSS fallback when Worker API is unavailable\n- Provide undo snackbars when marking articles as read or removing saved items\n- Stream article cache changes from repository to keep feed views synchronized\n- Update theme colors and checkbox styles to match design token palette\n- Add implementation plan for interactive settings row tap feedback",
+    "branch": "master",
+    "build_num": 89,
+    "build_parameters": {},
+    "build_time_millis": 22084,
+    "build_url": "https://circleci.com/gh/STRK-ND/feedapp/89",
+    "canceled": false,
+    "canceler": null,
+    "circle_yml": {
+        "string": "version: 2\njobs:\n  verify:\n    docker:\n    - image: cimg/android:2026.08.1\n    environment:\n    - FLUTTER_VERSION: 3.47.2\n    steps:\n    - checkout\n    - restore_cache:\n        keys:\n        - flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1\n    - run:\n        name: Install Flutter\n        command: |\n          if [ ! -x \"$HOME/flutter-sdk/bin/flutter\" ]; then\n            git clone --depth 1 -b \"$FLUTTER_VERSION\" https://github.com/flutter/flutter.git \"$HOME/flutter-sdk\"\n          fi\n          if [ -n \"\" ]; then\n            ACTUAL=$(git -C \"$HOME/flutter-sdk\" rev-parse HEAD)\n            if [ \"$ACTUAL\" != \"\" ]; then\n              echo \"Flutter SDK SHA mismatch: expected , got $ACTUAL\" \u003e\u00262\n              exit 1\n            fi\n          fi\n          \"$HOME/flutter-sdk/bin/flutter\" --version\n          echo \"export PATH=\\\"$HOME/flutter-sdk/bin:$PATH\\\"\" \u003e\u003e \"$BASH_ENV\"\n    - save_cache:\n        key: flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1\n        paths:\n        - ~/flutter-sdk\n    - run:\n        name: Get dependencies\n        command: flutter pub get\n    - run:\n        name: Check formatting\n        command: dart format --output=none --set-exit-if-changed lib test\n    - run:\n        name: Analyze\n        command: flutter analyze\n    - run:\n        name: Unit tests\n        command: flutter test\n    - run:\n        name: Brand assets in sync\n        command: |\n          if ! python3 -c \"import PIL\" 2\u003e/dev/null; then\n            pip install --quiet pillow 2\u003e/dev/null \\\n              || pip3 install --quiet pillow 2\u003e/dev/null \\\n              || { echo \"Pillow unavailable; skipping brand-asset drift check\"; exit 0; }\n          fi\n          python3 tool/generate_brand_assets.py\n          git diff --exit-code -- assets/brand android/app/src/main/res marketing/\n  build_signed:\n    docker:\n    - image: cimg/android:2026.08.1\n    environment:\n    - FLUTTER_VERSION: 3.47.2\n    steps:\n    - run:\n        name: Resolve pinned SDK commit\n        command: |\n          COMMIT=\"${FLUTTER_COMMIT:-d3b14c876900e553bc736ca19295fc09e3853e8e}\"\n          if [ -n \"${FLUTTER_COMMIT:-}\" ]; then\n            echo \"Using FLUTTER_COMMIT from project env vars.\"\n          else\n            echo \"FLUTTER_COMMIT not set; using config-pinned SHA $COMMIT for Flutter $FLUTTER_VERSION.\"\n          fi\n          echo \"export PINNED_SDK_COMMIT=\\\"$COMMIT\\\"\" \u003e\u003e \"$BASH_ENV\"\n    - checkout\n    - restore_cache:\n        keys:\n        - flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1\n    - run:\n        name: Install Flutter\n        command: |\n          if [ ! -x \"$HOME/flutter-sdk/bin/flutter\" ]; then\n            git clone --depth 1 -b \"$FLUTTER_VERSION\" https://github.com/flutter/flutter.git \"$HOME/flutter-sdk\"\n          fi\n          if [ -n \"${PINNED_SDK_COMMIT}\" ]; then\n            ACTUAL=$(git -C \"$HOME/flutter-sdk\" rev-parse HEAD)\n            if [ \"$ACTUAL\" != \"${PINNED_SDK_COMMIT}\" ]; then\n              echo \"Flutter SDK SHA mismatch: expected ${PINNED_SDK_COMMIT}, got $ACTUAL\" \u003e\u00262\n              exit 1\n            fi\n          fi\n          \"$HOME/flutter-sdk/bin/flutter\" --version\n          echo \"export PATH=\\\"$HOME/flutter-sdk/bin:$PATH\\\"\" \u003e\u003e \"$BASH_ENV\"\n    - save_cache:\n        key: flutter-sdk-{{ .Environment.FLUTTER_VERSION }}-v1\n        paths:\n        - ~/flutter-sdk\n    - run:\n        name: Decode upload keystore\n        command: |\n          echo \"$UPLOAD_KEYSTORE_BASE64\" | base64 -d \u003e android/app/upload-keystore.jks\n          # NB: no heredoc here — that sequence is reserved in CircleCI\n          # configs (YAML merge key) and breaks compilation.\n          {\n            echo \"storePassword=$KEYSTORE_PASSWORD\"\n            echo \"keyPassword=$KEY_PASSWORD\"\n            echo \"keyAlias=$KEY_ALIAS\"\n            echo \"storeFile=upload-keystore.jks\"\n          } \u003e android/key.properties\n    - run:\n        name: Write google-services.json\n        command: echo \"$GOOGLE_SERVICES_JSON\" \u003e android/app/google-services.json\n    - restore_cache:\n        keys:\n        - pub-v1-{{ checksum \"pubspec.lock\" }}\n    - restore_cache:\n        keys:\n        - gradle-v1-{{ checksum \"android/gradle/wrapper/gradle-wrapper.properties\" }}\n    - run:\n        name: Pub get\n        command: flutter pub get\n    - save_cache:\n        key: pub-v1-{{ checksum \"pubspec.lock\" }}\n        paths:\n        - ~/.pub-cache\n    - run:\n        name: Build signed APK (direct channel)\n        command: flutter build apk --release --flavor direct --dart-define=\"WORKER_API_SECRET=$WORKER_API_SECRET\"\n    - run:\n        name: Build signed AAB (direct channel)\n        command: flutter build appbundle --release --flavor direct --dart-define=\"WORKER_API_SECRET=$WORKER_API_SECRET\"\n    - run:\n        name: Build Play AAB (play channel)\n        command: flutter build appbundle --release --flavor play --dart-define=\"WORKER_API_SECRET=$WORKER_API_SECRET\" --dart-define=\"PLAY_STORE_BUILD=true\"\n    - save_cache:\n        key: gradle-v1-{{ checksum \"android/gradle/wrapper/gradle-wrapper.properties\" }}\n        paths:\n        - ~/.gradle/wrapper\n        - ~/.gradle/caches/modules-2\n    - run:\n        name: Normalize artifact names\n        command: |\n          # Gradle names the APK with the synced version\n          # (\"Curated Feeds v\u003cversion\u003e.apk\"); strip it for the\n          # version-independent artifact path. Branch builds have no tag.\n          cd build/app/outputs/apk/direct/release\n          mv \"Curated Feeds v\"*.apk curated-feeds-direct.apk\n          ls -l\n    - store_artifacts:\n        path: build/app/outputs/apk/direct/release/curated-feeds-direct.apk\n        destination: curated-feeds-direct.apk\n    - store_artifacts:\n        path: build/app/outputs/bundle/directRelease/app-direct-release.aab\n        destination: app-direct-release.aab\n    - store_artifacts:\n        path: build/app/outputs/bundle/playRelease/app-play-release.aab\n        destination: app-play-release.aab\nworkflows:\n  ci:\n    jobs:\n    - verify\n    - build_signed:\n        requires:\n        - verify\n        upstream:\n          verify:\n          - success\n  version: 2\n"
+    },
+    "committer_date": "2026-11-23T05:43:59.000Z",
+    "committer_email": "rajat@curatedfeeds.app",
+    "committer_name": "Rajat",
+    "compare": null,
+    "context_ids": [],
+    "dont_build": null,
+    "fail_reason": null,
+    "failed": true,
+    "infrastructure_fail": false,
+    "is_first_green_build": false,
+    "job_name": null,
+    "lifecycle": "finished",
+    "messages": [],
+    "node": null,
+    "oss": true,
+    "outcome": "failed",
+    "owners": [],
+    "parallel": 1,
+    "picard": {
+        "executor": "docker",
+        "resource_class": {
+            "class": "large",
+            "name": "Large",
+            "cpu": 4,
+            "ram": 8192
+        }
+    },
+    "platform": "2.0",
+    "previous": {
+        "build_num": 88,
+        "build_time_millis": 361325,
+        "status": "failed"
+    },
+    "previous_successful_build": {
+        "build_num": 87,
+        "build_time_millis": 163045,
+        "status": "success"
+    },
+    "pull_requests": [],
+    "queued_at": "2026-11-23T05:44:11.982Z",
+    "reponame": "feedapp",
+    "retries": null,
+    "retry_of": null,
+    "ssh_disabled": false,
+    "ssh_users": [],
+    "start_time": "2026-11-23T05:44:13.891Z",
+    "status": "failed",
+    "steps": [
+        {
+            "name": "Spin up environment",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 0,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Spin up environment",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:13.232Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": null,
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:15.215Z",
+                    "exit_code": null,
+                    "run_time_millis": 1983,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/0?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Preparing environment variables",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 99,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Preparing environment variables",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:15.407Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": null,
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:15.416Z",
+                    "exit_code": null,
+                    "run_time_millis": 9,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/99?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Checkout code",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 101,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Checkout code",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:15.52Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": null,
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:16.461Z",
+                    "exit_code": null,
+                    "run_time_millis": 941,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/101?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Restoring cache",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 102,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Restoring cache",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:16.519Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": null,
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:19.926Z",
+                    "exit_code": null,
+                    "run_time_millis": 3407,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/102?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Install Flutter",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 103,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Install Flutter",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:19.977Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": "#!/bin/bash -eo pipefail\nif [ ! -x \"$HOME/flutter-sdk/bin/flutter\" ]; then\n  git clone --depth 1 -b \"$FLUTTER_VERSION\" https://github.com/flutter/flutter.git \"$HOME/flutter-sdk\"\nfi\nif [ -n \"\" ]; then\n  ACTUAL=$(git -C \"$HOME/flutter-sdk\" rev-parse HEAD)\n  if [ \"$ACTUAL\" != \"\" ]; then\n    echo \"Flutter SDK SHA mismatch: expected , got $ACTUAL\" \u003e\u00262\n    exit 1\n  fi\nfi\n\"$HOME/flutter-sdk/bin/flutter\" --version\necho \"export PATH=\\\"$HOME/flutter-sdk/bin:$PATH\\\"\" \u003e\u003e \"$BASH_ENV\"\n",
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:20.092Z",
+                    "exit_code": 0,
+                    "run_time_millis": 115,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/103?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Saving cache",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 104,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Saving cache",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:20.134Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": null,
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:20.253Z",
+                    "exit_code": null,
+                    "run_time_millis": 119,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/104?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Get dependencies",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 105,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Get dependencies",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:20.295Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": "#!/bin/bash -eo pipefail\nflutter pub get",
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:34.981Z",
+                    "exit_code": 0,
+                    "run_time_millis": 14686,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/105?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "success",
+                    "failed": null,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        },
+        {
+            "name": "Check formatting",
+            "actions": [
+                {
+                    "index": 0,
+                    "step": 106,
+                    "allocation_id": "6b03d2abcd66491987608d8e-0-build/ABCDEFGH",
+                    "name": "Check formatting",
+                    "type": "test",
+                    "start_time": "2026-11-23T05:44:35.032Z",
+                    "truncated": false,
+                    "parallel": true,
+                    "bash_command": "#!/bin/bash -eo pipefail\ndart format --output=none --set-exit-if-changed lib test",
+                    "background": false,
+                    "insignificant": false,
+                    "has_output": true,
+                    "continue": null,
+                    "end_time": "2026-11-23T05:44:35.753Z",
+                    "exit_code": 1,
+                    "run_time_millis": 721,
+                    "output_url": "https://circleci.com/api/private/output/presigned/b1d16350-9c31-4e8a-b043-3f30cd499b2c/0/106?token=eyJhbGciOiJFUzI1NiIsImtpZCI6InRhc2tzLW91dHB1dC1qd3QtdjEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3OTU3MTM3ODQsImlzcyI6ImNpcmNsZWNpLmNvbSIsInN1YiI6ImIxZDE2MzUwLTljMzEtNGU4YS1iMDQzLTNmMzBjZDQ5OWIyYyJ9.1vRkg0rCjN_oScPR9tV9e4m2BjTLoLd_rlLwUCYgNyBYpg8wlWkBUAeljSAMaIJyg9VtI4UAos5p8cbSVF51EA",
+                    "status": "failed",
+                    "failed": true,
+                    "infrastructure_fail": null,
+                    "timedout": null,
+                    "canceled": null
+                }
+            ]
+        }
+    ],
+    "stop_time": "2026-11-23T05:44:35.976Z",
+    "subject": "feat: adopt design tokens, add client feed fallback and undo actions",
+    "timedout": false,
+    "usage_queued_at": "2026-11-23T05:44:11.875Z",
+    "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/50959267?v=4",
+        "id": 50959267,
+        "is_user": true,
+        "login": "STRK-ND",
+        "name": "Rajat Kashyap",
+        "vcs_type": "github"
+    },
+    "username": "STRK-ND",
+    "vcs_revision": "f5e4f2ae39d903455c287796ed0f4aa53981f669",
+    "vcs_tag": null,
+    "vcs_type": "github",
+    "vcs_url": "https://github.com/STRK-ND/feedapp",
+    "why": "github",
+    "workflows": {
+        "job_id": "b1d16350-9c31-4e8a-b043-3f30cd499b2c",
+        "job_name": "verify",
+        "upstream_concurrency_map": {},
+        "upstream_job_ids": [],
+        "workflow_id": "da324b31-8106-42d2-8c6a-f72db658254d",
+        "workflow_name": "ci",
+        "workspace_id": "da324b31-8106-42d2-8c6a-f72db658254d"
+    }
+}

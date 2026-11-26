@@ -188,8 +188,8 @@ Future<void> _pumpFeed(
   final notifier = SettingsNotifier(settings);
   await notifier.setAutoRefresh(false);
   await notifier.setRefreshInterval(0);
-  if (mutedTerms.isNotEmpty) {
-    await notifier.setMutedTerms(mutedTerms);
+  for (final term in mutedTerms) {
+    await notifier.muteTerm(term);
   }
 
   getIt.registerLazySingleton<SettingsService>(() => settings);
@@ -197,15 +197,17 @@ Future<void> _pumpFeed(
   getIt.registerLazySingleton<WorkerFeedService>(() => worker);
   getIt.registerLazySingleton<ArticleRepository>(() => repository);
 
+  final home = showSaved
+      ? const RssFeedScreen(showSavedArticles: true)
+      : const RssFeedScreen();
+
   await tester.pumpWidget(
     ChangeNotifierProvider<SettingsNotifier>(
       create: (_) => notifier,
-      child: const MaterialApp(
+      child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: showSaved
-            ? const RssFeedScreen(showSavedArticles: true)
-            : const RssFeedScreen(),
+        home: home,
       ),
     ),
   );
@@ -344,13 +346,10 @@ void main() {
       sourceName: 'Source',
       pubDate: DateTime.fromMillisecondsSinceEpoch(now),
     );
-    final storage = _CountingStorageService(
-      [
-        article('m1', 'Quantum rally', 'markets'),
-        article('ok1', 'Plain headline', 'nothing special'),
-      ],
-      <Article>[],
-    );
+    final storage = _CountingStorageService([
+      article('m1', 'Quantum rally', 'markets'),
+      article('ok1', 'Plain headline', 'nothing special'),
+    ], <Article>[]);
     final repo = ArticleRepository(
       storageService: storage,
       workerFeedService: worker,
@@ -384,10 +383,7 @@ void main() {
       pubDate: DateTime.fromMillisecondsSinceEpoch(now),
       isSaved: true,
     );
-    final storage = _CountingStorageService(
-      <Article>[],
-      [saved],
-    );
+    final storage = _CountingStorageService(<Article>[], [saved]);
     final repo = ArticleRepository(
       storageService: storage,
       workerFeedService: worker,

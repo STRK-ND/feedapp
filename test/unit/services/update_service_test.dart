@@ -220,21 +220,21 @@ void main() {
       expect(got, digest);
     });
 
-    test('fetchExpectedChecksum handles binary-mode asterisk prefixes', () async {
-      final digest = 'c' * 64;
-      final client = MockClient((request) async {
-        return http.Response(
-          '$digest *Curated Feeds v1.2.2.apk\n',
-          200,
+    test(
+      'fetchExpectedChecksum handles binary-mode asterisk prefixes',
+      () async {
+        final digest = 'c' * 64;
+        final client = MockClient((request) async {
+          return http.Response('$digest *Curated Feeds v1.2.2.apk\n', 200);
+        });
+        final got = await UpdateService.fetchExpectedChecksum(
+          checksumUrl: 'https://example.com/SHA256SUMS-v1.2.2.txt',
+          apkFileName: 'Curated Feeds v1.2.2.apk',
+          client: client,
         );
-      });
-      final got = await UpdateService.fetchExpectedChecksum(
-        checksumUrl: 'https://example.com/SHA256SUMS-v1.2.2.txt',
-        apkFileName: 'Curated Feeds v1.2.2.apk',
-        client: client,
-      );
-      expect(got, digest);
-    });
+        expect(got, digest);
+      },
+    );
 
     group('extractApkFileName', () {
       test('decodes percent-encoded asset names from GitHub URLs', () {

@@ -8,6 +8,7 @@ import '../services/cache_manager.dart';
 import '../providers/settings_notifier.dart';
 import '../utils/article_view.dart';
 import '../utils/constants.dart';
+import '../utils/design_tokens.dart';
 import 'swipeable_card.dart';
 
 /// Card stack widget for displaying articles in a swipeable stack
@@ -333,4 +334,3 @@ class _CardStackState extends State<CardStack> with TickerProviderStateMixin {
     );
   }
 }
-

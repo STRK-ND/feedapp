@@ -36,16 +36,19 @@ void main() {
     expect(await service.getMutedTerms(), equals(['crypto']));
   });
 
-  test('muteTerm rejects empty and duplicate terms without notifying', () async {
-    await notifier.muteTerm('crypto');
-    var notified = 0;
-    notifier.addListener(() => notified++);
+  test(
+    'muteTerm rejects empty and duplicate terms without notifying',
+    () async {
+      await notifier.muteTerm('crypto');
+      var notified = 0;
+      notifier.addListener(() => notified++);
 
-    expect(await notifier.muteTerm('   '), isFalse);
-    expect(await notifier.muteTerm('CRYPTO'), isFalse);
-    expect(notified, 0);
-    expect(notifier.mutedTerms, equals(['crypto']));
-  });
+      expect(await notifier.muteTerm('   '), isFalse);
+      expect(await notifier.muteTerm('CRYPTO'), isFalse);
+      expect(notified, 0);
+      expect(notifier.mutedTerms, equals(['crypto']));
+    },
+  );
 
   test('muteTerm refuses past the cap', () async {
     await service.setMutedTerms(List.generate(maxMutedTerms, (i) => 't$i'));
@@ -55,15 +58,18 @@ void main() {
     expect(notifier.mutedTerms, hasLength(maxMutedTerms));
   });
 
-  test('unmuteTerm removes case-insensitively; unknown term is a no-op', () async {
-    await notifier.muteTerm('crypto');
+  test(
+    'unmuteTerm removes case-insensitively; unknown term is a no-op',
+    () async {
+      await notifier.muteTerm('crypto');
 
-    await notifier.unmuteTerm('CRYPTO');
-    expect(notifier.mutedTerms, isEmpty);
+      await notifier.unmuteTerm('CRYPTO');
+      expect(notifier.mutedTerms, isEmpty);
 
-    await notifier.unmuteTerm('not-muted');
-    expect(notifier.mutedTerms, isEmpty);
-  });
+      await notifier.unmuteTerm('not-muted');
+      expect(notifier.mutedTerms, isEmpty);
+    },
+  );
 
   test('loadSettings picks up persisted terms (cloud-restore path)', () async {
     await notifier.muteTerm('crypto');

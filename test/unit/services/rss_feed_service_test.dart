@@ -6,7 +6,6 @@ import 'package:curatedfeeds/models/rss_source.dart';
 import 'package:curatedfeeds/services/rss_feed_service.dart';
 import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/utils/category_accent.dart';
-import 'package:curatedfeeds/utils/constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';

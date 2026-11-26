@@ -458,6 +458,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dialogCancel => 'Cancel';
 
   @override
+  String get dialogOk => 'OK';
+
+  @override
   String get dialogClearAction => 'Clear';
 
   @override

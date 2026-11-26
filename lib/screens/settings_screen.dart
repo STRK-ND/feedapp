@@ -143,14 +143,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } else if (UpdateService.lastCheckRateLimited) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Update check rate-limited by GitHub. Try again later.'),
+            content: Text(
+              'Update check rate-limited by GitHub. Try again later.',
+            ),
             duration: Duration(seconds: 3),
           ),
         );
       } else if (!UpdateService.lastCheckSucceeded) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Could not reach update server. Check your connection.'),
+            content: Text(
+              'Could not reach update server. Check your connection.',
+            ),
             duration: Duration(seconds: 3),
           ),
         );
@@ -1092,9 +1096,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (!added && value.trim().isNotEmpty) {
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text(
-                      _l10n.mutedKeywordsCapSnack(maxMutedTerms),
-                    ),
+                    content: Text(_l10n.mutedKeywordsCapSnack(maxMutedTerms)),
                   ),
                 );
               }
@@ -1334,9 +1336,7 @@ class _SettingsReaderSheetState extends State<_SettingsReaderSheet> {
             title: Text(
               'WIDEN MEASURE',
               style: AppType.monoEyebrow(
-                color: isDark
-                    ? AppColors.paperOnGroundSoft
-                    : AppColors.inkSoft,
+                color: isDark ? AppColors.paperOnGroundSoft : AppColors.inkSoft,
               ),
             ),
             subtitle: Text(

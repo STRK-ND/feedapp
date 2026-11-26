@@ -210,9 +210,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                     color: colorScheme.onSurfaceVariant.withValues(
                       alpha: _position.dx < 0 ? _position.dx.abs() / 400 : 0,
                     ),
-                    borderRadius: BorderRadius.circular(
-                      AppRadius.card,
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                   ),
                   child: _position.dx < -40
                       ? Center(
@@ -247,9 +245,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                     color: colorScheme.primary.withValues(
                       alpha: _position.dx > 0 ? (_position.dx / 400) * 0.12 : 0,
                     ),
-                    borderRadius: BorderRadius.circular(
-                      AppRadius.card,
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                   ),
                   child: _position.dx > 40
                       ? Center(

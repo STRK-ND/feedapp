@@ -151,7 +151,8 @@ class UpdateService {
           final url = asset['browser_download_url'] as String?;
           if (url != null) {
             // Prefer universal or main branded APK if multiple per-arch APKs exist
-            if (name.toLowerCase().contains('universal') || !name.contains('-arm') && !name.contains('-x86')) {
+            if (name.toLowerCase().contains('universal') ||
+                !name.contains('-arm') && !name.contains('-x86')) {
               return url;
             }
             fallbackApkUrl ??= url;
@@ -175,9 +176,9 @@ class UpdateService {
       final name = asset['name'] as String?;
       if (name != null &&
           (name == 'SHA256SUMS-$tag.txt' ||
-           name == 'SHA256SUMS-v$cleanTag.txt' ||
-           name == 'SHA256SUMS-$cleanTag.txt' ||
-           name == 'SHA256SUMS.txt')) {
+              name == 'SHA256SUMS-v$cleanTag.txt' ||
+              name == 'SHA256SUMS-$cleanTag.txt' ||
+              name == 'SHA256SUMS.txt')) {
         return asset['browser_download_url'] as String?;
       }
     }
@@ -220,7 +221,10 @@ class UpdateService {
           r'^([0-9A-Fa-f]{64})\s+(.+)$',
         ).firstMatch(line.trim());
         if (match == null) continue;
-        final candidate = match.group(2)!.replaceFirst(RegExp(r'^\*'), '').trim();
+        final candidate = match
+            .group(2)!
+            .replaceFirst(RegExp(r'^\*'), '')
+            .trim();
         if (candidate == apkFileName) {
           return match.group(1)!.toLowerCase();
         }

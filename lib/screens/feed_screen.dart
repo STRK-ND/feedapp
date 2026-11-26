@@ -853,13 +853,19 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(AppRadius.card),
                       border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.3,
+                        ),
                         width: 1,
                       ),
                     ),
                     child: Semantics(
                       label: title,
-                      child: Icon(icon, size: 72, color: colorScheme.onSurfaceVariant),
+                      child: Icon(
+                        icon,
+                        size: 72,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -900,7 +906,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                       icon: const Icon(Icons.clear_rounded, size: 18),
                       label: Text(_l10n.clearSearchCta),
                     ),
-                  ] else if (_selectedTab == 0 && _articles.isEmpty && !_isLoading) ...[
+                  ] else if (_selectedTab == 0 &&
+                      _articles.isEmpty &&
+                      !_isLoading) ...[
                     const SizedBox(height: 12),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -950,9 +958,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     // strip + hairline + mono label, not an amber container.
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(
-                        AppRadius.badge,
-                      ),
+                      borderRadius: BorderRadius.circular(AppRadius.badge),
                       border: Border.all(
                         color: colorScheme.outlineVariant,
                         width: 1,
@@ -1185,7 +1191,9 @@ class _RssFeedScreenState extends State<RssFeedScreen>
               // scrolling the stack's card list downward (the folio dot
               // below marks all read, which is the genuinely global
               // action).
-              if (_selectedTab == 0 && widget.sourceId != null && _articles.isNotEmpty)
+              if (_selectedTab == 0 &&
+                  widget.sourceId != null &&
+                  _articles.isNotEmpty)
                 // Same trailing row: keep the count readable but never let it
                 // force the bar past the viewport.
                 Flexible(
@@ -1202,9 +1210,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     // on the source drill-in where Folio is hidden.
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(
-                        AppRadius.badge,
-                      ),
+                      borderRadius: BorderRadius.circular(AppRadius.badge),
                       border: Border.all(
                         color: colorScheme.outlineVariant,
                         width: 1,
@@ -1442,27 +1448,21 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                         filled: true,
                         fillColor: colorScheme.surfaceContainerHighest,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppRadius.badge,
-                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.badge),
                           borderSide: BorderSide(
                             color: colorScheme.outlineVariant,
                             width: 1,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppRadius.badge,
-                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.badge),
                           borderSide: BorderSide(
                             color: colorScheme.outlineVariant,
                             width: 1,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppRadius.badge,
-                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.badge),
                           borderSide: BorderSide(
                             color: colorScheme.primary,
                             width: 2,
@@ -1636,9 +1636,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(
-                        AppRadius.badge,
-                      ),
+                      borderRadius: BorderRadius.circular(AppRadius.badge),
                       border: Border.all(
                         color: colorScheme.error.withValues(alpha: 0.3),
                         width: 1,

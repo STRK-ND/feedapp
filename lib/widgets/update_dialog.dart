@@ -165,9 +165,7 @@ class UpdateDialog extends StatelessWidget {
     if (!success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            l10n.failedOpenVisit(updateInfo.htmlUrl),
-          ),
+          content: Text(l10n.failedOpenVisit(updateInfo.htmlUrl)),
           action: SnackBarAction(
             label: l10n.openInBrowserAction,
             onPressed: () => UpdateService.openDownloadUrl(updateInfo.htmlUrl),
@@ -205,10 +203,7 @@ class _DownloadAndInstallButton extends StatefulWidget {
   final UpdateInfo updateInfo;
   final http.Client? client;
 
-  const _DownloadAndInstallButton({
-    required this.updateInfo,
-    this.client,
-  });
+  const _DownloadAndInstallButton({required this.updateInfo, this.client});
 
   @override
   State<_DownloadAndInstallButton> createState() =>
@@ -246,7 +241,7 @@ class _DownloadAndInstallButtonState extends State<_DownloadAndInstallButton> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           icon: _busy
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(

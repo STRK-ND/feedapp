@@ -168,6 +168,7 @@
   "clearCacheDialogBody": "This will delete {count} cached articles. Saved articles are kept. This action cannot be undone.",
   "@clearCacheDialogBody": { "placeholders": { "count": { "type": "int" } } },
   "dialogCancel": "Cancel",
+  "dialogOk": "OK",
   "dialogClearAction": "Clear",
   "dialogSaveAction": "Save",
   "cacheClearedSnack": "Cache cleared successfully",

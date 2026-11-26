@@ -286,7 +286,7 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
-  String get dialogDone => 'पूर्ण';
+  String get dialogDone => 'Done';
 
   @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
@@ -445,6 +445,9 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get dialogCancel => 'रद्द करें';
+
+  @override
+  String get dialogOk => 'ठीक है';
 
   @override
   String get dialogClearAction => 'साफ़ करें';

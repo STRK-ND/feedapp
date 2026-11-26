@@ -138,6 +138,7 @@
   "clearCacheDialogTitle": "कैश साफ़ करें",
   "clearCacheDialogBody": "{count} कैश लेख हट जाएँगे। सेव किए गए लेख सुरक्षित रहते हैं। इसे वापस नहीं किया जा सकता।",
   "dialogCancel": "रद्द करें",
+  "dialogOk": "ठीक है",
   "dialogClearAction": "साफ़ करें",
   "dialogSaveAction": "सेव करें",
   "cacheClearedSnack": "कैश सफलतापूर्वक साफ़ हुआ",

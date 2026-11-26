@@ -177,6 +177,13 @@ class ArticleRepository {
           ),
         );
         final fallbackArticles = await _fetchCanonicalFallbackArticles();
+        if (fallbackArticles.isEmpty) {
+          // The fallback found nothing either, so this refresh genuinely
+          // failed — surface the worker error (the feed's error state with
+          // its Retry button is how the user learns the refresh failed)
+          // instead of reporting a successful empty refresh.
+          rethrow;
+        }
         workerArticles.addAll(fallbackArticles);
       }
 
@@ -283,7 +290,9 @@ class ArticleRepository {
       );
       return results.expand((list) => list).toList();
     } catch (e) {
-      unawaited(ErrorHandler.logError('Canonical fallback fetch failed', error: e));
+      unawaited(
+        ErrorHandler.logError('Canonical fallback fetch failed', error: e),
+      );
       return [];
     }
   }

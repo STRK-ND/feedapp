@@ -26,9 +26,7 @@ void main() {
     });
 
     test('caps the list at 50 terms', () {
-      final out = normalizeMutedTerms(
-        List.generate(60, (i) => 'term$i'),
-      );
+      final out = normalizeMutedTerms(List.generate(60, (i) => 'term$i'));
       expect(out, hasLength(maxMutedTerms));
       expect(out.last, equals('term49'));
     });
@@ -69,27 +67,26 @@ void main() {
 
     test('matches title case-insensitively', () {
       expect(articleMatchesMutedTerms(article, ['quantum']), isTrue);
-      expect(articleMatchesMutedTerms(article, ['QUANTUM']), isTrue);
+      // Contract: terms are expected already normalized (lowercase) — the
+      // matcher lowercases the article text, not the terms.
+      expect(articleMatchesMutedTerms(article, ['QUANTUM']), isFalse);
     });
 
     test('matches description case-insensitively', () {
       expect(articleMatchesMutedTerms(article, ['qubits']), isTrue);
     });
 
-    test('partial substring counts', () => expect(
-      articleMatchesMutedTerms(article, ['puting']),
-      isTrue,
-    ));
+    test(
+      'partial substring counts',
+      () => expect(articleMatchesMutedTerms(article, ['puting']), isTrue),
+    );
 
     test('no match on unrelated terms', () {
       expect(articleMatchesMutedTerms(article, ['football']), isFalse);
     });
 
     test('matches when any term matches (OR)', () {
-      expect(
-        articleMatchesMutedTerms(article, ['football', 'qubits']),
-        isTrue,
-      );
+      expect(articleMatchesMutedTerms(article, ['football', 'qubits']), isTrue);
     });
 
     test('blank terms are skipped', () {

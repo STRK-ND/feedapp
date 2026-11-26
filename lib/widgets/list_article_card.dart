@@ -154,5 +154,3 @@ class ListArticleCard extends StatelessWidget {
     );
   }
 }
-
-

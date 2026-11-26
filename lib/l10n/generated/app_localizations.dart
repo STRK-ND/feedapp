@@ -884,6 +884,12 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get dialogCancel;
 
+  /// No description provided for @dialogOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get dialogOk;
+
   /// No description provided for @dialogClearAction.
   ///
   /// In en, this message translates to:

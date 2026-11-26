@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/article.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/cache_manager.dart';
+import '../utils/article_view.dart';
 import '../services/rss_feed_service.dart';
 import '../services/article_content_service.dart';
 import '../services/tts_service.dart';
@@ -398,9 +399,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                 style: IconButton.styleFrom(
                   backgroundColor: color.withValues(alpha: 0.08),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      AppRadius.button,
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.button),
                   ),
                 ),
               ),
@@ -501,7 +500,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                   buildHeaderButton(
                                     icon: Icons.open_in_new_rounded,
                                     onPressed: () async {
-                                      final uri = Uri.parse(widget.article.link);
+                                      final uri = Uri.parse(
+                                        widget.article.link,
+                                      );
                                       // Scheme allowlist: the link comes from
                                       // feed content, so only real web URLs may
                                       // leave the app (blocks intent:// and
@@ -696,17 +697,23 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                 const SizedBox(height: 20),
                                 Builder(
                                   builder: (context) {
-                                    final hasFullContent = _fullContent != null &&
+                                    final hasFullContent =
+                                        _fullContent != null &&
                                         _fullContent!.trim().isNotEmpty;
-                                    final isContentIdentical = hasFullContent &&
+                                    final isContentIdentical =
+                                        hasFullContent &&
                                         _fullContent!.trim() ==
                                             widget.article.description.trim();
 
                                     return Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         if (!isContentIdentical &&
-                                            widget.article.description.isNotEmpty) ...[
+                                            widget
+                                                .article
+                                                .description
+                                                .isNotEmpty) ...[
                                           SelectableText(
                                             widget.article.description,
                                             style: _bodyStyle().copyWith(
@@ -729,9 +736,9 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                                   CircularProgressIndicator(
                                                     strokeWidth: 2,
                                                     valueColor:
-                                                        AlwaysStoppedAnimation<Color>(
-                                                          sourceColor,
-                                                        ),
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(sourceColor),
                                                   ),
                                                   const SizedBox(height: 16),
                                                   Text(

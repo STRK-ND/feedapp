@@ -28,9 +28,10 @@ List<OpmlEntry> parseOpmlEntries(String opmlText) {
           ? xmlUrl
           : ((htmlUrl != null && htmlUrl.isNotEmpty) ? htmlUrl : null);
       if (url != null && seenUrls.add(url)) {
-        final title = outline.getAttribute('title') ??
+        final title =
+            outline.getAttribute('title') ??
             outline.getAttribute('text') ??
-            '';
+            _hostFromUrl(url);
         entries.add(OpmlEntry(url: url, title: title));
       }
     }
@@ -39,11 +40,22 @@ List<OpmlEntry> parseOpmlEntries(String opmlText) {
     for (final m in xmlUrlRe.allMatches(opmlText)) {
       final url = m.group(1)!;
       if (seenUrls.add(url)) {
-        entries.add(OpmlEntry(url: url, title: ''));
+        entries.add(OpmlEntry(url: url, title: _hostFromUrl(url)));
       }
     }
   }
   return entries;
+}
+
+/// Domain of [url] for use as a fallback title when the OPML outline
+/// carries neither `title` nor `text`. Empty string when the URL does
+/// not parse — callers already handle an empty title.
+String _hostFromUrl(String url) {
+  try {
+    return Uri.parse(url).host;
+  } catch (_) {
+    return '';
+  }
 }
 
 /// Pull every xmlUrl (and htmlUrl as fallback) out of an OPML document.

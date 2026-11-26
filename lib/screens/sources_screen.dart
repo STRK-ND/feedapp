@@ -829,11 +829,7 @@ class _CategoryGroup extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: subscriptions.contains(s.id)
-                          ? Icon(
-                              Icons.check,
-                              size: 12,
-                              color: cs.onPrimary,
-                            )
+                          ? Icon(Icons.check, size: 12, color: cs.onPrimary)
                           : null,
                     ),
                   ],

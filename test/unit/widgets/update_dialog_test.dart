@@ -66,9 +66,13 @@ void main() {
   testWidgets(
     'tapping Update Now shows downloading state and handles failure cleanly',
     (tester) async {
-      final mockClient = MockClient(
-        (request) async => http.Response('error', 500),
-      );
+      final mockClient = MockClient((request) async {
+        // Hold the download open across a frame so the in-flight spinner
+        // is observable; a synchronous 500 would complete the whole async
+        // chain inside the first pump and the spinner would never paint.
+        await Future<void>.delayed(const Duration(seconds: 1));
+        return http.Response('error', 500);
+      });
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -86,12 +90,13 @@ void main() {
 
       expect(find.text('Update Now'), findsOneWidget);
       await tester.tap(find.text('Update Now'));
-      await tester.pump(); // Starts _run
+      await tester.pump(); // Starts _run; download still in flight
 
       // In-flight spinner is visible and label says Downloading…
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Downloading…'), findsOneWidget);
 
+      await tester.pump(const Duration(seconds: 1)); // download fails (500)
       await tester.pumpAndSettle();
 
       // After failure, label switches to "Try again" and localized error text is shown
