@@ -109,7 +109,7 @@ void main() {
         );
 
         final original = await db.searchBodies('original');
-      expect(original ?? const <BodySearchHit>[], isEmpty);
+        expect(original ?? const <BodySearchHit>[], isEmpty);
         final hits = await db.searchBodies('zebra');
         expect(hits!.map((h) => h.id), ['a1']);
       },
@@ -126,7 +126,7 @@ void main() {
 
         // Feed search does not see saved-table-only rows.
         final pasta = await db.searchBodies('pasta');
-      expect(pasta ?? const <BodySearchHit>[], isEmpty);
+        expect(pasta ?? const <BodySearchHit>[], isEmpty);
         final savedHits = await db.searchBodies('pasta', saved: true);
         expect(savedHits!.map((h) => h.id), ['s1']);
       },
@@ -142,7 +142,7 @@ void main() {
         await db.saveSavedArticles([]);
 
         final pastaSaved = await db.searchBodies('pasta', saved: true);
-      expect(pastaSaved ?? const <BodySearchHit>[], isEmpty);
+        expect(pastaSaved ?? const <BodySearchHit>[], isEmpty);
       },
     );
 
@@ -158,10 +158,10 @@ void main() {
 
         // Still findable in the feed index…
         final pasta = await db.searchBodies('pasta');
-      expect(pasta ?? const <BodySearchHit>[], isNotEmpty);
+        expect(pasta ?? const <BodySearchHit>[], isNotEmpty);
         // …and gone from the saved index.
         final pastaSaved = await db.searchBodies('pasta', saved: true);
-      expect(pastaSaved ?? const <BodySearchHit>[], isEmpty);
+        expect(pastaSaved ?? const <BodySearchHit>[], isEmpty);
       },
     );
 
