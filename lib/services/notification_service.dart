@@ -69,6 +69,9 @@ class NotificationService {
           .getNewArticleNotifications();
       // [] = unrestricted (all categories) — the worker narrows per token.
       final categories = await settingsService.getNotificationCategories();
+      // Muted keywords travel with the subscription row so the worker's
+      // push fan-out can skip articles the user has muted.
+      final mutedTerms = await settingsService.getMutedTerms();
 
       final uri = Uri.parse('${AppConfig.workerApiUrl}subscribe');
       final headers = _workerHeaders();
@@ -83,6 +86,7 @@ class NotificationService {
                 'newArticles': newArticlesEnabled,
                 if (categories.length < AppConfig.categories.length - 1)
                   'categories': categories,
+                if (mutedTerms.isNotEmpty) 'mutedTerms': mutedTerms,
               },
             }),
           )

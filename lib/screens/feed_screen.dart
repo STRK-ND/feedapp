@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -27,6 +28,7 @@ import '../widgets/grain_overlay.dart';
 import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
+import '../utils/mute_filter.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
 import 'settings_screen.dart';
@@ -90,6 +92,13 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   // Subscribed source IDs — loaded from SettingsService. Empty set means
   // "no filter applied yet" (first run before _loadSubscribedIds returns).
   Set<String> _subscribedIds = {};
+  SettingsNotifier? _settingsNotifier;
+
+  // Muted keywords: mirrored from the notifier so _getFilteredArticles
+  // stays synchronous. Kept fresh by _onSettingsChanged (attached in
+  // didChangeDependencies), which recomputes the visible list when the
+  // terms change.
+  List<String> _mutedTerms = const [];
 
   int get _unreadCount =>
       _articles.where((a) => !a.isRead && !a.isSaved).length;
@@ -200,6 +209,15 @@ class _RssFeedScreenState extends State<RssFeedScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final settings = context.read<SettingsNotifier>();
+    if (!_muteListenerAttached) {
+      // Mirror muted keywords up front and recompute when they change (the
+      // notifier notifies on every settings write; the listEquals guard in
+      // _onSettingsChanged keeps unrelated writes from recomputing).
+      _settingsNotifier = settings;
+      _mutedTerms = List.of(settings.mutedTerms);
+      settings.addListener(_onSettingsChanged);
+      _muteListenerAttached = true;
+    }
     final shouldRefresh =
         _autoRefreshTimer == null ||
         settings.autoRefresh != _lastAutoRefresh ||
@@ -211,6 +229,23 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   bool _lastAutoRefresh = false;
   int _lastRefreshInterval = 0;
+
+  // Muted keywords: the notifier lives in the widget tree (Provider, not
+  // getIt), so attach the mirror listener on first dependency resolution.
+  bool _muteListenerAttached = false;
+
+  void _onSettingsChanged() {
+    final notifier = _settingsNotifier;
+    if (notifier == null) return;
+    final muted = notifier.mutedTerms;
+    if (listEquals(muted, _mutedTerms)) return;
+    _mutedTerms = List.of(muted);
+    if (mounted) {
+      setState(() {
+        _displayedArticles = _getFilteredArticles();
+      });
+    }
+  }
 
   void _setupAutoRefresh(SettingsNotifier settings) {
     _autoRefreshTimer?.cancel();
@@ -253,6 +288,7 @@ class _RssFeedScreenState extends State<RssFeedScreen>
 
   @override
   void dispose() {
+    _settingsNotifier?.removeListener(_onSettingsChanged);
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _autoRefreshTimer?.cancel();
@@ -687,6 +723,14 @@ class _RssFeedScreenState extends State<RssFeedScreen>
         final source = rssService.getSourceById(a.sourceId);
         return source?.category == _selectedFilter;
       }).toList();
+    }
+
+    // Muted keywords hide matching articles from the feed tab. The Saved
+    // tab is never filtered — saving an article was a deliberate act.
+    if (_selectedTab == 0 && _mutedTerms.isNotEmpty) {
+      articles = articles
+          .where((a) => !articleMatchesMutedTerms(a, _mutedTerms))
+          .toList();
     }
 
     if (_searchQuery.isNotEmpty) {

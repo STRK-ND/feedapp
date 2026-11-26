@@ -10,10 +10,12 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/settings_service.dart';
+import '../utils/mute_filter.dart';
 import '../utils/reader_theme.dart';
 
 class SettingsNotifier extends ChangeNotifier {
@@ -39,6 +41,9 @@ class SettingsNotifier extends ChangeNotifier {
   // ----- Feed / edition -----
   String _viewMode = 'stack'; // 'stack' | 'continuous'
   int _edition = 1;
+
+  // ----- Muted keywords (hide matching articles from the feed tab) -----
+  List<String> _mutedTerms = const [];
 
   // ----- Monetization -----
   bool _isPro = false;
@@ -80,6 +85,10 @@ class SettingsNotifier extends ChangeNotifier {
   int get edition => _edition;
   bool get isPro => _isPro;
 
+  /// Normalized muted keywords (unmodifiable copy). See
+  /// `utils/mute_filter.dart` for the matching contract.
+  List<String> get mutedTerms => List.unmodifiable(_mutedTerms);
+
   ReadingPreferences get readingPrefs => ReadingPreferences(
     theme: _readerTheme,
     fontSize: _fontSize,
@@ -112,6 +121,7 @@ class SettingsNotifier extends ChangeNotifier {
       _settingsService.getFeedViewMode(),
       _settingsService.getEditionNumber(),
       _settingsService.getIsPro(),
+      _settingsService.getMutedTerms(),
     ]);
 
     _showImages = results[0] as bool;
@@ -129,6 +139,7 @@ class SettingsNotifier extends ChangeNotifier {
     _viewMode = results[12] as String;
     _edition = results[13] as int;
     _isPro = results[14] as bool;
+    _mutedTerms = List.of(results[15] as List<String>);
 
     try {
       notifyListeners();
@@ -238,6 +249,31 @@ class SettingsNotifier extends ChangeNotifier {
   Future<void> setIsPro(bool value) async {
     _isPro = value;
     await _settingsService.setIsPro(value);
+    notifyListeners();
+  }
+
+  /// Mute [term]. Returns false (and changes nothing) when the term is
+  /// empty, a duplicate, or the list is already at the cap — callers show
+  /// feedback on false. Persists and notifies on success.
+  Future<bool> muteTerm(String term) async {
+    final candidate = term.trim().toLowerCase();
+    if (candidate.isEmpty) return false;
+    if (_mutedTerms.contains(candidate)) return false;
+    if (_mutedTerms.length >= maxMutedTerms) return false;
+    final next = normalizeMutedTerms([..._mutedTerms, candidate]);
+    if (listEquals(next, _mutedTerms)) return false;
+    _mutedTerms = next;
+    await _settingsService.setMutedTerms(next);
+    notifyListeners();
+    return true;
+  }
+
+  /// Remove [term] (case-insensitive). No-op when it isn't muted.
+  Future<void> unmuteTerm(String term) async {
+    final candidate = term.trim().toLowerCase();
+    if (!_mutedTerms.contains(candidate)) return;
+    _mutedTerms = List.of(_mutedTerms)..remove(candidate);
+    await _settingsService.setMutedTerms(_mutedTerms);
     notifyListeners();
   }
 

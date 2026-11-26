@@ -24,6 +24,7 @@ import {
   matchingTokens,
   resetRateMemory,
   rowMatchesCategories,
+  rowClearsMutes,
 } from '../feed-worker.js';
 import worker from '../feed-worker.js';
 
@@ -190,7 +191,7 @@ const FILTER_FIXTURE = [
 test('parseArticleParams defaults and clamping', () => {
   const url = new URL('https://x.dev/articles');
   const p = parseArticleParams(url);
-  assert.deepEqual(p, { page: 1, pageSize: 50, q: '', since: 0, until: 0, category: '', sources: [], sort: 'date_desc' });
+  assert.deepEqual(p, { page: 1, pageSize: 50, q: '', since: 0, until: 0, category: '', sources: [], sort: 'date_desc', mute: [] });
 
   // page floors at 1, pageSize clamps to [1, 100]
   const bad = parseArticleParams(new URL('https://x.dev/articles?page=-3&pageSize=9999'));
@@ -220,6 +221,41 @@ test('parseArticleParams defaults and clamping', () => {
   // Unknown sort value degrades to the default, not an error
   const sorty = parseArticleParams(new URL('https://x.dev/articles?sort=bogus'));
   assert.equal(sorty.sort, 'date_desc');
+});
+
+test('parseArticleParams: mute param is split, lowercased and clamped', () => {
+  const p = parseArticleParams(new URL('https://x.dev/articles?mute=Crypto,+ NFTS ,crypto'));
+  // Trim + lowercase + dedupe, preserving first-seen order
+  assert.deepEqual(p.mute, ['crypto', 'nfts']);
+
+  // No param → empty list (no filtering)
+  assert.deepEqual(parseArticleParams(new URL('https://x.dev/articles')).mute, []);
+
+  // Per-term clamp to 64 chars and list cap at 50 terms
+  const long = 'x'.repeat(100);
+  const many = Array.from({ length: 60 }, (_, i) => `term${i}`);
+  const clamped = parseArticleParams(new URL(`https://x.dev/articles?mute=${encodeURIComponent(many.join(','))},${long}`));
+  assert.equal(clamped.mute.length, 50);
+  assert.ok(clamped.mute.every((t) => t.length <= 64));
+});
+
+test('applyFilters: mute drops articles matching any term in title or description', () => {
+  // Title hit
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: ['quantum'] }), [FILTER_FIXTURE[1], FILTER_FIXTURE[2]]);
+  // Description hit, case-insensitive
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: ['ROUNDUP'] }), [FILTER_FIXTURE[0], FILTER_FIXTURE[2]]);
+  // Multiple terms OR together
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: ['qubits', 'mars'] }), [FILTER_FIXTURE[1]]);
+  // Source name is deliberately NOT matched — unsubscribing is that feature
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: ['verge'] }), FILTER_FIXTURE);
+  // Empty/absent mute → unchanged
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: [] }), FILTER_FIXTURE);
+  assert.deepEqual(applyFilters(FILTER_FIXTURE, { mute: ['   '] }), FILTER_FIXTURE);
+  // Mute composes with other filters (AND)
+  assert.deepEqual(
+    applyFilters(FILTER_FIXTURE, { category: 'Sports', mute: ['football'] }),
+    [],
+  );
 });
 
 test('applyFilters: q matches title, description, source name and category, case-insensitive', () => {
@@ -389,6 +425,58 @@ test('matchingTokens returns only tokens matching the announced categories', asy
   assert.deepEqual(await matchingTokens(env, ['Gaming']), ['t-all', 't-games']);
   // Unrestricted announcement reaches everyone opted in.
   assert.deepEqual(await matchingTokens(env, []), ['t-all', 't-tech', 't-games']);
+});
+
+test('rowClearsMutes: muted terms suppress the announcement for matching articles', () => {
+  const fresh = [
+    { title: 'Crypto rally continues', description: 'Bitcoin hits new high' },
+    { title: 'Local elections', description: 'Voting opens tomorrow' },
+  ];
+
+  // No mutedTerms / empty list → clears trivially
+  assert.equal(rowClearsMutes({ token: 't', preferences: {} }, fresh), true);
+  assert.equal(rowClearsMutes({ token: 't', preferences: { mutedTerms: [] } }, fresh), true);
+
+  // Muted term matches a fresh article title → suppressed
+  assert.equal(
+    rowClearsMutes({ token: 't', preferences: { mutedTerms: ['crypto'] } }, fresh),
+    false,
+  );
+  // Description hit, case-insensitive
+  assert.equal(
+    rowClearsMutes({ token: 't', preferences: { mutedTerms: ['BITCOIN'] } }, fresh),
+    false,
+  );
+  // No fresh article matches → still announced
+  assert.equal(
+    rowClearsMutes({ token: 't', preferences: { mutedTerms: ['football'] } }, fresh),
+    true,
+  );
+  // No fresh articles passed (legacy call shape) → clears
+  assert.equal(
+    rowClearsMutes({ token: 't', preferences: { mutedTerms: ['crypto'] } }, []),
+    true,
+  );
+  // Non-string junk terms are tolerated
+  assert.equal(
+    rowClearsMutes({ token: 't', preferences: { mutedTerms: [42, null, 'crypto'] } }, fresh),
+    false,
+  );
+});
+
+test('matchingTokens skips tokens whose muted terms match a fresh article', async () => {
+  const env = {
+    ARTICLES_KV: new FakeKV({
+      'sub:t-plain': { token: 't-plain', preferences: { newArticles: true } },
+      'sub:t-muted': { token: 't-muted', preferences: { newArticles: true, mutedTerms: ['quantum'] } },
+      'sub:t-muted-other': { token: 't-muted-other', preferences: { newArticles: true, mutedTerms: ['football'] } },
+    }),
+  };
+  const fresh = [{ title: 'Quantum Computing Advances', description: 'Qubits', sourceCategory: 'Tech' }];
+
+  assert.deepEqual(await matchingTokens(env, ['Tech'], fresh), ['t-plain', 't-muted-other']);
+  // Legacy two-arg call shape still works (no mute filtering)
+  assert.deepEqual(await matchingTokens(env, ['Tech']), ['t-plain', 't-muted', 't-muted-other']);
 });
 
 test('signRs256 round-trip verifies with the public key (no network)', async () => {

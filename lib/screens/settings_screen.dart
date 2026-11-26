@@ -17,6 +17,7 @@ import '../services/background_sync_service.dart';
 import '../repositories/article_repository.dart';
 import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
+import '../utils/mute_filter.dart';
 import '../utils/reader_theme.dart';
 import '../di/service_locator.dart';
 import '../widgets/app_logo.dart';
@@ -448,6 +449,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 _buildDivider(),
                 _buildViewModeSelector(notifier),
+                _buildDivider(),
+                _buildActionTile(
+                  icon: Icons.do_not_disturb_on_outlined,
+                  title: _l10n.mutedKeywordsTitle,
+                  subtitle: _l10n.mutedKeywordsSubtitle,
+                  onTap: _showMutedKeywordsDialog,
+                ),
               ]),
               const SizedBox(height: 24),
               _buildSectionHeader(_l10n.sectionSources),
@@ -1058,6 +1066,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
         },
       ),
+    );
+  }
+
+  /// Muted keywords management: add/remove terms; the feed tab hides
+  /// matching articles immediately (SettingsNotifier notifies), and the
+  /// push subscription row is re-POSTed so the worker's fan-out honours
+  /// the same list without waiting for the next app launch.
+  Future<void> _showMutedKeywordsDialog() async {
+    final notifier = context.read<SettingsNotifier>();
+    final messenger = ScaffoldMessenger.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final controller = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            var terms = notifier.mutedTerms;
+
+            Future<void> addTerm() async {
+              final value = controller.text;
+              controller.clear();
+              final added = await notifier.muteTerm(value);
+              if (!added && value.trim().isNotEmpty) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _l10n.mutedKeywordsCapSnack(maxMutedTerms),
+                    ),
+                  ),
+                );
+              }
+              setDialogState(() => terms = notifier.mutedTerms);
+              if (added) {
+                // Server-side row mirrors the new list (best effort).
+                unawaited(
+                  NotificationService.enablePushNotifications().catchError(
+                    (Object _) {},
+                  ),
+                );
+              }
+            }
+
+            Future<void> removeTerm(String term) async {
+              await notifier.unmuteTerm(term);
+              setDialogState(() => terms = notifier.mutedTerms);
+              unawaited(
+                NotificationService.enablePushNotifications().catchError(
+                  (Object _) {},
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: Text(_l10n.mutedKeywordsTitle),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => addTerm(),
+                    decoration: InputDecoration(
+                      hintText: _l10n.mutedKeywordsAddLabel,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: terms.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Text(
+                              _l10n.mutedKeywordsEmpty,
+                              style: GoogleFonts.dmSans(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: terms.length,
+                            itemBuilder: (context, index) {
+                              final term = terms[index];
+                              return ListTile(
+                                dense: true,
+                                title: Text(term),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.close),
+                                  tooltip: _l10n.mutedKeywordsRemoveLabel,
+                                  onPressed: () => removeTerm(term),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(_l10n.dialogDone),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

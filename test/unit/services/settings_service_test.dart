@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:curatedfeeds/services/rss_feed_service.dart';
 import 'package:curatedfeeds/services/settings_service.dart';
 import 'package:curatedfeeds/utils/constants.dart';
+import 'package:curatedfeeds/utils/mute_filter.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -136,6 +137,68 @@ void main() {
 
       expect(await service.getCustomSources(), isEmpty);
       expect(await service.getSubscribedSourceIds(), {'verge'});
+    });
+  });
+
+  group('SettingsService muted terms', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('empty by default', () async {
+      final service = SettingsService();
+      expect(await service.getMutedTerms(), isEmpty);
+    });
+
+    test('set normalizes: trim, lowercase, dedupe, cap', () async {
+      final service = SettingsService();
+      await service.setMutedTerms([
+        '  Crypto ',
+        'CRYPTO',
+        'x' * 100,
+        ...List.generate(60, (i) => 'term$i'),
+      ]);
+
+      final terms = await service.getMutedTerms();
+      expect(terms, hasLength(maxMutedTerms));
+      expect(terms.first, equals('crypto'));
+      expect(terms.where((t) => t == 'crypto'), hasLength(1));
+      expect(terms.every((t) => t.length <= maxMutedTermLength), isTrue);
+    });
+
+    test('set persists across instances', () async {
+      final first = SettingsService();
+      await first.setMutedTerms(['crypto', 'nfts']);
+
+      final second = SettingsService();
+      expect(await second.getMutedTerms(), equals(['crypto', 'nfts']));
+    });
+
+    test('muted_terms travels in the sync snapshot and restores', () async {
+      final service = SettingsService();
+      await service.setMutedTerms(['crypto', 'nfts']);
+
+      final snapshot = await service.snapshotForSync();
+      expect(snapshot['muted_terms'], equals(['crypto', 'nfts']));
+
+      // A second install restores from the snapshot.
+      SharedPreferences.setMockInitialValues({});
+      final restored = SettingsService();
+      await restored.restoreFromSync(snapshot);
+      expect(await restored.getMutedTerms(), equals(['crypto', 'nfts']));
+    });
+
+    test('restore never accepts is_pro even beside muted_terms', () async {
+      // Defence-in-depth companion to the M-1 test: adding a new synced
+      // list key must not reopen the entitlement hole.
+      final service = SettingsService();
+      await service.restoreFromSync({
+        'muted_terms': ['crypto'],
+        'is_pro': true,
+      });
+
+      expect(await service.getMutedTerms(), equals(['crypto']));
+      expect(await service.getIsPro(), isFalse);
     });
   });
 }

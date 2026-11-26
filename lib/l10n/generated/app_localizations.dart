@@ -536,6 +536,48 @@ abstract class AppLocalizations {
   /// **'View Mode'**
   String get viewModeLabel;
 
+  /// No description provided for @mutedKeywordsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted keywords'**
+  String get mutedKeywordsTitle;
+
+  /// No description provided for @mutedKeywordsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide articles containing these words'**
+  String get mutedKeywordsSubtitle;
+
+  /// No description provided for @mutedKeywordsAddLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add keyword'**
+  String get mutedKeywordsAddLabel;
+
+  /// No description provided for @mutedKeywordsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing muted yet'**
+  String get mutedKeywordsEmpty;
+
+  /// No description provided for @mutedKeywordsRemoveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get mutedKeywordsRemoveLabel;
+
+  /// No description provided for @mutedKeywordsCapSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'You can mute up to {count} keywords'**
+  String mutedKeywordsCapSnack(int count);
+
+  /// No description provided for @dialogDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get dialogDone;
+
   /// No description provided for @markAllAsReadAction.
   ///
   /// In en, this message translates to:

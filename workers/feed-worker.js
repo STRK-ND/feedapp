@@ -233,7 +233,7 @@ async function consumeRate(env, key, limit, windowSec) {
 }
 
 async function handleArticles(request, url, env) {
-  const { page, pageSize, q, since, until, category, sources, sort } = parseArticleParams(url);
+  const { page, pageSize, q, since, until, category, sources, sort, mute: muted } = parseArticleParams(url);
 
   // Per-IP throttle on the hot path. Generous (the app polls at most a
   // few times per minute plus retry bursts) but stops raw abuse.
@@ -253,7 +253,7 @@ async function handleArticles(request, url, env) {
   // invariant is what makes the sort skip below valid; keep it or this
   // becomes a latent correctness bug).
   const cached = articles;
-  articles = applyFilters(articles, { q, since, until, category, sources });
+  articles = applyFilters(articles, { q, since, until, category, sources, mute: muted });
   const isUnfilteredCache = articles === cached;
 
   // P-3: skip the redundant sort for the default order when the array is
@@ -299,14 +299,27 @@ function parseArticleParams(url) {
     .slice(0, 50);
   const sortRaw = url.searchParams.get('sort') || '';
   const sort = ['date_asc', 'date_desc', 'source'].includes(sortRaw) ? sortRaw : 'date_desc';
-  return { page, pageSize, q, since, until, category, sources, sort };
+  // Mute filter: comma-separated keywords the client has muted. Clamped
+  // defensively (the client normalizes before sending): 1024 raw chars,
+  // 50 terms, 64 chars each, lowercased and deduped (first seen wins).
+  const muteRaw = (url.searchParams.get('mute') || '').slice(0, 1024);
+  const muteSeen = new Set();
+  const mute = [];
+  for (const rawTerm of muteRaw.split(',')) {
+    const term = rawTerm.trim().toLowerCase().slice(0, 64);
+    if (!term || muteSeen.has(term)) continue;
+    muteSeen.add(term);
+    mute.push(term);
+    if (mute.length >= 50) break;
+  }
+  return { page, pageSize, q, since, until, category, sources, sort, mute };
 }
 
 // Server-side search (`q`: substring over title/description/source name and
 // category — the app previously sent `q=` and the worker ignored it), delta
 // fetch (`since`/`until`: epoch ms), category + source narrowing. All
 // predicates AND together; unknown values simply match nothing.
-function applyFilters(articles, { q = '', since = 0, until = 0, category = '', sources = [] } = {}) {
+function applyFilters(articles, { q = '', since = 0, until = 0, category = '', sources = [], mute = [] } = {}) {
   let out = articles;
   const needle = (q || '').trim().toLowerCase();
   if (needle) {
@@ -316,6 +329,19 @@ function applyFilters(articles, { q = '', since = 0, until = 0, category = '', s
       (a.sourceName || '').toLowerCase().includes(needle) ||
       (a.sourceCategory || '').toLowerCase().includes(needle)
     );
+  }
+  // Mute filter: drop articles whose title/description contains any muted
+  // term. Mirrors the client's mute filter (lib/utils/mute_filter.dart) —
+  // keep the two in lockstep. Source name is deliberately NOT matched:
+  // removing a source is what unsubscribing is for.
+  const mutedTerms = (mute || [])
+    .map((t) => String(t).trim().toLowerCase())
+    .filter(Boolean);
+  if (mutedTerms.length > 0) {
+    out = out.filter(a => !mutedTerms.some(t =>
+      (a.title || '').toLowerCase().includes(t) ||
+      (a.description || '').toLowerCase().includes(t)
+    ));
   }
   const cat = (category || '').trim().toLowerCase();
   if (cat) {
@@ -733,7 +759,7 @@ async function announceNewArticles(articles, env) {
   const categories = [...new Set(
     fresh.map(a => a.sourceCategory).filter(Boolean),
   )];
-  const optedIn = await matchingTokens(env, categories);
+  const optedIn = await matchingTokens(env, categories, fresh);
   if (optedIn.length === 0) return;
 
   const latestTitle = fresh[0]?.title || 'Fresh feed is ready';
@@ -782,7 +808,7 @@ async function announceNewArticles(articles, env) {
 //   - rows with a non-empty preferences.categories array only match when it
 //     intersects the announced categories (per-category alerts);
 //   - rows with no/empty category list match everything.
-async function matchingTokens(env, categories) {
+async function matchingTokens(env, categories, freshArticles = []) {
   const catSet = new Set(categories || []);
   const tokens = [];
   // P-4: cap the scan. Beyond this the cron is doing more work than the
@@ -800,6 +826,7 @@ async function matchingTokens(env, categories) {
       const row = await env.ARTICLES_KV.get(name, 'json');
       if (!row || typeof row.token !== 'string') continue;
       if (!rowMatchesCategories(row, catSet)) continue;
+      if (!rowClearsMutes(row, freshArticles)) continue;
       tokens.push(row.token);
     }
     cursor = page.cursor;
@@ -816,6 +843,24 @@ function rowMatchesCategories(row, catSet) {
     return prefs.categories.some(c => catSet.has(c));
   }
   return true;
+}
+
+// Pure predicate: true when the token should still receive the
+// announcement given its muted terms. A row with no/empty mutedTerms
+// clears trivially. Mirrors the client's mute filter (title +
+// description, lowercase substring) — keep the two in lockstep.
+function rowClearsMutes(row, articles) {
+  const prefs = row.preferences || {};
+  const mutes = prefs.mutedTerms;
+  if (!Array.isArray(mutes) || mutes.length === 0) return true;
+  const terms = mutes.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
+  if (terms.length === 0) return true;
+  return !(articles || []).some(a =>
+    terms.some(t =>
+      (a.title || '').toLowerCase().includes(t) ||
+      (a.description || '').toLowerCase().includes(t)
+    )
+  );
 }
 
 const FCM_TOKEN_CACHE_KEY = 'fcm:access-token';
@@ -1031,4 +1076,4 @@ function cors(response, { etag } = {}) {
 // fresh env but runs inside the same rate window must be able to start clean.
 function resetRateMemory() { RATE_MEMORY.clear(); }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, rowClearsMutes, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };

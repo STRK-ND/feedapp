@@ -266,6 +266,29 @@ class AppLocalizationsHi extends AppLocalizations {
   String get viewModeLabel => 'दृश्य मोड';
 
   @override
+  String get mutedKeywordsTitle => 'म्यूट किए गए शब्द';
+
+  @override
+  String get mutedKeywordsSubtitle => 'इन शब्दों वाले लेख छिपाएँ';
+
+  @override
+  String get mutedKeywordsAddLabel => 'शब्द जोड़ें';
+
+  @override
+  String get mutedKeywordsEmpty => 'अभी कुछ म्यूट नहीं किया गया';
+
+  @override
+  String get mutedKeywordsRemoveLabel => 'अनम्यूट करें';
+
+  @override
+  String mutedKeywordsCapSnack(int count) {
+    return 'आप अधिकतम $count शब्द म्यूट कर सकते हैं';
+  }
+
+  @override
+  String get dialogDone => 'पूर्ण';
+
+  @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
 
   @override

@@ -9,6 +9,12 @@ class FilterParams {
   final DateTime? until;
   final SortOption? sortBy;
 
+  /// Muted keywords — the worker drops matching articles server-side so
+  /// delta fetches don't ship rows the client would hide anyway. Expected
+  /// already normalized (see `utils/mute_filter.dart`); the worker clamps
+  /// defensively regardless.
+  final List<String>? mutedTerms;
+
   const FilterParams({
     this.page,
     this.pageSize,
@@ -18,6 +24,7 @@ class FilterParams {
     this.since,
     this.until,
     this.sortBy,
+    this.mutedTerms,
   });
 
   /// Default pagination params
@@ -29,7 +36,8 @@ class FilterParams {
       searchQuery = null,
       since = null,
       until = null,
-      sortBy = null;
+      sortBy = null,
+      mutedTerms = null;
 
   /// Create a copy with modified fields
   FilterParams copyWith({
@@ -41,6 +49,7 @@ class FilterParams {
     DateTime? since,
     DateTime? until,
     SortOption? sortBy,
+    List<String>? mutedTerms,
   }) {
     return FilterParams(
       page: page ?? this.page,
@@ -51,6 +60,7 @@ class FilterParams {
       since: since ?? this.since,
       until: until ?? this.until,
       sortBy: sortBy ?? this.sortBy,
+      mutedTerms: mutedTerms ?? this.mutedTerms,
     );
   }
 
@@ -83,6 +93,9 @@ class FilterParams {
     }
     if (sortBy != null) {
       params['sort'] = sortBy!.value;
+    }
+    if (mutedTerms != null && mutedTerms!.isNotEmpty) {
+      params['mute'] = mutedTerms!.join(',');
     }
 
     return params;

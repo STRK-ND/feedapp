@@ -181,11 +181,16 @@ Future<void> _pumpFeed(
   WidgetTester tester, {
   required _CountingStorageService storage,
   required ArticleRepository repository,
+  List<String> mutedTerms = const [],
+  bool showSaved = false,
 }) async {
   final settings = SettingsService();
   final notifier = SettingsNotifier(settings);
   await notifier.setAutoRefresh(false);
   await notifier.setRefreshInterval(0);
+  if (mutedTerms.isNotEmpty) {
+    await notifier.setMutedTerms(mutedTerms);
+  }
 
   getIt.registerLazySingleton<SettingsService>(() => settings);
   getIt.registerLazySingleton<StorageService>(() => storage);
@@ -198,7 +203,9 @@ Future<void> _pumpFeed(
       child: const MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: RssFeedScreen(),
+        home: showSaved
+            ? const RssFeedScreen(showSavedArticles: true)
+            : const RssFeedScreen(),
       ),
     ),
   );
@@ -321,5 +328,83 @@ void main() {
     await repo.fetchSavedArticles(forceRefresh: true);
 
     expect(storage.savedReads, 2);
+  });
+
+  testWidgets('muted keywords hide matching articles from the feed tab', (
+    tester,
+  ) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    Article article(String id, String title, String description) => Article(
+      id: id,
+      title: title,
+      description: description,
+      fullContent: '',
+      link: 'https://example.com/$id',
+      sourceId: 'verge',
+      sourceName: 'Source',
+      pubDate: DateTime.fromMillisecondsSinceEpoch(now),
+    );
+    final storage = _CountingStorageService(
+      [
+        article('m1', 'Quantum rally', 'markets'),
+        article('ok1', 'Plain headline', 'nothing special'),
+      ],
+      <Article>[],
+    );
+    final repo = ArticleRepository(
+      storageService: storage,
+      workerFeedService: worker,
+    );
+    await repo.fetchAllArticles();
+    await repo.fetchSavedArticles();
+
+    await _pumpFeed(
+      tester,
+      storage: storage,
+      repository: repo,
+      mutedTerms: ['quantum'],
+    );
+
+    // The muted article is gone from the visible list entirely; the
+    // unmuted one is the front card of the stack.
+    expect(find.text('Quantum rally'), findsNothing);
+    expect(find.text('Plain headline'), findsOneWidget);
+  });
+
+  testWidgets('the saved tab is never muted-filtered', (tester) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final saved = Article(
+      id: 's1',
+      title: 'Quantum rally',
+      description: 'markets',
+      fullContent: '',
+      link: 'https://example.com/s1',
+      sourceId: 'verge',
+      sourceName: 'Source',
+      pubDate: DateTime.fromMillisecondsSinceEpoch(now),
+      isSaved: true,
+    );
+    final storage = _CountingStorageService(
+      <Article>[],
+      [saved],
+    );
+    final repo = ArticleRepository(
+      storageService: storage,
+      workerFeedService: worker,
+    );
+    await repo.fetchAllArticles();
+    await repo.fetchSavedArticles();
+
+    await _pumpFeed(
+      tester,
+      storage: storage,
+      repository: repo,
+      mutedTerms: ['quantum'],
+      showSaved: true,
+    );
+
+    // Saving was a deliberate act — the same muted term that hides the
+    // article from the feed must not hide it from Saved.
+    expect(find.text('Quantum rally'), findsOneWidget);
   });
 }

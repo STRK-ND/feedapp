@@ -276,6 +276,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewModeLabel => 'View Mode';
 
   @override
+  String get mutedKeywordsTitle => 'Muted keywords';
+
+  @override
+  String get mutedKeywordsSubtitle => 'Hide articles containing these words';
+
+  @override
+  String get mutedKeywordsAddLabel => 'Add keyword';
+
+  @override
+  String get mutedKeywordsEmpty => 'Nothing muted yet';
+
+  @override
+  String get mutedKeywordsRemoveLabel => 'Unmute';
+
+  @override
+  String mutedKeywordsCapSnack(int count) {
+    return 'You can mute up to $count keywords';
+  }
+
+  @override
+  String get dialogDone => 'Done';
+
+  @override
   String get markAllAsReadAction => 'Mark all as read';
 
   @override

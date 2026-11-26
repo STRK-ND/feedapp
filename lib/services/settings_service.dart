@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/rss_source.dart';
 import '../utils/constants.dart';
+import '../utils/mute_filter.dart';
 import '../utils/reader_theme.dart';
 import 'rss_feed_service.dart';
 import 'sync_hooks.dart';
@@ -137,6 +138,28 @@ class SettingsService {
       _getBool('in_app_notifications_enabled', true);
   Future<void> setInAppNotificationsEnabled(bool enabled) =>
       _setBool('in_app_notifications_enabled', enabled);
+
+  /// Muted keywords: articles whose title or description contains any of
+  /// these are hidden from the feed tab (the Saved tab is never filtered —
+  /// saving was a deliberate act). Mirrored to the worker via the push
+  /// subscription preferences and the `mute=` query param so both the
+  /// server-side list and the push fan-out honour the same list.
+  /// Stored as a StringList; reads and writes normalize through
+  /// [normalizeMutedTerms] so caps hold no matter which path wrote.
+  static const String _kMutedTermsKey = 'muted_terms';
+
+  Future<List<String>> getMutedTerms() async {
+    await init();
+    return normalizeMutedTerms(
+      _prefs.getStringList(_kMutedTermsKey) ?? const <String>[],
+    );
+  }
+
+  Future<void> setMutedTerms(List<String> terms) async {
+    await init();
+    await _prefs.setStringList(_kMutedTermsKey, normalizeMutedTerms(terms));
+    syncHooks?.onSettingsChanged();
+  }
 
   // ============================================
   // APP SETTINGS
@@ -424,6 +447,7 @@ class SettingsService {
     'notification_categories',
     'subscribed_source_ids',
     'custom_sources',
+    'muted_terms',
   ];
 
   /// Current values of all synced keys (absent keys are omitted).

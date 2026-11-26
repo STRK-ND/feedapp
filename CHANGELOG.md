@@ -5,6 +5,27 @@ All notable changes to Curated Feeds will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Mute filters (market roadmap Tier 1, feature 1):** a user-managed list of
+  muted keywords hides matching articles from the feed tab. Stored in
+  `SettingsService` (`muted_terms`), normalized by the shared contract in
+  `lib/utils/mute_filter.dart` (trim/lowercase/dedupe, 50 terms × 64 chars,
+  commas split terms), synced via the settings snapshot, and enforced at
+  three points: the feed screen's filter (Saved tab deliberately exempt),
+  the worker's `GET /articles` via a clamped `mute=` query param, and the
+  push fan-out — subscription rows carry `preferences.mutedTerms` and
+  `matchingTokens` skips tokens whose muted terms match a fresh article.
+  Managed from Settings → Feed Settings → Muted keywords; every add/remove
+  re-POSTs the push subscription so the server-side row mirrors without
+  waiting for the next app launch. Regression: `test/unit/utils/mute_filter_test.dart`,
+  the muted-terms groups in `test/unit/services/settings_service_test.dart`,
+  `test/unit/providers/muted_terms_test.dart`, the two mute tests in
+  `test/unit/screens/feed_launch_read_test.dart`, and the mute cases in
+  `workers/test/feed-worker.test.js` (param clamping, `applyFilters`,
+  `rowClearsMutes`, `matchingTokens` skip).
+
 ## [1.2.1] - 2026-11-01
 
 Hotfix release: Settings touch feedback and two local-read optimizations.
