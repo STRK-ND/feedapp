@@ -300,6 +300,25 @@ class AppLocalizationsHi extends AppLocalizations {
   String get bodySearchLockedCta => 'इन परिणामों को खोलने के लिए Pro लें';
 
   @override
+  String get summarizeCta => 'AI से सारांश बनाएँ';
+
+  @override
+  String get summarizingLabel => 'सारांश बन रहा है…';
+
+  @override
+  String get summaryTitle => 'AI सारांश';
+
+  @override
+  String get summaryBudgetSnack =>
+      'मासिक AI सारांश सीमा पूरी — अगले महीने पुनः प्रयास करें';
+
+  @override
+  String get summarySignInSnack => 'AI सारांश के लिए साइन इन करें';
+
+  @override
+  String get summaryFailedSnack => 'सारांश नहीं बन सका। फिर प्रयास करें।';
+
+  @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
 
   @override

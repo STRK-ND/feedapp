@@ -15,6 +15,8 @@ import '../services/tts_service.dart';
 import '../providers/settings_notifier.dart';
 import '../di/service_locator.dart';
 import '../services/analytics_service.dart';
+import '../services/storage_service.dart';
+import '../services/summarize_service.dart';
 import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/helpers.dart';
@@ -42,6 +44,8 @@ class ExpandedArticleCard extends StatefulWidget {
 }
 
 class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   bool _isLoadingContent = false;
   String? _fullContent;
 
@@ -148,6 +152,196 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     // Leaving the reader always silences playback.
     unawaited(_tts?.stop());
     super.dispose();
+  }
+
+  // =========================================================================
+  // AI summaries (market roadmap Tier 1, feature 4).
+  // =========================================================================
+
+  String? _summary;
+  bool _isSummarizing = false;
+  String? _summaryError;
+
+  /// The body the worker would summarize — the effective reader body.
+  String get _summarizableBody {
+    final body =
+        _fullContent ??
+        (widget.article.fullContent.isNotEmpty
+            ? widget.article.fullContent
+            : widget.article.description);
+    return body;
+  }
+
+  /// The action shows only when there is something substantial to
+  /// summarize (the worker rejects bodies under 200 chars) and no
+  /// summary is on screen yet.
+  bool get _canShowSummarize {
+    if (_summary != null) return false;
+    if (_isSummarizing) return true;
+    return _summarizableBody.trim().length >= kSummaryMinBodyChars;
+  }
+
+  Widget _buildSummarizeSection(ReaderPalette palette) {
+    if (_summary != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: palette.soft,
+              borderRadius: BorderRadius.circular(AppRadius.badge),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 14,
+                      color: palette.text,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _l10n.summaryTitle,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: palette.text,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  _summary!,
+                  style: _bodyStyle().copyWith(
+                    fontSize: 14,
+                    color: palette.text,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (!_canShowSummarize) return const SizedBox.shrink();
+
+    final l10n = _l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            if (_isSummarizing)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.auto_awesome_rounded, size: 16),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: _isSummarizing ? null : _onSummarize,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+              ),
+              child: Text(
+                _isSummarizing ? l10n.summarizingLabel : l10n.summarizeCta,
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (_summaryError != null)
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    _summaryError!,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _onSummarize() async {
+    final articleId = widget.article.id;
+    unawaited(AnalyticsService.logSummaryRequested(articleId: articleId));
+
+    final service = getIt<SummarizeService>();
+    final isPro = _isProUser;
+
+    // Free users get a small monthly trial; past it, the demonstrated
+    // intent routes to the paywall (R-1 pattern).
+    if (!isPro) {
+      final remaining = await service.remainingFreeTrial();
+      if (!mounted) return;
+      if (remaining <= 0) {
+        unawaited(AnalyticsService.logSummaryLocked());
+        unawaited(
+          AnalyticsService.logPaywallShown(
+            trigger: 'summary_trial',
+            savedCount: 0,
+          ),
+        );
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const PaywallScreen(entry: PaywallEntry.aiSummary),
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _isSummarizing = true;
+      _summaryError = null;
+    });
+
+    final result = await service.summarize(
+      widget.article,
+      persistentLookup: (id) => getIt<StorageService>().getSummary(id),
+      persist: (id, text) => getIt<StorageService>().saveSummary(id, text),
+    );
+    if (!mounted) return;
+    setState(() => _isSummarizing = false);
+
+    switch (result.status) {
+      case SummaryStatus.success:
+        setState(() => _summary = result.summary);
+        unawaited(AnalyticsService.logSummaryShown(articleId: articleId));
+        if (!isPro) await service.recordFreeUse();
+      case SummaryStatus.budgetExhausted:
+        setState(() => _summaryError = _l10n.summaryBudgetSnack);
+        unawaited(AnalyticsService.logSummaryError(articleId: articleId));
+      case SummaryStatus.authFailed:
+        setState(() => _summaryError = _l10n.summarySignInSnack);
+        unawaited(AnalyticsService.logSummaryError(articleId: articleId));
+      case SummaryStatus.rateLimited:
+      case SummaryStatus.failed:
+        setState(() => _summaryError = _l10n.summaryFailedSnack);
+        unawaited(AnalyticsService.logSummaryError(articleId: articleId));
+    }
   }
 
   Future<void> _loadPrefs() async {
@@ -733,6 +927,7 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                     letterSpacing: -0.4,
                                   ),
                                 ),
+                                _buildSummarizeSection(palette),
                                 const SizedBox(height: 20),
                                 Builder(
                                   builder: (context) {

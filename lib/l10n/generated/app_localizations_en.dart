@@ -312,6 +312,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodySearchLockedCta => 'Go Pro to open these results';
 
   @override
+  String get summarizeCta => 'Summarize with AI';
+
+  @override
+  String get summarizingLabel => 'Summarizing…';
+
+  @override
+  String get summaryTitle => 'AI SUMMARY';
+
+  @override
+  String get summaryBudgetSnack =>
+      'Monthly AI summary limit reached — try again next month';
+
+  @override
+  String get summarySignInSnack => 'Sign in to use AI summaries';
+
+  @override
+  String get summaryFailedSnack => 'Could not summarize. Try again.';
+
+  @override
   String get markAllAsReadAction => 'Mark all as read';
 
   @override

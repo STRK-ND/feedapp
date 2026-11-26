@@ -596,6 +596,42 @@ abstract class AppLocalizations {
   /// **'Go Pro to open these results'**
   String get bodySearchLockedCta;
 
+  /// No description provided for @summarizeCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize with AI'**
+  String get summarizeCta;
+
+  /// No description provided for @summarizingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarizing…'**
+  String get summarizingLabel;
+
+  /// No description provided for @summaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI SUMMARY'**
+  String get summaryTitle;
+
+  /// No description provided for @summaryBudgetSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly AI summary limit reached — try again next month'**
+  String get summaryBudgetSnack;
+
+  /// No description provided for @summarySignInSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to use AI summaries'**
+  String get summarySignInSnack;
+
+  /// No description provided for @summaryFailedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not summarize. Try again.'**
+  String get summaryFailedSnack;
+
   /// No description provided for @markAllAsReadAction.
   ///
   /// In en, this message translates to:

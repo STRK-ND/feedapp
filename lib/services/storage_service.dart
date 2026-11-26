@@ -63,6 +63,25 @@ class StorageService {
     }
   }
 
+  /// Cached AI summary for [articleId], or null (passthrough).
+  Future<String?> getSummary(String articleId) async {
+    try {
+      return await _database.getSummary(articleId);
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Failed to read summary', error: e));
+      return null;
+    }
+  }
+
+  /// Persist an AI summary (passthrough).
+  Future<void> saveSummary(String articleId, String text) async {
+    try {
+      await _database.saveSummary(articleId, text);
+    } catch (e) {
+      unawaited(ErrorHandler.logError('Failed to save summary', error: e));
+    }
+  }
+
   /// Full-text (body) search passthrough. Null means the device's SQLite
   /// lacks FTS5 and the caller must fall back to the substring filter.
   Future<List<BodySearchHit>?> searchBodies(

@@ -113,6 +113,21 @@ class AnalyticsService {
       _log('body_search_locked', {'match_count': matchCount});
 
   // =========================================================================
+  // AI summaries (market roadmap Tier 1, feature 4).
+  // =========================================================================
+
+  static Future<void> logSummaryRequested({required String articleId}) =>
+      _log('summary_requested', {'article_id': articleId});
+
+  static Future<void> logSummaryShown({required String articleId}) =>
+      _log('summary_shown', {'article_id': articleId});
+
+  static Future<void> logSummaryError({required String articleId}) =>
+      _log('summary_error', {'article_id': articleId});
+
+  static Future<void> logSummaryLocked() => _log('summary_locked', {});
+
+  // =========================================================================
   // In-app review prompt (R-4).
   // =========================================================================
 

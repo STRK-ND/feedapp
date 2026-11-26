@@ -133,6 +133,9 @@ export default {
         if (!(await isAuthorized(request, env))) return json({ error: 'unauthorized' }, 401);
         return await handleUnsubscribe(request, env);
       }
+      if (url.pathname === '/summarize' && request.method === 'POST') {
+        return await handleSummarize(request, env);
+      }
       return json({ error: 'not_found' }, 404);
     } catch (e) {
       // Log details to structured logs only — never echo exception text to
@@ -763,6 +766,168 @@ function xmlDecodeUrl(url) {
 }
 
 // ---------------------------------------------------------------------------
+// Pro AI summaries (market roadmap Tier 1, feature 4).
+//
+// POST /summarize { articleId, text } → { summary }.
+//
+// Auth model: the shared API_SECRET ships in the APK (M-2 called the
+// app-level routes "effectively public"), so budget keying must not trust
+// client-supplied identity. Callers present a Firebase ID token; it is
+// verified against Google's Identity Toolkit lookup (the Web API key is
+// public by design) and the REAL uid keys the monthly budget. Fail closed
+// when FIREBASE_API_KEY is not configured. Verified tokens are cached in
+// KV for 55 minutes (same pattern as the FCM access token).
+//
+// Budget: one counter per uid per calendar month in KV. The client gates
+// the UI on Pro (free users see a 5/month trial in the UI); the server
+// budget is the abuse backstop for scripted callers, so it is a single
+// per-uid number, not a per-tier one. The get-then-put increment is
+// advisory under concurrency (KV has no compare-and-swap — same caveat as
+// the rate limiter, L-1).
+// ---------------------------------------------------------------------------
+
+const SUMMARIZE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const SUMMARIZE_MAX_TEXT_CHARS = 8000;
+const SUMMARIZE_MAX_ARTICLE_ID_CHARS = 200;
+const SUMMARIZE_MONTHLY_LIMIT_DEFAULT = 50;
+const SUMMARIZE_IP_RATE = { limit: 10, windowSec: 60 };
+const SUMMARIZE_UID_RATE = { limit: 6, windowSec: 60 };
+const ID_TOKEN_CACHE_TTL_SECONDS = 55 * 60;
+
+/// Resolve the caller's Firebase uid from the Authorization: Bearer ID
+/// token, via KV cache or a live Identity Toolkit lookup. null when the
+/// token is missing/invalid or the lookup is not configured.
+async function resolveUid(request, env) {
+  if (!env.FIREBASE_API_KEY) {
+    console.error('firebase_api_key_not_configured');
+    return null;
+  }
+  const header = request.headers.get('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (token.length < 20 || token.length > 4096) return null;
+
+  const cacheKey = 'idtoken:' + (await sha1Hex(token));
+  const cached = await env.ARTICLES_KV.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: token }),
+      },
+    );
+    if (!response.ok) {
+      console.warn('idtoken_lookup_failed', { status: response.status });
+      return null;
+    }
+    const data = await response.json();
+    const uid = data?.users?.[0]?.localId;
+    if (typeof uid !== 'string' || uid.length === 0 || uid.length > 128) {
+      return null;
+    }
+    await env.ARTICLES_KV.put(cacheKey, uid, {
+      expirationTtl: ID_TOKEN_CACHE_TTL_SECONDS,
+    });
+    return uid;
+  } catch (e) {
+    console.warn('idtoken_lookup_error', { error: String(e) });
+    return null;
+  }
+}
+
+/// The monthly budget counter key for [uid].
+function summarizeBudgetKey(uid) {
+  const now = new Date();
+  const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  return `summarize:${uid}:${ym}`;
+}
+
+/// Consume one unit of the caller's monthly budget. Returns the remaining
+/// allowance, or null when the budget is exhausted.
+async function consumeSummaryBudget(env, uid) {
+  const key = summarizeBudgetKey(uid);
+  const limit =
+    typeof env.SUMMARIZE_MONTHLY_LIMIT === 'number' &&
+    env.SUMMARIZE_MONTHLY_LIMIT > 0
+      ? env.SUMMARIZE_MONTHLY_LIMIT
+      : SUMMARIZE_MONTHLY_LIMIT_DEFAULT;
+  const current = await env.ARTICLES_KV.get(key, 'json');
+  const used = typeof current?.n === 'number' ? current.n : 0;
+  if (used >= limit) return null;
+  // ~40 days TTL: always outlives the current calendar month.
+  await env.ARTICLES_KV.put(key, JSON.stringify({ n: used + 1 }), {
+    expirationTtl: 40 * 24 * 3600,
+  });
+  return limit - used - 1;
+}
+
+/// Build the summarization prompt. Kept pure for tests.
+function summarizePrompt(text) {
+  return (
+    'Summarize the following article in at most 3 short bullet points, ' +
+    '60 words total maximum. Reply in the same language as the article. ' +
+    'Do not add commentary.\n\n' +
+    text
+  );
+}
+
+async function handleSummarize(request, env) {
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (!(await consumeRate(env, 'summarize:' + ip, SUMMARIZE_IP_RATE.limit, SUMMARIZE_IP_RATE.windowSec))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  const uid = await resolveUid(request, env);
+  if (uid === null) return json({ error: 'unauthorized' }, 401);
+  if (!(await consumeRate(env, 'summarize-uid:' + uid, SUMMARIZE_UID_RATE.limit, SUMMARIZE_UID_RATE.windowSec))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'invalid_json' }, 400);
+  }
+  const articleId = typeof body?.articleId === 'string' ? body.articleId.trim().slice(0, SUMMARIZE_MAX_ARTICLE_ID_CHARS) : '';
+  const text = typeof body?.text === 'string' ? body.text.trim().slice(0, SUMMARIZE_MAX_TEXT_CHARS) : '';
+  if (!articleId || text.length < 200) {
+    return json({ error: 'invalid_body' }, 400);
+  }
+
+  const remaining = await consumeSummaryBudget(env, uid);
+  if (remaining === null) {
+    return json({ error: 'budget_exhausted' }, 429);
+  }
+
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    console.error('ai_binding_not_configured');
+    return json({ error: 'summarize_unavailable' }, 503);
+  }
+
+  try {
+    const result = await env.AI.run(SUMMARIZE_MODEL, {
+      messages: [
+        { role: 'user', content: summarizePrompt(text) },
+      ],
+      max_tokens: 256,
+    });
+    const summary = typeof result?.response === 'string' ? result.response.trim() : '';
+    if (!summary) {
+      console.warn('summarize_empty_response', { uid });
+      return json({ error: 'summarize_failed' }, 502);
+    }
+    return json({ summary, remaining });
+  } catch (e) {
+    console.error('summarize_model_failed', { error: String(e) });
+    return json({ error: 'summarize_failed' }, 502);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Teaser-feed full-text extraction
 // ---------------------------------------------------------------------------
 
@@ -1236,4 +1401,4 @@ function cors(response, { etag } = {}) {
 // fresh env but runs inside the same rate window must be able to start clean.
 function resetRateMemory() { RATE_MEMORY.clear(); }
 
-export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, rowClearsMutes, isTeaser, fetchArticleText, extractMainText, attachExtractedFullContent, shedFullContentForLimit, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };
+export { SOURCES, parseRss, extractRssItems, extractAtomEntries, buildArticle, stableId, parseDate, extractTag, strip, signRs256, base64UrlEncode, ARTICLES_CACHE_KEY, SOURCES_OVERRIDE_KEY, getSourceList, parseArticleParams, applyFilters, consumeRate, matchingTokens, rowMatchesCategories, rowClearsMutes, isTeaser, fetchArticleText, extractMainText, attachExtractedFullContent, shedFullContentForLimit, resolveUid, consumeSummaryBudget, summarizePrompt, handleSummarize, isAuthorized, secretsMatch, timingSafeEqual, sha1Hex, resetRateMemory };

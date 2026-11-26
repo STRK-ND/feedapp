@@ -45,6 +45,7 @@ class FeedDatabase {
   static const String _savedTable = 'saved_articles';
   static const String _articlesFtsTable = 'articles_fts';
   static const String _savedFtsTable = 'saved_fts';
+  static const String _summariesTable = 'summaries';
 
   /// False when the device's SQLite build lacks FTS5 (rare on API 21+).
   /// [searchBodies] returns null in that case and callers fall back to
@@ -71,7 +72,7 @@ class FeedDatabase {
         : '${await getDatabasesPath()}/';
     final opened = await openDatabase(
       '$dirPath$path',
-      version: 3,
+      version: 4,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: migrate,
     );
@@ -104,6 +105,13 @@ class FeedDatabase {
       )
     ''');
     await _createFtsTables(db);
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $_summariesTable (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   /// FTS5 virtual tables over the searchable body text (title +
@@ -190,6 +198,15 @@ class FeedDatabase {
     if (oldVersion < 3) {
       final ftsAvailable = await createFtsTablesForTest(db);
       if (ftsAvailable) await _backfillFts(db);
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS $_summariesTable (
+          id TEXT PRIMARY KEY,
+          text TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      ''');
     }
   }
 
@@ -515,11 +532,41 @@ class FeedDatabase {
     await db.transaction((txn) async {
       await txn.delete(_articlesTable);
       await txn.delete(_savedTable);
+      await txn.delete(_summariesTable);
       if (_ftsAvailable) {
         await txn.delete(_articlesFtsTable);
         await txn.delete(_savedFtsTable);
       }
     });
+  }
+
+  /// Cached AI summary for [articleId], or null. Summaries are immutable
+  /// per body text, so a cache hit never re-spends budget.
+  Future<String?> getSummary(String articleId) async {
+    try {
+      final db = await _open();
+      final rows = await db.query(
+        _summariesTable,
+        columns: ['text'],
+        where: 'id = ?',
+        whereArgs: [articleId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return rows.first['text'] as String?;
+    } catch (e) {
+      debugPrint('[FeedDatabase] getSummary failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveSummary(String articleId, String text) async {
+    final db = await _open();
+    await db.insert(_summariesTable, {
+      'id': articleId,
+      'text': text,
+      'created_at': _nowMs(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// Full-text (body) search over the cached feed or the saved list.

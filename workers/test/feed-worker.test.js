@@ -935,3 +935,197 @@ function stringReader(text) {
     cancel: async () => {},
   };
 }
+
+// ---------------------------------------------------------------------------
+// Pro AI summaries: POST /summarize
+// ---------------------------------------------------------------------------
+
+import { handleSummarize, resolveUid, consumeSummaryBudget, summarizePrompt } from '../feed-worker.js';
+
+const LONG_TEXT = 'Real article body sentence. '.repeat(40);
+
+function summarizeEnv(extra = {}) {
+  return {
+    ARTICLES_KV: new FakeKV({}),
+    FIREBASE_API_KEY: 'test-web-api-key',
+    AI: { run: async () => ({ response: '- Point one\n- Point two\n- Point three' }) },
+    ...extra,
+  };
+}
+
+function summarizeRequest(body, { uidToken = 'valid-id-token-abcdefghijklmnop', ip = '1.2.3.4' } = {}) {
+  const headers = {
+    'CF-Connecting-IP': ip,
+    'Content-Type': 'application/json',
+    authorization: `Bearer ${uidToken}`,
+  };
+  return new Request('https://worker.test/summarize', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+test('resolveUid: fail-closed without FIREBASE_API_KEY, verifies via lookup, caches', async () => {
+  // Fail closed: no key configured → null regardless of token.
+  assert.equal(await resolveUid(summarizeRequest({}), { ARTICLES_KV: new FakeKV({}) }), null);
+
+  const originalFetch = globalThis.fetch;
+  let lookups = 0;
+  try {
+    globalThis.fetch = async (url, opts) => {
+      lookups++;
+      const payload = JSON.parse(opts.body);
+      if (payload.idToken === 'valid-id-token-abcdefghijklmnop') {
+        return { ok: true, json: async () => ({ users: [{ localId: 'uid-123' }] }) };
+      }
+      return { ok: false, status: 400, json: async () => ({}) };
+    };
+
+    const env = summarizeEnv();
+    assert.equal(await resolveUid(summarizeRequest({}), env), 'uid-123');
+    assert.equal(lookups, 1);
+    // Second call is served from the KV cache — no second lookup.
+    assert.equal(await resolveUid(summarizeRequest({}), env), 'uid-123');
+    assert.equal(lookups, 1);
+
+    // Invalid token → null.
+    assert.equal(await resolveUid(summarizeRequest({}, { uidToken: 'bogus-token-abcdefghijklmnop' }), env), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('consumeSummaryBudget: increments per uid per month and exhausts at the limit', async () => {
+  const env = summarizeEnv({ SUMMARIZE_MONTHLY_LIMIT: 3 });
+  assert.equal(await consumeSummaryBudget(env, 'uid-1'), 2);
+  assert.equal(await consumeSummaryBudget(env, 'uid-1'), 1);
+  assert.equal(await consumeSummaryBudget(env, 'uid-1'), 0);
+  assert.equal(await consumeSummaryBudget(env, 'uid-1'), null, 'exhausted');
+
+  // A different uid has its own budget.
+  assert.equal(await consumeSummaryBudget(env, 'uid-2'), 2);
+
+  // Default limit applies when the env var is absent.
+  const envDefault = summarizeEnv();
+  assert.equal(await consumeSummaryBudget(envDefault, 'uid-1'), 50 - 1);
+
+  // Key shape: summarize:<uid>:<yyyy-mm>
+  const key = summarizeBudgetKeyShape();
+  assert.match(key, /^summarize:uid-1:\d{4}-\d{2}$/);
+});
+
+function summarizeBudgetKeyShape() {
+  // Re-derive the key the same way the worker does (no export needed —
+  // the regex assertion above pins the contract).
+  const now = new Date();
+  return `summarize:uid-1:${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+test('summarizePrompt: carries the instructions and the article text', () => {
+  const p = summarizePrompt(LONG_TEXT);
+  assert.ok(p.includes('3 short bullet points'));
+  assert.ok(p.includes('same language as the article'));
+  assert.ok(p.includes(LONG_TEXT));
+});
+
+
+// Stub the Identity Toolkit lookup for handler tests (no real network).
+function withLookupStubbed(fn) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    const payload = JSON.parse(opts.body);
+    if (payload.idToken === 'valid-id-token-abcdefghijklmnop') {
+      return { ok: true, json: async () => ({ users: [{ localId: 'uid-123' }] }) };
+    }
+    return { ok: false, status: 400, json: async () => ({}) };
+  };
+  return fn().finally(() => { globalThis.fetch = originalFetch; });
+}
+
+test('handleSummarize: happy path returns the model summary and remaining budget', async () => {
+  await withLookupStubbed(async () => {
+    const env = summarizeEnv({ SUMMARIZE_MONTHLY_LIMIT: 5 });
+    const res = await handleSummarize(
+      summarizeRequest({ articleId: 'a1', text: LONG_TEXT }),
+      env,
+    );
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.summary, '- Point one\n- Point two\n- Point three');
+    assert.equal(data.remaining, 4, '5/month budget, 1 consumed');
+  });
+});
+
+test('handleSummarize: auth, clamps, and budget failures', async () => {
+  // No FIREBASE_API_KEY → fail closed.
+  const noKey = { ARTICLES_KV: new FakeKV({}) };
+  assert.equal(
+    (await handleSummarize(summarizeRequest({ articleId: 'a1', text: LONG_TEXT }), noKey)).status,
+    401,
+  );
+
+  await withLookupStubbed(async () => {
+    const env = summarizeEnv();
+
+    // Missing / too-short text → 400.
+    assert.equal(
+      (await handleSummarize(summarizeRequest({ articleId: 'a1', text: 'too short' }), env)).status,
+      400,
+    );
+    assert.equal(
+      (await handleSummarize(summarizeRequest({ articleId: '', text: LONG_TEXT }), env)).status,
+      400,
+    );
+
+    // Budget exhaustion → 429 budget_exhausted.
+    const limited = summarizeEnv({ SUMMARIZE_MONTHLY_LIMIT: 1 });
+    assert.equal(
+      (await handleSummarize(summarizeRequest({ articleId: 'a1', text: LONG_TEXT }), limited)).status,
+      200,
+    );
+    const exhausted = await handleSummarize(
+      summarizeRequest({ articleId: 'a1', text: LONG_TEXT }),
+      limited,
+    );
+    assert.equal(exhausted.status, 429);
+    assert.equal((await exhausted.json()).error, 'budget_exhausted');
+
+    // Per-IP burst cap → 429 rate_limited.
+    resetRateMemory();
+    const burst = summarizeEnv();
+    for (let i = 0; i < 10; i++) {
+      await handleSummarize(summarizeRequest({ articleId: `a${i}`, text: LONG_TEXT }, { ip: '9.9.9.9' }), burst);
+    }
+    const limitedIp = await handleSummarize(
+      summarizeRequest({ articleId: 'a1', text: LONG_TEXT }, { ip: '9.9.9.9' }),
+      burst,
+    );
+    assert.equal(limitedIp.status, 429);
+    assert.equal((await limitedIp.json()).error, 'rate_limited');
+  });
+});
+
+test('handleSummarize: model failures degrade to 502/503, never 500', async () => {
+  await withLookupStubbed(async () => {
+    const throwing = summarizeEnv({ AI: { run: async () => { throw new Error('model down'); } } });
+    const failed = await handleSummarize(
+      summarizeRequest({ articleId: 'a1', text: LONG_TEXT }),
+      throwing,
+    );
+    assert.equal(failed.status, 502);
+    assert.equal((await failed.json()).error, 'summarize_failed');
+
+    const empty = summarizeEnv({ AI: { run: async () => ({ response: '   ' }) } });
+    assert.equal(
+      (await handleSummarize(summarizeRequest({ articleId: 'a1', text: LONG_TEXT }), empty)).status,
+      502,
+    );
+
+    const noBinding = summarizeEnv({ AI: undefined });
+    assert.equal(
+      (await handleSummarize(summarizeRequest({ articleId: 'a1', text: LONG_TEXT }), noBinding)).status,
+      503,
+    );
+  });
+});

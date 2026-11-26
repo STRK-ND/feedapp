@@ -20,6 +20,18 @@ class AuthService {
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   bool get isSignedIn => _auth.currentUser != null;
 
+  /// A fresh Firebase ID token for the signed-in user, or null when
+  /// signed out. Refreshes automatically when the cached one is stale.
+  Future<String?> getIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    try {
+      return await user.getIdToken();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _ensureGoogleInitialized() async {
     if (_googleInitialized) return;
     await _google.initialize();

@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pro AI summaries (market roadmap Tier 1, feature 4):** a "Summarize
+  with AI" action on the reader card (3 bullets, ≤60 words, article's own
+  language) served by a new worker route `POST /summarize` on the
+  Cloudflare Workers AI binding (`@cf/meta/llama-3.1-8b-instruct`). Auth
+  model: the shared API_SECRET ships in the APK (M-2: effectively
+  public), so budget keying never trusts client identity — callers
+  present a Firebase ID token verified via the Identity Toolkit lookup
+  (Web API key, public by design; KV-cached 55 min; fail closed when
+  `FIREBASE_API_KEY` is unset) and the REAL uid keys the monthly budget
+  (`summarize:{uid}:{yyyy-mm}`, default 50/month, get-then-put advisory
+  per the L-1 KV caveat) with per-IP (10/min) and per-uid (6/min) rate
+  limits. Bodies are clamped to 8 000 chars client-side; the worker
+  re-clamps and rejects bodies under 200 chars. Client: summaries are
+  cached in memory and a new `summaries` SQLite table (schema v3→v4) so
+  a summary bought with budget once is never bought again; free users
+  get a 5/month trial in the UI, past which the demonstrated intent
+  routes to the paywall (`ai_summary` entry, `summary_requested/shown/
+  error/locked` analytics). Regression:
+  `test/unit/services/summarize_service_test.dart` (body selection,
+  trial counter, cache-before-network, response mapping) and
+  `test/unit/widgets/summary_gate_test.dart` (trial gate → paywall,
+  Pro path, trial tick); the `/summarize` group in
+  `workers/test/feed-worker.test.js` (auth fail-closed, lookup caching,
+  budget, clamps, model-failure degradation).
 - **Full-text body search (market roadmap Tier 1, feature 3):** SQLite FTS5
   virtual tables over title + description + extracted body, schema v2→v3
   with a one-time backfill of existing rows. Index maintenance lives in

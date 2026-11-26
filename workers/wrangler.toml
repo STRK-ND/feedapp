@@ -18,3 +18,10 @@ id = "5e2bee05f76043c7add1d6b2178dca6d"
 # Cron trigger — refreshes feed cache every 5 minutes.
 [triggers]
 crons = ["*/5 * * * *"]
+
+# Workers AI — Pro article summaries (POST /summarize). Secrets (wrangler
+# secret put): API_SECRET, FCM_SERVICE_ACCOUNT, FCM_PROJECT_ID,
+# FIREBASE_API_KEY (the public Web API key), SUMMARIZE_MONTHLY_LIMIT
+# (optional, default 50).
+[ai]
+binding = "AI"
