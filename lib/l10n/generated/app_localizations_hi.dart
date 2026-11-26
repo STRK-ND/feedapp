@@ -319,6 +319,21 @@ class AppLocalizationsHi extends AppLocalizations {
   String get summaryFailedSnack => 'सारांश नहीं बन सका। फिर प्रयास करें।';
 
   @override
+  String get noteDialogTitle => 'नोट';
+
+  @override
+  String get noteHint => 'नोट जोड़ें…';
+
+  @override
+  String get noteSaveAction => 'सहेजें';
+
+  @override
+  String get noteSavedSnack => 'नोट सहेजा गया';
+
+  @override
+  String get exportSavedLabel => 'सहेजे गए लेख निर्यात करें';
+
+  @override
   String get markAllAsReadAction => 'सभी को पढ़ा हुआ चिह्नित करें';
 
   @override

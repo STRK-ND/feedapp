@@ -632,6 +632,36 @@ abstract class AppLocalizations {
   /// **'Could not summarize. Try again.'**
   String get summaryFailedSnack;
 
+  /// No description provided for @noteDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get noteDialogTitle;
+
+  /// No description provided for @noteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a note…'**
+  String get noteHint;
+
+  /// No description provided for @noteSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get noteSaveAction;
+
+  /// No description provided for @noteSavedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Note saved'**
+  String get noteSavedSnack;
+
+  /// No description provided for @exportSavedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Export saved articles'**
+  String get exportSavedLabel;
+
   /// No description provided for @markAllAsReadAction.
   ///
   /// In en, this message translates to:

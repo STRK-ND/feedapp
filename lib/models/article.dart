@@ -22,6 +22,12 @@ class Article {
   bool isSaved;
   String? fetchedFullContent;
 
+  /// User's personal note on the article (Saved-collection feature).
+  /// Mutable like the triage flags: the reader mutates the shared
+  /// instance and the screen persists the row (data-layer L9 pattern).
+  /// Travels inside the payload JSON, so cloud sync carries it for free.
+  String userNote;
+
   Article({
     required this.id,
     required this.title,
@@ -39,6 +45,7 @@ class Article {
     this.isRead = false,
     this.isSaved = false,
     this.fetchedFullContent,
+    this.userNote = '',
   });
 
   Map<String, dynamic> toJson() {
@@ -58,6 +65,7 @@ class Article {
       'sourceIcon': sourceIcon,
       'isRead': isRead,
       'isSaved': isSaved,
+      'userNote': userNote,
       'fetchedFullContent': fetchedFullContent,
     };
   }
@@ -104,6 +112,7 @@ class Article {
       isRead: json['isRead'] as bool? ?? false,
       isSaved: json['isSaved'] as bool? ?? false,
       fetchedFullContent: json['fetchedFullContent'] as String?,
+      userNote: json['userNote'] as String? ?? '',
     );
   }
 
@@ -124,6 +133,7 @@ class Article {
     bool? isRead,
     bool? isSaved,
     String? fetchedFullContent,
+    String? userNote,
   }) {
     return Article(
       id: id ?? this.id,
@@ -142,6 +152,7 @@ class Article {
       isRead: isRead ?? this.isRead,
       isSaved: isSaved ?? this.isSaved,
       fetchedFullContent: fetchedFullContent ?? this.fetchedFullContent,
+      userNote: userNote ?? this.userNote,
     );
   }
 }

@@ -344,6 +344,51 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
     }
   }
 
+  /// Edit the personal note (Saved articles only — the button is hidden
+  /// otherwise). Mutates the shared article instance; the row is persisted
+  /// here because the Saved-tab entry point's onClose does not re-save.
+  Future<void> _onEditNote() async {
+    final controller = TextEditingController(text: widget.article.userNote);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_l10n.noteDialogTitle),
+        content: TextField(
+          controller: controller,
+          maxLines: 6,
+          autofocus: true,
+          textInputAction: TextInputAction.newline,
+          decoration: InputDecoration(hintText: _l10n.noteHint),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(_l10n.dialogCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(_l10n.noteSaveAction),
+          ),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+
+    setState(() {
+      widget.article.userNote = controller.text.trim();
+    });
+    try {
+      await getIt<StorageService>().saveSavedArticle(widget.article);
+    } catch (_) {
+      // Persistence failure must not lose the in-session note; the
+      // onClose path re-saves for feed-tab entries anyway.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(_l10n.noteSavedSnack)));
+  }
+
   Future<void> _loadPrefs() async {
     final notifier = context.read<SettingsNotifier>();
     if (!mounted) return;
@@ -782,6 +827,19 @@ class _ExpandedArticleCardState extends State<ExpandedArticleCard> {
                                         ? 'Saved'
                                         : 'Save',
                                   ),
+                                  // Personal note — a Saved-collection
+                                  // feature: notes live in the article
+                                  // payload (cloud sync carries them) and
+                                  // ride the Markdown export.
+                                  if (widget.article.isSaved)
+                                    buildHeaderButton(
+                                      icon: widget.article.userNote.isEmpty
+                                          ? Icons.sticky_note_2_outlined
+                                          : Icons.sticky_note_2,
+                                      onPressed: _onEditNote,
+                                      color: sourceColor,
+                                      label: 'Note',
+                                    ),
                                   buildHeaderButton(
                                     icon: Icons.close_rounded,
                                     onPressed: widget.onClose,

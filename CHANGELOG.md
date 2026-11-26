@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Saved-collection notes + Markdown export (market roadmap Tier 2,
+  feature 5):** a Note action on saved articles in the reader (hidden for
+  unsaved ones — notes belong to the Saved collection); the note lives
+  in the article payload, so cloud sync carries it across devices with
+  no schema work. An "Export saved articles" menu item on the Saved tab
+  shares the whole collection as Markdown (title, source, date, link,
+  note as blockquotes) with injection-safe content cleaning — a title or
+  note line can never forge headings or lists inside the export.
+  `saved_export` analytics event with the article count. Regression:
+  `test/unit/utils/saved_export_test.dart` (format, notes, injection
+  safety, userNote payload roundtrip incl. legacy rows) and the note
+  dialog test in `test/unit/widgets/expanded_article_card_test.dart`.
 - **Pro AI summaries (market roadmap Tier 1, feature 4):** a "Summarize
   with AI" action on the reader card (3 bullets, ≤60 words, article's own
   language) served by a new worker route `POST /summarize` on the

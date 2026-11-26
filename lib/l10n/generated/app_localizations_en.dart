@@ -331,6 +331,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get summaryFailedSnack => 'Could not summarize. Try again.';
 
   @override
+  String get noteDialogTitle => 'Note';
+
+  @override
+  String get noteHint => 'Add a note…';
+
+  @override
+  String get noteSaveAction => 'Save';
+
+  @override
+  String get noteSavedSnack => 'Note saved';
+
+  @override
+  String get exportSavedLabel => 'Export saved articles';
+
+  @override
   String get markAllAsReadAction => 'Mark all as read';
 
   @override

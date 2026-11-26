@@ -127,6 +127,10 @@ class AnalyticsService {
 
   static Future<void> logSummaryLocked() => _log('summary_locked', {});
 
+  /// Saved-collection Markdown export (Tier 2, feature 5).
+  static Future<void> logSavedExport({required int articleCount}) =>
+      _log('saved_export', {'article_count': articleCount});
+
   // =========================================================================
   // In-app review prompt (R-4).
   // =========================================================================

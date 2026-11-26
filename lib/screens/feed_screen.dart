@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../models/article.dart';
@@ -30,6 +31,7 @@ import '../utils/constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/error_handler.dart';
 import '../utils/mute_filter.dart';
+import '../utils/saved_export.dart';
 import '../services/rss_feed_service.dart';
 import '../di/service_locator.dart';
 import 'settings_screen.dart';
@@ -1509,6 +1511,22 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                             );
                           }
                         }
+                      } else if (value == 'export_saved') {
+                        // Tier 2: the Saved collection as Markdown — every
+                        // kept article with its note, shareable to any
+                        // notes app.
+                        if (_savedArticles.isEmpty) return;
+                        final markdown = buildSavedExportMarkdown(
+                          _savedArticles,
+                        );
+                        unawaited(
+                          AnalyticsService.logSavedExport(
+                            articleCount: _savedArticles.length,
+                          ),
+                        );
+                        await SharePlus.instance.share(
+                          ShareParams(text: markdown),
+                        );
                       } else if (value == 'settings') {
                         unawaited(
                           Navigator.push(
@@ -1529,6 +1547,17 @@ class _RssFeedScreenState extends State<RssFeedScreen>
                               const Icon(Icons.system_update),
                               const SizedBox(width: 12),
                               Text(_l10n.checkForUpdates),
+                            ],
+                          ),
+                        ),
+                      if (_selectedTab == 1 && _savedArticles.isNotEmpty)
+                        PopupMenuItem(
+                          value: 'export_saved',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.ios_share),
+                              const SizedBox(width: 12),
+                              Text(_l10n.exportSavedLabel),
                             ],
                           ),
                         ),

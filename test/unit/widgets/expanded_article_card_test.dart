@@ -7,6 +7,7 @@ import 'package:curatedfeeds/models/article.dart';
 import 'package:curatedfeeds/providers/settings_notifier.dart';
 import 'package:curatedfeeds/services/article_content_service.dart';
 import 'package:curatedfeeds/services/settings_service.dart';
+import 'package:curatedfeeds/services/storage_service.dart';
 import 'package:curatedfeeds/widgets/expanded_article_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,17 @@ class _RecordingContentService extends ArticleContentService {
   Future<String> fetchArticleContent(String url) async {
     calls++;
     return 'Client-fetched body that must not be used.';
+  }
+}
+
+/// StorageService double recording saved-row writes — the note dialog
+/// persists through it.
+class _RecordingStorageService extends StorageService {
+  final List<Article> savedRows = [];
+
+  @override
+  Future<void> saveSavedArticle(Article article) async {
+    savedRows.add(article);
   }
 }
 
@@ -69,6 +81,7 @@ void main() {
     await getIt.reset();
     contentService = _RecordingContentService();
     getIt.registerSingleton<ArticleContentService>(contentService);
+    getIt.registerSingleton<StorageService>(_RecordingStorageService());
   });
 
   testWidgets('server-extracted fullContent renders without a client fetch', (
@@ -102,5 +115,36 @@ void main() {
     // itself and caches it on the article.
     expect(contentService.calls, 1);
     expect(article.fetchedFullContent, isNotNull);
+  });
+
+  testWidgets('note dialog: hidden for unsaved, saves for saved articles', (
+    tester,
+  ) async {
+    final storage = getIt<StorageService>() as _RecordingStorageService;
+
+    // Unsaved article: no Note button (icon-only header buttons carry
+    // semantic labels, so find by icon).
+    final unsaved = _article(fullContent: 'F' * 300, description: 'Teaser.');
+    await _pumpCard(tester, unsaved);
+    expect(find.byIcon(Icons.sticky_note_2_outlined), findsNothing);
+
+    // Saved article: Note button opens the dialog; saving mutates the
+    // shared article and persists the row.
+    final saved = _article(fullContent: 'F' * 300, description: 'Teaser.')
+      ..isSaved = true;
+    await _pumpCard(tester, saved);
+    await tester.tap(find.byIcon(Icons.sticky_note_2_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Key takeaway: cache it');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(saved.userNote, 'Key takeaway: cache it');
+    expect(storage.savedRows, hasLength(1));
+    expect(storage.savedRows.single.id, saved.id);
+    expect(find.text('Note saved'), findsOneWidget);
+    // The button flips to the filled icon once a note exists.
+    expect(find.byIcon(Icons.sticky_note_2), findsOneWidget);
   });
 }
